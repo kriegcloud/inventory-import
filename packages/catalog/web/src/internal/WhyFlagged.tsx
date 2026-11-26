@@ -4,6 +4,7 @@
 // (`Problem.message`, `Proposal.basis`); nothing is reworded or guessed.
 import { Code } from "@inventory/ui/Code"
 import type { ReviewRow } from "@inventory/review/ReviewTypes"
+import * as O from "effect/Option"
 import { problemKinds, type Proposal, type Review, rowPlace } from "@inventory/catalog-model/Review"
 
 /** How many rows the panel lists in full; past it, it says how many more and how to narrow the view. */
@@ -27,10 +28,10 @@ export function WhyFlagged(props: { rows: ReadonlyArray<ReviewRow>; current: Rev
     // A form-only fix already in force is not a reason the row waits: it is listed under the row's changes.
     const open = reviewed.problems.filter(
       (problem) =>
-        problem.proposal === null ||
-        !problem.proposal.lossless ||
-        problem.field === null ||
-        reviewed.values[problem.field] !== problem.proposal.to
+        !O.exists(
+          problem.proposal,
+          (proposal) => proposal.lossless && problem.field !== null && reviewed.values[problem.field] === proposal.to
+        )
     )
     return open.length === 0 ? [] : [{ ...reviewed, problems: open }]
   })
@@ -51,7 +52,7 @@ export function WhyFlagged(props: { rows: ReadonlyArray<ReviewRow>; current: Rev
         {found.slice(0, listed).map((row) => (
           <li key={row.id} className="flex flex-col gap-1 border-b pb-3 last:border-b-0">
             <span className="font-medium">
-              Row {rowPlace({ rowNumber: row.rowNumber, label: row.partLabel ?? null })}
+              Row {rowPlace({ rowNumber: row.rowNumber, label: O.map(row.part, (part) => part.label) })}
               {" · "}
               {row.file.name.trim() === "" ? <span className="text-muted-foreground">no name</span> : row.file.name}
               {row.file.sku.trim() === "" ? null : (
@@ -66,11 +67,14 @@ export function WhyFlagged(props: { rows: ReadonlyArray<ReviewRow>; current: Rev
                 <li key={`${problem.kind}:${problem.field ?? ""}:${at}`} className="list-disc">
                   <span className="text-muted-foreground">{kindLabel(problem.kind)}: </span>
                   {problem.message}
-                  {problem.proposal === null ? null : (
-                    <span className="block text-muted-foreground">
-                      {proposalWords(problem.proposal)} {problem.proposal.basis}
-                    </span>
-                  )}
+                  {O.match(problem.proposal, {
+                    onNone: () => null,
+                    onSome: (proposal) => (
+                      <span className="block text-muted-foreground">
+                        {proposalWords(proposal)} {proposal.basis}
+                      </span>
+                    )
+                  })}
                 </li>
               ))}
             </ul>

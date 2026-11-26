@@ -4,7 +4,7 @@
  * Trims the reader's table to what the server stages. Nothing is coerced: each cell keeps its stored text, and
  * what Excel displays when that differs.
  */
-import { SpreadsheetTable } from "../Reading/Spreadsheet.rules.ts"
+import { SpreadsheetTable, shownOf } from "../Reading/Spreadsheet.rules.ts"
 import { StagedTable, maxColumns, maxNotes, maxStagedRows } from "@inventory/catalog-contract/Staged"
 import * as A from "effect/Array"
 import * as Match from "effect/Match"
@@ -23,11 +23,11 @@ export const stageTable = (input: { readonly table: SpreadsheetTable }): StagedT
     columns: A.map(table.columns, (column) => ({ index: column.index, letter: column.letter, label: column.label })),
     rows: A.map(table.rows, (row) => ({
       rowNumber: row.rowNumber,
-      cells: A.map(row.cells, (cell) =>
-        cell.shown === undefined || cell.shown === cell.text
-          ? { text: cell.text }
-          : { text: cell.text, shown: cell.shown }
-      )
+      // What Excel shows is kept only where it differs from the value.
+      cells: A.map(row.cells, (cell) => ({
+        text: cell.text,
+        shown: O.filter(shownOf(cell), (shown) => shown !== cell.text)
+      }))
     })),
     notes: keptNotes(table.notes)
   }

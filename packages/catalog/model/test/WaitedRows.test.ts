@@ -4,12 +4,13 @@
 // The comparison and the write are one thing, whatever lands in between. Over the in-memory twins; the same on D1 is in
 // the app's WaitedRows and MatchAtomic slow tests.
 import { describe, expect, layer } from "@effect/vitest"
-import { type DecidedSince, decisionFromFlags, type RowDecisionFlags } from "@inventory/catalog-contract/Decision"
+import { type DecidedSince, decisionFromFlags, RowDecisionFlags } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { AlreadyImported, DraftBusy, ImportNotFound, RevisionAhead } from "@inventory/catalog-contract/ImportRejection"
 import type { Field, StagedTable } from "@inventory/catalog-contract/Staged"
 import { MatchTakeBack, takenBackRowsNamed } from "@inventory/catalog-contract/Import"
 import { decisionsMoved, draftTries, ImportStore } from "@inventory/catalog-model/ImportStore"
+import { noItemsRead } from "@inventory/catalog-model/Rematch"
 import { importsEndpoints } from "@inventory/catalog-model/ImportsHandler"
 import { ItemsOfRow } from "@inventory/catalog-model/ItemsOfRow"
 import { type ItemsOfRow as ItemsOfRowShape, itemsOfRow } from "@inventory/catalog-model/Review"
@@ -26,27 +27,16 @@ import * as Ref from "effect/Ref"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
-import { as, dana, elena, marcus, priya, stage } from "./support.ts"
+import { as, dana, elena, marcus, priya, stage, stagedTableOf } from "./support.ts"
 
-const App = Layer.mergeAll(catalogMemory(), SecureRandom.layerWebCrypto)
+const App = Layer.mergeAll(catalogMemory, SecureRandom.layerWebCrypto)
 
 const headings = ["sku", "name", "category", "uom", "unit_cost", "quantity_on_hand", "Alt code", "Net cost"] as const
-const letters = ["A", "B", "C", "D", "E", "F", "G", "H"]
 type Line = Partial<Record<(typeof headings)[number], string>>
 const column = (heading: (typeof headings)[number]): number =>
   O.getOrThrow(A.findFirstIndex(headings, (candidate) => candidate === heading))
-const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable => ({
-  fileName,
-  kind: "csv",
-  sheet: O.none(),
-  headerRowNumber: 1,
-  columns: A.map(headings, (label, index) => ({ index, letter: O.getOrElse(A.get(letters, index), () => "A"), label })),
-  notes: [],
-  rows: A.map(lines, (line, index) => ({
-    rowNumber: index + 2,
-    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "" }))
-  }))
-})
+const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable =>
+  stagedTableOf({ fileName, headings, lines })
 
 const item = { category: "packaging", uom: "EA", quantity_on_hand: "10" }
 const stocked = tableOf("stocked.csv", [
@@ -61,8 +51,8 @@ const reviewed = tableOf("reviewed.csv", [
   { ...item, sku: "BBB-0002", name: "Nylon Rope", unit_cost: "2", "Net cost": "2", "Alt code": "YYY-0002" }
 ])
 
-const flags = (set: Readonly<Record<string, RowDecisionFlags>>) => R.map(set, decisionFromFlags)
-const some = (decision: RowDecisionFlags) => O.some(decisionFromFlags(decision))
+const flags = (set: Readonly<Record<string, RowDecisionFlags.Encoded>>) => R.map(set, decisionFromFlags)
+const some = (decision: RowDecisionFlags.Encoded) => O.some(decisionFromFlags(decision))
 
 /** The two items stocked, then the reviewed file staged; and what people do with it, each as themselves. */
 const seeded = Effect.gen(function* () {
@@ -77,21 +67,25 @@ const seeded = Effect.gen(function* () {
 
 type Imports = Effect.Success<typeof importsEndpoints>
 
-/** A save of rows as a screen sends it: what it sets and clears, the revision they were made on, and what they waited over. */
-type Save = {
-  readonly on: number
-  readonly set?: Readonly<Record<string, RowDecisionFlags>>
-  readonly clear?: ReadonlyArray<string>
-  readonly over?: Readonly<Record<string, ReadonlyArray<O.Option<RowDecisionFlags>>>>
-}
-const request = (save: Save) => {
-  const set = flags(save.set ?? {})
-  const clear = save.clear ?? []
+// A save of rows as a screen sends it: what it sets and clears, the revision they were made on, and what they waited
+// over. A part the test leaves out is empty.
+const Written = S.toEncoded(RowDecisionFlags)
+const Save = S.Struct({
+  on: S.Int,
+  set: S.Record(S.String, Written).pipe(S.withConstructorDefault(Effect.succeed({}))),
+  clear: S.Array(S.String).pipe(S.withConstructorDefault(Effect.succeed([]))),
+  over: S.Record(S.String, Written.pipe(S.Option, S.Array)).pipe(S.withConstructorDefault(Effect.succeed({})))
+})
+type Save = (typeof Save)["~type.make.in"]
+const request = (input: Save) => {
+  const save = Save.make(input)
+  const set = flags(save.set)
+  const { clear } = save
   return {
     madeOn: R.fromEntries(A.map([...R.keys(set), ...clear], (row) => [row, save.on] as const)),
     set,
     clear,
-    ...(save.over === undefined ? {} : { over: R.map(save.over, A.map(O.map(decisionFromFlags))) })
+    over: R.map(save.over, A.map(O.map(decisionFromFlags)))
   }
 }
 const people = (imports: Imports, id: ImportId) => {
@@ -396,9 +390,9 @@ const sackStock = tableOf("sack-stock.csv", [
   { ...item, sku: "CCC-0001", name: "Jute Sack", unit_cost: "5" },
   { ...item, sku: "CCC-0002", name: "Canvas Sack", unit_cost: "3" }
 ])
-const mine = { stored: "replace", edits: { name: "Sack" } } satisfies RowDecisionFlags
+const mine = { stored: "replace", edits: { name: "Sack" } } satisfies RowDecisionFlags.Encoded
 /** A Replace with an accept of the cost: a match of the cost takes the accept in any case, the Replace only on row 2. */
-const both = { stored: "replace", accepted: ["unitCost"] } satisfies RowDecisionFlags
+const both = { stored: "replace", accepted: ["unitCost"] } satisfies RowDecisionFlags.Encoded
 
 /** Another import that stocks the sack, confirmed by Marcus; `takeBack` takes it back again. */
 const stockSack = Effect.gen(function* () {
@@ -502,7 +496,7 @@ describe("a row that waited across a match, and the items since", () => {
     })
   )
 
-  const keepSack = { stored: "keep", edits: { name: "Sack" } } satisfies RowDecisionFlags
+  const keepSack = { stored: "keep", edits: { name: "Sack" } } satisfies RowDecisionFlags.Encoded
 
   alone("a colleague's Keep-stored the match took back reads as hers did: named with his, not written", () =>
     Effect.gen(function* () {
@@ -580,7 +574,8 @@ describe("a row that waited across a match, and the items since", () => {
         Effect.fnUntraced(function* (entry) {
           if (entry.draft.id !== view.id) return entry
           const entries = yield* S.decodeEffect(Entries)(entry.draft.takenBackJson)
-          const old = A.map(entries, ({ saved: _saved, ...rest }) => rest)
+          // As an entry stored before `saved` was kept.
+          const old = A.map(entries, (one) => ({ ...one, saved: O.none() }))
           return { ...entry, draft: { ...entry.draft, takenBackJson: yield* S.encodeEffect(Entries)(old) } }
         }),
         { concurrency: 1 }
@@ -784,7 +779,7 @@ describe("a row of hers past those a match's entry names by row: the known limit
         }))
         const view = yield* stage(tableOf("many.csv", lines)).pipe(as(marcus))
         const { danaSaves, marcusSaves, matched, stored } = people(imports, view.id)
-        const accept = { accepted: ["unitCost"], edits: { name: "Sack" } } satisfies RowDecisionFlags
+        const accept = { accepted: ["unitCost"], edits: { name: "Sack" } } satisfies RowDecisionFlags.Encoded
         const his = `row-${takenBackRowsNamed + 2}`
         const hers = `row-${takenBackRowsNamed + 3}`
         yield* marcusSaves({
@@ -971,10 +966,10 @@ describe("what lands between a save's comparison and its write", () => {
           dana,
           draft,
           { set: flags({ "row-4": { out: true } }), clear: [] },
-          undefined,
+          noItemsRead,
           at
         )
-        const nothing = yield* store.decide(dana, draft, { set: {}, clear: [] }, undefined, at)
+        const nothing = yield* store.decide(dana, draft, { set: {}, clear: [] }, noItemsRead, at)
         expect([refused, nothing]).toEqual([decisionsMoved, decisionsMoved])
         const now = yield* stored(["row-4"])
         expect(now).toEqual([O.none()])
@@ -1058,7 +1053,7 @@ describe("what a save with rows that waited costs", () => {
         // Eight decisions a row may name, each one the match leaves as the row's name alone.
         const variants = A.flatMap(["replace", "keep"] as const, (stored) =>
           A.flatMap([[], ["unitCost"]], (accepted) =>
-            A.map([[], ["unitCost"]], (reverted): RowDecisionFlags => ({
+            A.map([[], ["unitCost"]], (reverted): RowDecisionFlags.Encoded => ({
               stored,
               accepted,
               reverted,
@@ -1323,7 +1318,7 @@ describe("a row that waited, and who last saved what is stored", () => {
 
   // Her decision is out when the match takes its accept; her screen reads the draft after it and she decides the row
   // again over the decision still on its way, which is all she named. What is stored is hers as the match left it.
-  const acceptedSack = { accepted: ["unitCost"], edits: { name: "Sack" } } satisfies RowDecisionFlags
+  const acceptedSack = { accepted: ["unitCost"], edits: { name: "Sack" } } satisfies RowDecisionFlags.Encoded
   alone("her own decision as a match left it, named by a press made after the match: still hers, and written", () =>
     Effect.gen(function* () {
       const { view, sends, matched, stored, credit } = yield* sackSeen
@@ -1438,7 +1433,7 @@ describe("a row that waited, and who last saved what is stored", () => {
         dana,
         draft,
         { set: flags({ "row-2": { out: true } }), clear: [] },
-        undefined,
+        noItemsRead,
         O.some({ revision: draft.revision, saves: held.saves })
       )
       expect(refused).toEqual(decisionsMoved)

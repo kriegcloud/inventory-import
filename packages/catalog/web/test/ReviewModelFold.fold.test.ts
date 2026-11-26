@@ -26,7 +26,7 @@ import { DecideGroup } from "@inventory/catalog-model/DecidingGroup"
 import { Group, GroupDecided, GroupUndone, GroupState } from "@inventory/catalog-model/GroupAggregate"
 import { ActCounted, GroupCounted, Import, ImportStaged, ReviewMovedOn } from "@inventory/catalog-model/ImportAggregate"
 import { Catalog } from "@inventory/catalog-model/Model"
-import { firstDecisions, recheckRow, review, ruleFixes } from "@inventory/catalog-model/Review"
+import { firstDecisions, itemsOfRow, noHistory, recheckRow, review, ruleFixes } from "@inventory/catalog-model/Review"
 import {
   Level,
   NO_DECISION,
@@ -1463,19 +1463,19 @@ it.effect("the fold equals `act` on a group only when the group's rows are split
 
 /** The rows the Review step gives the region for decisions, and its recheck: the app's own wiring. */
 const messy = (table: StagedTable) => {
-  const input = { table, choices: [], storedItems: [] }
+  const input = { ...noHistory, table, choices: [], storedItems: [] }
   const check = recheckRow(input)
   const recheck = (asked: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => {
     const problem = check({ id: asked.row.id, values: asked.cells })
     const answered = asked.cells[storedChoice] === "keep" || asked.cells[storedChoice] === "replace"
-    if (problem?.kind === "changed" && answered) return asked.row.problem
-    return problem === undefined ? undefined : toRegionProblem(problem)
+    if (O.exists(problem, (open) => open.kind === "changed") && answered) return asked.row.problem
+    return O.match(problem, { onNone: () => undefined, onSome: toRegionProblem })
   }
   const rows = (decisions: Readonly<Record<string, ReviewDecision>>) => {
     const server = toServerDecisions(decisions)
     return toRegionRows(review({ ...input, decisions: server }), server)
   }
-  return { rows, recheck, first: firstDecisions({ table, choices: [], mode: ruleFixes }) }
+  return { rows, recheck, first: firstDecisions({ table, choices: [], mode: ruleFixes, itemsOf: itemsOfRow }) }
 }
 
 /**

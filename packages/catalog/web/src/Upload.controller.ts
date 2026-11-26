@@ -39,7 +39,7 @@ import { type ImportId, UploadKey } from "@inventory/catalog-contract/Ids"
 import { UploadNotFound } from "@inventory/catalog-contract/ImportRejection"
 import { Forbidden, NotSignedIn } from "@inventory/kernel/AccessError"
 import { matchedColumn } from "@inventory/catalog-contract/Mapping"
-import { requiredFields, type StagedHead, type StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
+import { requiredFields, type StagedHead, StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
 import type { SheetChoice, SheetSummary } from "@inventory/catalog-model/Spreadsheet"
 import { savedRows } from "@inventory/catalog-model/Upload"
 import { rowsOf, UploadState } from "./Upload.machine.ts"
@@ -211,6 +211,8 @@ const reader = (request: ReadRequest) =>
     )
   )
 
+const decodeChunk = S.decodeEffect(S.Array(StagedRow))
+
 /** Reads `file` in the worker, sends it in chunks as they arrive, and finishes it. Reports each step to the store. */
 const program = Effect.fn("upload.program")(function* (
   registry: AtomRegistry.AtomRegistry,
@@ -261,10 +263,13 @@ const program = Effect.fn("upload.program")(function* (
         yield* Deferred.succeed(begun, { id, sizes: message.chunkSizes })
       }),
       Chunk: Effect.fn("Upload.chunk")(function* (message) {
-        chunks[message.seq] = message.rows
+        // The rows crossed the threads in the wire's form (protocol.ts): decoded once here. Our own reader made
+        // them, so rows that do not decode are a defect, not the file's problem.
+        const decoded = yield* decodeChunk(message.rows).pipe(Effect.orDie)
+        chunks[message.seq] = decoded
         const { id, sizes } = yield* Deferred.await(begun)
         yield* client.imports
-          .putChunk({ params: { id }, payload: { seq: message.seq, rows: message.rows } })
+          .putChunk({ params: { id }, payload: { seq: message.seq, rows: decoded } })
           .pipe(mine, staged)
         acknowledged.push(message.seq)
         const rows = sizes.reduce((sum, size) => sum + size, 0)

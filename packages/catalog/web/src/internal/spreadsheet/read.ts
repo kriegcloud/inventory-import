@@ -161,7 +161,7 @@ export const readSpreadsheet = Effect.fn("readSpreadsheet")(function* (
       fileProblem.tooManyBytes({ fileName, bytes: file.size, limitBytes: maxFileBytes.csv, what: "files" })
     )
   }
-  if (file.size === 0) return yield* Effect.fail(fileProblem.noValues({ fileName }))
+  if (file.size === 0) return yield* Effect.fail(fileProblem.emptyFile({ fileName }))
   const buffer = yield* Effect.promise(() => file.arrayBuffer())
   const bytes = new Uint8Array(buffer)
   const first = sniff(fileName, bytes)

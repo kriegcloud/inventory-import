@@ -11,7 +11,7 @@ import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import * as SqlClient from "effect/sql/SqlClient"
-import { decisionFromFlags, type RowDecisionFlags } from "@inventory/catalog-contract/Decision"
+import { decisionFromFlags, RowDecisionFlags } from "@inventory/catalog-contract/Decision"
 import { ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
 import type { Field, StagedTable } from "@inventory/catalog-contract/Staged"
 import { Forbidden } from "@inventory/kernel/AccessError"
@@ -33,7 +33,7 @@ const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable => (
   notes: [],
   rows: A.map(lines, (line, index) => ({
     rowNumber: index + 2,
-    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "" }))
+    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "", shown: O.none() }))
   }))
 })
 const item = { category: "packaging", uom: "EA", quantity_on_hand: "10" }
@@ -51,23 +51,27 @@ const reviewed = tableOf("reviewed.csv", [
 
 const marcus = as("mem_marcus")
 const dana = as("mem_dana")
-const flags = (set: Readonly<Record<string, RowDecisionFlags>>) => R.map(set, decisionFromFlags)
-const some = (decision: RowDecisionFlags) => O.some(decisionFromFlags(decision))
+const flags = (set: Readonly<Record<string, RowDecisionFlags.Encoded>>) => R.map(set, decisionFromFlags)
+const some = (decision: RowDecisionFlags.Encoded) => O.some(decisionFromFlags(decision))
 
-type Save = {
-  readonly on: number
-  readonly set?: Readonly<Record<string, RowDecisionFlags>>
-  readonly clear?: ReadonlyArray<string>
-  readonly over?: Readonly<Record<string, ReadonlyArray<O.Option<RowDecisionFlags>>>>
-}
-const request = (save: Save) => {
-  const set = flags(save.set ?? {})
-  const clear = save.clear ?? []
+// What a save of rows says when the test leaves it out: nothing set, cleared or waited over.
+const Written = S.toEncoded(RowDecisionFlags)
+const Save = S.Struct({
+  on: S.Int,
+  set: S.Record(S.String, Written).pipe(S.withConstructorDefault(Effect.succeed({}))),
+  clear: S.Array(S.String).pipe(S.withConstructorDefault(Effect.succeed([]))),
+  over: S.Record(S.String, Written.pipe(S.Option, S.Array)).pipe(S.withConstructorDefault(Effect.succeed({})))
+})
+type Save = (typeof Save)["~type.make.in"]
+const request = (input: Save) => {
+  const save = Save.make(input)
+  const set = flags(save.set)
+  const { clear } = save
   return {
     madeOn: R.fromEntries(A.map([...R.keys(set), ...clear], (row) => [row, save.on] as const)),
     set,
     clear,
-    ...(save.over === undefined ? {} : { over: R.map(save.over, A.map(O.map(decisionFromFlags))) })
+    over: R.map(save.over, A.map(O.map(decisionFromFlags)))
   }
 }
 
@@ -232,9 +236,9 @@ const sackStock = tableOf("sack-stock.csv", [
   { ...item, sku: "CCC-0001", name: "Jute Sack", unit_cost: "5" },
   { ...item, sku: "CCC-0002", name: "Canvas Sack", unit_cost: "3" }
 ])
-const mine = { stored: "replace", edits: { name: "Sack" } } satisfies RowDecisionFlags
+const mine = { stored: "replace", edits: { name: "Sack" } } satisfies RowDecisionFlags.Encoded
 /** A Replace with an accept of the cost: a match of the cost takes the accept in any case, the Replace only on row 2. */
-const both = { stored: "replace", accepted: ["unitCost"] } satisfies RowDecisionFlags
+const both = { stored: "replace", accepted: ["unitCost"] } satisfies RowDecisionFlags.Encoded
 
 /** The sacks staged; `stock` confirms another import that stocks them, and its `takeBack` takes that one back. */
 const seededSacks = Effect.gen(function* () {
@@ -393,7 +397,7 @@ layer(TypedApp)("a row that waited across a match whose take-backs a confirm let
   )
 })
 
-const keepSack = { stored: "keep", edits: { name: "Sack" } } satisfies RowDecisionFlags
+const keepSack = { stored: "keep", edits: { name: "Sack" } } satisfies RowDecisionFlags.Encoded
 
 layer(TypedApp)("a row that waited across a match that took a colleague's Keep-stored", (it) => {
   it.effect("what the match left of his reads as hers would: named with his, not written", () =>
@@ -660,7 +664,7 @@ layer(TypedApp)(
 )
 
 layer(TypedApp)("a row that waited across a match, her own decision taken from", (it) => {
-  const rope = { accepted: ["unitCost", "uom"], edits: { name: "Rope" } } satisfies RowDecisionFlags
+  const rope = { accepted: ["unitCost", "uom"], edits: { name: "Rope" } } satisfies RowDecisionFlags.Encoded
   it.effect("named as her screen showed it between two matches: hers, and written; his, after both, named", () =>
     Effect.gen(function* () {
       const { view, marcusSaves, danaSaves, matched, stored } = yield* seeded

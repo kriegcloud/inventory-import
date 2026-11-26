@@ -35,9 +35,9 @@ import * as R from "effect/Record"
 import * as Ref from "effect/Ref"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as S from "effect/Schema"
-import { as, dana, marcus, stage } from "./support.ts"
+import { as, dana, marcus, stage, stagedTableOf } from "./support.ts"
 
-const App = Layer.mergeAll(catalogMemory(), SecureRandom.layerWebCrypto)
+const App = Layer.mergeAll(catalogMemory, SecureRandom.layerWebCrypto)
 
 const headings = [
   "sku",
@@ -53,22 +53,11 @@ const headings = [
   "Pack unit"
 ] as const
 type Line = Partial<Record<(typeof headings)[number], string>>
-const letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"]
 const column = (heading: (typeof headings)[number]): number =>
   O.getOrThrow(A.findFirstIndex(headings, (candidate) => candidate === heading))
 
-const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable => ({
-  fileName,
-  kind: "csv",
-  sheet: O.none(),
-  headerRowNumber: 1,
-  columns: A.map(headings, (label, index) => ({ index, letter: O.getOrElse(A.get(letters, index), () => "A"), label })),
-  notes: [],
-  rows: A.map(lines, (line, index) => ({
-    rowNumber: index + 2,
-    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "" }))
-  }))
-})
+const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable =>
+  stagedTableOf({ fileName, headings, lines })
 
 const item = { category: "packaging", uom: "EA", quantity_on_hand: "10" }
 /** What the organization already has: two items, confirmed from a first file. */
@@ -124,7 +113,7 @@ const seeded = Effect.gen(function* () {
   return { imports, saving, matching }
 })
 
-const flags = (set: Readonly<Record<string, RowDecisionFlags>>) => R.map(set, decisionFromFlags)
+const flags = (set: Readonly<Record<string, RowDecisionFlags.Encoded>>) => R.map(set, decisionFromFlags)
 
 /**
  * One rule end to end on the twins: `rematch` on the first import, a save of `set` made before it (what it names, and
@@ -133,7 +122,7 @@ const flags = (set: Readonly<Record<string, RowDecisionFlags>>) => R.map(set, de
  */
 const scenario = Effect.fn("scenario")(function* (input: {
   readonly rematch: ReadonlyArray<{ readonly field: MappingChoice["field"]; readonly column: number }>
-  readonly set: Readonly<Record<string, RowDecisionFlags>>
+  readonly set: Readonly<Record<string, RowDecisionFlags.Encoded>>
 }) {
   const { imports, saving, matching } = yield* seeded
   const set = flags(input.set)
@@ -149,7 +138,7 @@ const scenario = Effect.fn("scenario")(function* (input: {
     )
   yield* rematch(saving.id)
   const saved = yield* imports
-    .decide({ params: { id: saving.id }, payload: { madeOn, set, clear: [] } })
+    .decide({ params: { id: saving.id }, payload: { over: {}, madeOn, set, clear: [] } })
     .pipe(as(marcus))
   const afterSave = yield* imports.get({ params: { id: saving.id } }).pipe(as(marcus))
   const refused = yield* Effect.flip(
@@ -160,7 +149,10 @@ const scenario = Effect.fn("scenario")(function* (input: {
   const stillOpen = yield* imports.get({ params: { id: saving.id } }).pipe(as(marcus))
 
   yield* imports
-    .decide({ params: { id: matching.id }, payload: { madeOn: R.map(set, () => matching.revision), set, clear: [] } })
+    .decide({
+      params: { id: matching.id },
+      payload: { over: {}, madeOn: R.map(set, () => matching.revision), set, clear: [] }
+    })
     .pipe(as(marcus))
   yield* rematch(matching.id)
   const afterMatch = yield* imports.get({ params: { id: matching.id } }).pipe(as(marcus))
@@ -209,8 +201,19 @@ describe("a request's earlier tries, held", () => {
   }
   const { rows: _rows, ...head } = reviewed
   const net = column("Net cost")
-  const choice = (index: number, at: number): MappingChoice => ({ field: "unitCost", column: index, by: "person", at })
-  const move = (was: number, index: number, at: number): ColumnMove => ({ field: "unitCost", at, was, column: index })
+  const choice = (index: number, at: number): MappingChoice => ({
+    field: "unitCost",
+    column: O.some(index),
+    by: "person",
+    at
+  })
+  const move = (was: number, index: number, at: number): ColumnMove => ({
+    field: "unitCost",
+    at,
+    was: O.some(was),
+    column: O.some(index),
+    knownFrom: O.none()
+  })
   // A match of unit cost to "Net cost", asked of a draft at revision 4.
   const firstTry = heldToTries({
     earlier: O.none(),
@@ -232,7 +235,11 @@ describe("a request's earlier tries, held", () => {
       choices: asked.choices,
       moves: asked.moves,
       questions: [
-        { ...question, fields: [{ field: "unitCost", made: asked.made }], decided: asked.decided ?? question.decided }
+        {
+          ...question,
+          fields: [{ field: "unitCost", made: asked.made }],
+          decided: { decided: question.decided, ...asked }.decided
+        }
       ],
       changed: [{ rowId: "row-3", field: "unitCost" }]
     }).changed
@@ -252,7 +259,7 @@ describe("a request's earlier tries, held", () => {
   })
 
   it("hold it down across another person's pick of the column a field already reads, which changes none", () => {
-    const pinned: MappingChoice = { field: "name", column: column("name"), by: "person", at: 0 }
+    const pinned: MappingChoice = { field: "name", column: O.some(column("name")), by: "person", at: 0 }
     expect(later({ choices: [pinned, choice(net, 6)], moves: [move(column("unit_cost"), net, 6)], made: 5 })).toEqual(
       []
     )
@@ -278,64 +285,88 @@ describe("the column a field read at a past revision, and when it moved", () => 
   const { rows: _rows, ...staged } = reviewed
   it("a field moved off its column by another field's match moves too, stamped with the same revision", () => {
     // Name takes the column headed "uom": the unit has no other heading, so it reads no column from then on.
-    const after: ReadonlyArray<MappingChoice> = [{ field: "name", column: column("uom"), by: "person", at: 4 }]
+    const after: ReadonlyArray<MappingChoice> = [{ field: "name", column: O.some(column("uom")), by: "person", at: 4 }]
     expect(movesOfMatch({ head: staged, before: [], after, kept: [], at: 4 })).toEqual([
-      { field: "name", at: 4, was: column("name"), column: column("uom") },
-      { field: "uom", at: 4, was: column("uom"), column: null }
+      { field: "name", at: 4, was: O.some(column("name")), column: O.some(column("uom")), knownFrom: O.none() },
+      { field: "uom", at: 4, was: O.some(column("uom")), column: O.none(), knownFrom: O.none() }
     ])
   })
 
   it("a field matched by hand to the column it already reads does not move", () => {
-    const after: ReadonlyArray<MappingChoice> = [{ field: "name", column: column("name"), by: "person", at: 4 }]
+    const after: ReadonlyArray<MappingChoice> = [{ field: "name", column: O.some(column("name")), by: "person", at: 4 }]
     expect(movesOfMatch({ head: staged, before: [], after, kept: [], at: 4 })).toEqual([])
   })
 
   it("the first move of a field matched before moves were kept says from which revision its `was` is known", () => {
     const before: ReadonlyArray<MappingChoice> = [
-      { field: "unitCost", column: column("List cost"), by: "person", at: 4 }
+      { field: "unitCost", column: O.some(column("List cost")), by: "person", at: 4 }
     ]
     const choices: ReadonlyArray<MappingChoice> = [
-      { field: "unitCost", column: column("Net cost"), by: "person", at: 9 }
+      { field: "unitCost", column: O.some(column("Net cost")), by: "person", at: 9 }
     ]
     const moves = movesOfMatch({ head: staged, before, after: choices, kept: [], at: 9 })
     expect(moves).toEqual([
-      { field: "unitCost", at: 9, was: column("List cost"), column: column("Net cost"), knownFrom: 4 }
+      {
+        field: "unitCost",
+        at: 9,
+        was: O.some(column("List cost")),
+        column: O.some(column("Net cost")),
+        knownFrom: O.some(4)
+      }
     ])
     const at = columnAt({ choices, moves, now: columnsOf({ head: staged, choices }) })
     // On 3 it read a column nobody kept; from 4 on "List cost", and from 9 on "Net cost".
     expect([at("unitCost", 3), at("unitCost", 4), at("unitCost", 8), at("unitCost", 9)]).toEqual([
       O.none(),
-      O.some(column("List cost")),
-      O.some(column("List cost")),
-      O.some(column("Net cost"))
+      O.some(O.some(column("List cost"))),
+      O.some(O.some(column("List cost"))),
+      O.some(O.some(column("Net cost")))
     ])
     // The next one is known as any move is.
     const next: ReadonlyArray<MappingChoice> = [
-      { field: "unitCost", column: column("unit_cost"), by: "person", at: 11 }
+      { field: "unitCost", column: O.some(column("unit_cost")), by: "person", at: 11 }
     ]
     expect(movesOfMatch({ head: staged, before: choices, after: next, kept: moves, at: 11 })).toEqual([
-      { field: "unitCost", at: 11, was: column("Net cost"), column: column("unit_cost") }
+      {
+        field: "unitCost",
+        at: 11,
+        was: O.some(column("Net cost")),
+        column: O.some(column("unit_cost")),
+        knownFrom: O.none()
+      }
     ])
   })
 
   it("is exact after several re-matches: the `was` of the first move after the revision, else the column now", () => {
     const choices: ReadonlyArray<MappingChoice> = [
-      { field: "unitCost", column: column("Net cost"), by: "person", at: 7 }
+      { field: "unitCost", column: O.some(column("Net cost")), by: "person", at: 7 }
     ]
     const moves: ReadonlyArray<ColumnMove> = [
-      { field: "unitCost", at: 4, was: column("unit_cost"), column: column("List cost") },
-      { field: "unitCost", at: 7, was: column("List cost"), column: column("Net cost") }
+      {
+        field: "unitCost",
+        at: 4,
+        was: O.some(column("unit_cost")),
+        column: O.some(column("List cost")),
+        knownFrom: O.none()
+      },
+      {
+        field: "unitCost",
+        at: 7,
+        was: O.some(column("List cost")),
+        column: O.some(column("Net cost")),
+        knownFrom: O.none()
+      }
     ]
     const at = columnAt({ choices, moves, now: columnsOf({ head: staged, choices }) })
     expect([at("unitCost", 3), at("unitCost", 4), at("unitCost", 6), at("unitCost", 7), at("name", 0)]).toEqual([
-      O.some(column("unit_cost")),
-      O.some(column("List cost")),
-      O.some(column("List cost")),
-      O.some(column("Net cost")),
-      O.some(column("name"))
+      O.some(O.some(column("unit_cost"))),
+      O.some(O.some(column("List cost"))),
+      O.some(O.some(column("List cost"))),
+      O.some(O.some(column("Net cost"))),
+      O.some(O.some(column("name")))
     ])
     // A choice made after the revision with no move kept (matched before moves were kept): not known.
-    expect(columnAt({ choices, moves: [], now: () => 0 })("unitCost", 3)).toEqual(O.none())
+    expect(columnAt({ choices, moves: [], now: () => O.some(0) })("unitCost", 3)).toEqual(O.none())
   })
 
   it.prop("ColumnMove generates only valid values", [Arbitrary.schema(ColumnMove)], ([move]) => {
@@ -346,19 +377,20 @@ describe("the column a field read at a past revision, and when it moved", () => 
 describe("accepts made before their field's column was matched again, as the save and the confirm judge them", () => {
   // Unit cost matched by hand at 12, the unit at 3; each match kept its move, as the stores write them.
   const choices: ReadonlyArray<MappingChoice> = [
-    { field: "unitCost", column: 7, by: "person", at: 12 },
-    { field: "uom", column: 4, by: "person", at: 3 }
+    { field: "unitCost", column: O.some(7), by: "person", at: 12 },
+    { field: "uom", column: O.some(4), by: "person", at: 3 }
   ]
   const moves: ReadonlyArray<ColumnMove> = [
-    { field: "uom", at: 3, was: 10, column: 4 },
-    { field: "unitCost", at: 12, was: 5, column: 7 }
+    { field: "uom", at: 3, was: O.some(10), column: O.some(4), knownFrom: O.none() },
+    { field: "unitCost", at: 12, was: O.some(5), column: O.some(7), knownFrom: O.none() }
   ]
   const set = flags({
     "row-55": { accepted: ["unitCost", "uom"], edits: { name: "Steel Tube 1in" } },
     "row-18": { reverted: ["name"] }
   })
-  const judge = (madeOn: Readonly<Record<string, number>>, decisions = set) =>
+  const judgeWith = (madeOn: Readonly<Record<string, number>>, decisions: typeof set) =>
     withoutStaleDecisions({ choices, moves, madeOn, set: decisions, changed: [] })
+  const judge = (madeOn: Readonly<Record<string, number>>) => judgeWith(madeOn, set)
 
   it("are taken out and named; the rest of the decision, and every other row, is applied", () => {
     const made = judge({ "row-55": 11, "row-18": 11 })
@@ -387,7 +419,7 @@ describe("accepts made before their field's column was matched again, as the sav
       "row-3": { accepted: ["unitCost"] }
     })
     // Row 9 waited from revision 10, before unit cost was matched again at 12; row 55 was accepted on 12.
-    expect(judge({ "row-55": 12, "row-9": 10 }, three).notApplied).toEqual([
+    expect(judgeWith({ "row-55": 12, "row-9": 10 }, three).notApplied).toEqual([
       { rowId: "row-9", field: "unitCost", kind: "accept" },
       { rowId: "row-3", field: "unitCost", kind: "accept" }
     ])
@@ -395,10 +427,10 @@ describe("accepts made before their field's column was matched again, as the sav
 
   it("are stale too when their field only moved off its column (another field took it), with no choice of its own", () => {
     const made = withoutStaleDecisions({
-      choices: [{ field: "name", column: 4, by: "person", at: 6 }],
+      choices: [{ field: "name", column: O.some(4), by: "person", at: 6 }],
       moves: [
-        { field: "name", at: 6, was: 1, column: 4 },
-        { field: "uom", at: 6, was: 4, column: null }
+        { field: "name", at: 6, was: O.some(1), column: O.some(4), knownFrom: O.none() },
+        { field: "uom", at: 6, was: O.some(4), column: O.none(), knownFrom: O.none() }
       ],
       madeOn: { "row-55": 5 },
       set: flags({ "row-55": { accepted: ["uom"] } }),
@@ -409,7 +441,7 @@ describe("accepts made before their field's column was matched again, as the sav
 })
 
 describe("each kind of decision judged on its row's revision", () => {
-  const choices: ReadonlyArray<MappingChoice> = [{ field: "sku", column: 7, by: "person", at: 5 }]
+  const choices: ReadonlyArray<MappingChoice> = [{ field: "sku", column: O.some(7), by: "person", at: 5 }]
   const set = flags({
     "row-2": { stored: "replace", accepted: ["name"], reverted: ["uom"] },
     "row-4": { kept: true },
@@ -435,7 +467,9 @@ describe("each kind of decision judged on its row's revision", () => {
   })
 
   it("after another field's re-match: a Replace only where `changed` names its row, with that field", () => {
-    const moved: ReadonlyArray<ColumnMove> = [{ field: "unitCost", at: 5, was: 5, column: 8 }]
+    const moved: ReadonlyArray<ColumnMove> = [
+      { field: "unitCost", at: 5, was: O.some(5), column: O.some(8), knownFrom: O.none() }
+    ]
     const both = flags({ "row-2": { stored: "replace" }, "row-3": { stored: "keep" } })
     const made = withoutStaleDecisions({
       choices: [],
@@ -518,11 +552,11 @@ describe("a Replace or Keep-stored across a re-match of another column", () => {
         const replace = flags({ "row-3": { stored: "replace" } })
         // Made while the cost read "unit_cost" (9.00, as "Net cost" reads): the comparison is the same, it stands.
         const before = yield* imports
-          .decide({ params, payload: { madeOn: { "row-3": saving.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: { "row-3": saving.revision }, set: replace, clear: [] } })
           .pipe(as(marcus))
         // Made while it read "List cost" (3, the stored cost): the comparison changed, it is taken back.
         const between = yield* imports
-          .decide({ params, payload: { madeOn: { "row-3": once.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: { "row-3": once.revision }, set: replace, clear: [] } })
           .pipe(as(marcus))
         expect([before.notApplied, between.notApplied]).toEqual([
           [],
@@ -555,12 +589,24 @@ describe("a Replace or Keep-stored across a re-match of another column", () => {
           })
           // Both fields matched again after the rows were decided on revision 1.
           const choices: ReadonlyArray<MappingChoice> = [
-            { field: "unitCost", column: column("Net cost"), by: "person", at: 2 },
-            { field: "uom", column: column("Pack unit"), by: "person", at: 3 }
+            { field: "unitCost", column: O.some(column("Net cost")), by: "person", at: 2 },
+            { field: "uom", column: O.some(column("Pack unit")), by: "person", at: 3 }
           ]
           const moves = [
-            { field: "unitCost" as const, at: 2, was: column("unit_cost"), column: column("Net cost") },
-            { field: "uom" as const, at: 3, was: column("uom"), column: column("Pack unit") }
+            {
+              field: "unitCost" as const,
+              at: 2,
+              was: O.some(column("unit_cost")),
+              column: O.some(column("Net cost")),
+              knownFrom: O.none()
+            },
+            {
+              field: "uom" as const,
+              at: 3,
+              was: O.some(column("uom")),
+              column: O.some(column("Pack unit")),
+              knownFrom: O.none()
+            }
           ]
           const madeOn = { "row-2": 1, "row-3": 1 }
           const changed = comparisonsChanged({
@@ -587,12 +633,24 @@ describe("a Replace or Keep-stored across a re-match of another column", () => {
         ])
         const view = yield* stage(table).pipe(as(marcus))
         const choices: ReadonlyArray<MappingChoice> = [
-          { field: "uom", column: column("Pack unit"), by: "person", at: 2 },
-          { field: "unitCost", column: column("Net cost"), by: "person", at: 3 }
+          { field: "uom", column: O.some(column("Pack unit")), by: "person", at: 2 },
+          { field: "unitCost", column: O.some(column("Net cost")), by: "person", at: 3 }
         ]
         const moves = [
-          { field: "uom" as const, at: 2, was: column("uom"), column: column("Pack unit") },
-          { field: "unitCost" as const, at: 3, was: column("unit_cost"), column: column("Net cost") }
+          {
+            field: "uom" as const,
+            at: 2,
+            was: O.some(column("uom")),
+            column: O.some(column("Pack unit")),
+            knownFrom: O.none()
+          },
+          {
+            field: "unitCost" as const,
+            at: 3,
+            was: O.some(column("unit_cost")),
+            column: O.some(column("Net cost")),
+            knownFrom: O.none()
+          }
         ]
         const questions = comparisonQuestions({
           choices,
@@ -668,7 +726,7 @@ describe("a field moved off its column when a person gives that column to anothe
 })
 
 /** One decision of each kind that rests on a column, as the same-column tests and the picks away and back make them. */
-const everyKind: Readonly<Record<string, RowDecisionFlags>> = {
+const everyKind: Readonly<Record<string, RowDecisionFlags.Encoded>> = {
   "row-2": { stored: "replace", accepted: ["unitCost"] },
   "row-3": { stored: "keep" },
   "row-4": { kept: true },
@@ -703,7 +761,7 @@ describe("a field matched by hand to the column it already reads", () => {
           const { imports, matching } = yield* seeded
           const params = { id: matching.id }
           yield* imports
-            .decide({ params, payload: { madeOn: R.map(set, () => matching.revision), set, clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: R.map(set, () => matching.revision), set, clear: [] } })
             .pipe(as(marcus))
           yield* picked(matching.id)
           const after = yield* imports.get({ params }).pipe(as(marcus))
@@ -740,7 +798,7 @@ describe("a field matched by hand to the column it already reads", () => {
         const params = { id: saving.id }
         const madeOn = R.map(set, () => saving.revision)
         yield* picked(saving.id)
-        const saved = yield* imports.decide({ params, payload: { madeOn, set, clear: [] } }).pipe(as(marcus))
+        const saved = yield* imports.decide({ params, payload: { over: {}, madeOn, set, clear: [] } }).pipe(as(marcus))
         expect(saved.notApplied).toEqual([])
         const after = yield* imports.get({ params }).pipe(as(marcus))
         expect(decided(after.decisions, rows)).toEqual(A.map(rows, (row) => R.get(set, row)))
@@ -762,7 +820,7 @@ describe("a field matched by hand to the column it already reads", () => {
         const again = yield* match
         expect([again.revision, again.choices]).toEqual([once.revision, once.choices])
         const saved = yield* imports
-          .decide({ params, payload: { madeOn: R.map(set, () => once.revision), set, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: R.map(set, () => once.revision), set, clear: [] } })
           .pipe(as(marcus))
         expect(saved.notApplied).toEqual([])
       })
@@ -777,6 +835,7 @@ describe("a field matched by hand to the column it already reads", () => {
           .decide({
             params,
             payload: {
+              over: {},
               madeOn: { "row-2": saving.revision },
               set: flags({ "row-2": { accepted: ["tags"], reverted: ["tags"] } }),
               clear: []
@@ -873,7 +932,7 @@ describe("a Replace or Keep-stored on an import matched before moves were kept",
           .match({ params, payload: { field: "unitCost", column: O.some(column("List cost")) } })
           .pipe(as(dana))
         expect([again.revision, again.takenBack]).toEqual([saving.revision + 1, []])
-        const saved = yield* imports.decide({ params, payload: { madeOn, set, clear: [] } }).pipe(as(marcus))
+        const saved = yield* imports.decide({ params, payload: { over: {}, madeOn, set, clear: [] } }).pipe(as(marcus))
         expect(saved.notApplied).toEqual(named)
         const refused = yield* Effect.flip(
           imports.commit({ params, payload: { revision: saved.revision, madeOn, set, clear: [] } }).pipe(as(marcus))
@@ -881,7 +940,7 @@ describe("a Replace or Keep-stored on an import matched before moves were kept",
         expect(S.is(AcceptsTakenBack)(refused) ? refused.accepts : refused).toEqual(named)
         // Decided on the revision that match made, the column is known: both stand.
         const since = yield* imports
-          .decide({ params, payload: { madeOn: R.map(set, () => saving.revision + 1), set, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: R.map(set, () => saving.revision + 1), set, clear: [] } })
           .pipe(as(marcus))
         expect(since.notApplied).toEqual([])
       })
@@ -892,7 +951,7 @@ describe("a Replace or Keep-stored on an import matched before moves were kept",
         const { imports, matching } = yield* seeded
         const params = { id: matching.id }
         const madeOn = R.map(set, () => matching.revision)
-        yield* imports.decide({ params, payload: { madeOn, set, clear: [] } }).pipe(as(marcus))
+        yield* imports.decide({ params, payload: { over: {}, madeOn, set, clear: [] } }).pipe(as(marcus))
         yield* matchedLongAgo(matching.id)
         const long = yield* imports.get({ params }).pipe(as(marcus))
         const further = yield* imports
@@ -903,12 +962,12 @@ describe("a Replace or Keep-stored on an import matched before moves were kept",
           ["unitCost", "stored", ["row-2", "row-3"]]
         ])
         // Made before the match that kept no move: named, though the further match's own move is kept.
-        const before = yield* imports.decide({ params, payload: { madeOn, set, clear: [] } }).pipe(as(marcus))
+        const before = yield* imports.decide({ params, payload: { over: {}, madeOn, set, clear: [] } }).pipe(as(marcus))
         expect(before.notApplied).toEqual(named)
         // Made since that match, on "List cost": the column is known, and row 2 compares the same under "Net cost".
         const replace = flags({ "row-2": { stored: "replace" } })
         const since = yield* imports
-          .decide({ params, payload: { madeOn: { "row-2": long.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: { "row-2": long.revision }, set: replace, clear: [] } })
           .pipe(as(marcus))
         expect(since.notApplied).toEqual([])
         // Its moves are kept from here on: a match that changes nothing of row 2 leaves its Replace.
@@ -930,7 +989,7 @@ describe("a Replace or Keep-stored on an import matched before moves were kept",
           // Decided on "List cost", which the import reads since: row 2 reads 99.00 in every cost column.
           const replace = flags({ "row-2": { stored: "replace" } })
           const saved = yield* imports
-            .decide({ params, payload: { madeOn: { "row-2": long.revision }, set: replace, clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: { "row-2": long.revision }, set: replace, clear: [] } })
             .pipe(as(marcus))
           expect(saved.notApplied).toEqual([])
           const further = yield* imports
@@ -942,12 +1001,12 @@ describe("a Replace or Keep-stored on an import matched before moves were kept",
               revision: further.revision,
               by: "Dana Whitfield",
               field: "unitCost",
-              matched: "unitCost",
-              reads: true,
+              matched: O.some("unitCost"),
+              reads: O.some(true),
               kind: "stored",
               count: 1,
               rows: ["row-2"],
-              saved: { "row-2": saved.revision }
+              saved: O.some({ "row-2": saved.revision })
             }
           ])
         })
@@ -963,7 +1022,7 @@ describe("a Replace or Keep-stored on an import matched before moves were kept",
           const long = yield* imports.get({ params }).pipe(as(marcus))
           const replace = flags({ "row-2": { stored: "replace" } })
           yield* imports
-            .decide({ params, payload: { madeOn: { "row-2": long.revision }, set: replace, clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: { "row-2": long.revision }, set: replace, clear: [] } })
             .pipe(as(marcus))
           // Description moves to "Pack unit", empty on row 2 as its own column is: the cost was not matched again.
           const other = yield* imports
@@ -1019,7 +1078,7 @@ describe("a match worked out again because something changed between two tries",
         ).pipe(as(marcus))
         const params = { id: view.id }
         yield* plain
-          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(as(marcus))
         const { imports, asked } = yield* interrupted(
           Effect.all(
@@ -1031,7 +1090,10 @@ describe("a match worked out again because something changed between two tries",
                 })
                 .pipe(as(marcus)),
               plain
-                .decide({ params, payload: { madeOn: {}, set: flags({ "row-3": { out: true } }), clear: [] } })
+                .decide({
+                  params,
+                  payload: { over: {}, madeOn: {}, set: flags({ "row-3": { out: true } }), clear: [] }
+                })
                 .pipe(as(marcus))
             ],
             { concurrency: 1 }
@@ -1065,7 +1127,7 @@ describe("a match worked out again because something changed between two tries",
         const params = { id: view.id }
         const both = flags({ "row-2": { stored: "replace" }, "row-3": { stored: "replace" } })
         yield* plain
-          .decide({ params, payload: { madeOn: R.map(both, () => view.revision), set: both, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: R.map(both, () => view.revision), set: both, clear: [] } })
           .pipe(as(marcus))
         // Marcus sees the stocked items and presses row 2's Replace again, by way of Keep: the same decision, made again.
         const pressed = (stored: "keep" | "replace") =>
@@ -1073,11 +1135,7 @@ describe("a match worked out again because something changed between two tries",
             plain
               .decide({
                 params,
-                payload: {
-                  madeOn: { "row-2": now.revision },
-                  set: flags({ "row-2": { stored } }),
-                  clear: []
-                }
+                payload: { over: {}, madeOn: { "row-2": now.revision }, set: flags({ "row-2": { stored } }), clear: [] }
               })
               .pipe(as(marcus))
           )
@@ -1119,7 +1177,7 @@ describe("a match worked out again because something changed between two tries",
         const params = { id: view.id }
         const decideReplace = Effect.flatMap(plain.get({ params }).pipe(as(marcus)), (now) =>
           plain
-            .decide({ params, payload: { madeOn: { "row-2": now.revision }, set: replace, clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: { "row-2": now.revision }, set: replace, clear: [] } })
             .pipe(as(marcus))
         )
         yield* decideReplace
@@ -1176,7 +1234,7 @@ describe("a save worked out again because something it read changed, and a colum
         })
         const imports = yield* importsEndpoints.pipe(Effect.provideService(ImportStore, stepped))
         const saved = yield* imports
-          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(as(marcus))
         expect([MutableRef.get(tries), saved.notApplied]).toEqual([
           2,

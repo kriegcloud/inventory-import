@@ -32,7 +32,8 @@ const NoRevision = S.Finite.check(
 )
 
 /** The revisions of this many rows, numbered from 1. */
-const rows = (count: number) => R.fromEntries(A.makeBy(count, (n) => [rowId({ rowNumber: n + 1 }), 1] as const))
+const rows = (count: number) =>
+  R.fromEntries(A.makeBy(count, (n) => [rowId({ rowNumber: n + 1, part: O.none() }), 1] as const))
 
 describe("the revisions a save's or a confirm's decisions were made on", () => {
   it.prop(

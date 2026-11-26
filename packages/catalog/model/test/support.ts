@@ -11,6 +11,9 @@ import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
 import * as MutableHashSet from "effect/MutableHashSet"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
+import { emptyText } from "@inventory/catalog-model/CellReading"
+import { columnLetter } from "@inventory/catalog-model/SheetLayout"
 
 const member = (id: string, name: string, role: Role, organization: string): Member =>
   Member.make({
@@ -32,29 +35,41 @@ export const as =
   <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, CurrentActor>> =>
     Effect.provideService(effect, CurrentActor, who)
 
-const letters = ["A", "B", "C", "D", "E", "F", "G"]
 const headings = ["sku", "name", "description", "category", "uom", "unit_cost", "quantity_on_hand"] as const
 
 /** One row of the test file: its cells by heading; a heading left out is an empty cell. */
 export type Line = Partial<Record<(typeof headings)[number], string>>
 
+/**
+ * A staged CSV of `lines` under `headings`, the first data row being row 2: what a test stages instead of a file. A
+ * heading a line leaves out is an empty cell, as a CSV row that stops short reads.
+ */
+export const stagedTableOf = <H extends string>(input: {
+  readonly fileName: string
+  readonly headings: ReadonlyArray<H>
+  readonly lines: ReadonlyArray<Partial<Record<H, string>>>
+}): StagedTable => {
+  const blank = R.fromEntries(A.map(input.headings, (heading) => [heading, emptyText] as const))
+  return {
+    fileName: input.fileName,
+    kind: "csv",
+    sheet: O.none(),
+    headerRowNumber: 1,
+    columns: A.map(input.headings, (label, index) => ({ index, letter: columnLetter(index), label })),
+    notes: [],
+    rows: A.map(input.lines, (line, index) => {
+      const cells = { ...blank, ...line }
+      return {
+        rowNumber: index + 2,
+        cells: A.map(input.headings, (heading) => ({ text: cells[heading], shown: O.none() }))
+      }
+    })
+  }
+}
+
 /** A staged file with the given rows under the seven headings, the first data row being row 2. */
-export const tableOf = (input: { readonly fileName: string; readonly lines: ReadonlyArray<Line> }): StagedTable => ({
-  fileName: input.fileName,
-  kind: "csv",
-  sheet: O.none(),
-  headerRowNumber: 1,
-  columns: A.map(headings, (label, index) => ({
-    index,
-    letter: O.getOrElse(A.get(letters, index), () => "A"),
-    label
-  })),
-  notes: [],
-  rows: A.map(input.lines, (line, index) => ({
-    rowNumber: index + 2,
-    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "" }))
-  }))
-})
+export const tableOf = (input: { readonly fileName: string; readonly lines: ReadonlyArray<Line> }): StagedTable =>
+  stagedTableOf({ ...input, headings })
 
 /** Five rows: three that are ready, one with no name (cannot import), one whose category is not a category. */
 export const fiveLines: ReadonlyArray<Line> = [

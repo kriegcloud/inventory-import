@@ -4,7 +4,11 @@
  *
  * @packageDocumentation
  */
+import * as Effect from "effect/Effect"
+import { dual } from "effect/Function"
+import * as O from "effect/Option"
 import * as S from "effect/Schema"
+import * as SchemaGetter from "effect/SchemaGetter"
 import * as SchemaTransformation from "effect/SchemaTransformation"
 
 /**
@@ -61,3 +65,47 @@ export const absentAsNone =
       .annotateKey({ description: key.description })
       .pipe(S.decodeTo(decoded, SchemaTransformation.optionFromOptionalKey()), S.annotateKey(key))
   }
+
+/** A schema a key that may be left out can carry: no default of its own, and no service to decode or encode it. */
+type LeftOutField = S.Top &
+  S.WithoutConstructorDefault & { readonly DecodingServices: never; readonly EncodingServices: never }
+
+/** The schema `emptyWhenLeftOut` makes of a key's schema. */
+type LeftOut<Value extends LeftOutField> = S.withConstructorDefault<S.decodeTo<S.toType<Value>, S.optionalKey<Value>>>
+
+/** What a key left out stands for, and how to tell that value when encoding. */
+type Emptiness<Decoded> = { readonly empty: Decoded; readonly isEmpty: (value: Decoded) => boolean }
+
+/**
+ * A key the wire and the store leave out while it holds its empty value, and that code always has: decoding a missing
+ * key gives `empty`, `make` starts there, and encoding leaves the key out again when the value `isEmpty`, so a
+ * record written before the key was always there still reads, and one written now looks the same. Use it where
+ * "left out" and "empty" mean one thing (no field accepted, no value typed); never where absence says something of
+ * its own, which is an `Option` (`absentAsNone`).
+ *
+ * **Example** (The fields a person accepted, left out of a stored decision while there are none)
+ *
+ * ```ts
+ * import { emptyWhenLeftOut } from "@inventory/kernel/Wire"
+ * import * as A from "effect/Array"
+ * import * as S from "effect/Schema"
+ * const Flags = S.Struct({
+ *   accepted: emptyWhenLeftOut(S.Array(S.String), { empty: [], isEmpty: A.isReadonlyArrayEmpty })
+ * })
+ * // decoding {} gives { accepted: [] }; encoding { accepted: [] } gives {}
+ * ```
+ *
+ * @category combinators
+ */
+export const emptyWhenLeftOut: {
+  <Value extends LeftOutField>(options: Emptiness<Value["Type"]>): (schema: Value) => LeftOut<Value>
+  <Value extends LeftOutField>(schema: Value, options: Emptiness<Value["Type"]>): LeftOut<Value>
+} = dual(2, <Value extends LeftOutField>(schema: Value, options: Emptiness<Value["Type"]>): LeftOut<Value> => {
+  const decoded = S.optionalKey(schema).pipe(
+    S.decodeTo(S.toType(schema), {
+      decode: SchemaGetter.withDefault(Effect.succeed(options.empty)),
+      encode: SchemaGetter.transformOptional(O.filter((value: Value["Type"]) => !options.isEmpty(value)))
+    })
+  )
+  return S.withConstructorDefault<typeof decoded>(Effect.succeed(options.empty))(decoded)
+})

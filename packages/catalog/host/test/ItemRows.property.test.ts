@@ -3,7 +3,7 @@
 // key its SKU is compared by, every piece bound is a JSON array of exactly the items it was cut from, and a list is cut
 // by the bytes its JSON really has, never past what D1 takes in one value.
 import { describe, expect, it } from "@effect/vitest"
-import { skuKey } from "@inventory/catalog-contract/Item"
+import { skuKey } from "@inventory/catalog-contract/SkuKey"
 import { ItemInsert, ItemsPiece } from "@inventory/catalog-host/ImportRows"
 import { jsonPieces, pieceBytes } from "@inventory/catalog-host/Pieces"
 import * as A from "effect/Array"

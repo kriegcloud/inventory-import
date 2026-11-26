@@ -118,8 +118,9 @@ const recheckOf = perKey((id: ImportId) =>
         // The check knows the typed values and not the keep-or-replace answer: once that is given, what is still open
         // is what the review of every decision says (the row's own problem).
         const answered = asked.cells[storedChoice] === "keep" || asked.cells[storedChoice] === "replace"
-        if (problem?.kind === "changed" && answered) return asked.row.problem
-        return problem === undefined ? undefined : toRegionProblem(problem)
+        if (O.exists(problem, (open) => open.kind === "changed") && answered) return asked.row.problem
+        // The region takes no problem as undefined: the screen's last step.
+        return O.match(problem, { onNone: () => undefined, onSome: toRegionProblem })
       }
     })
   )

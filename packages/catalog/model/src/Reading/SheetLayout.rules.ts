@@ -3,6 +3,7 @@
 // browser, in a Worker and in tests. Do not break: a row is never dropped or a value changed without a Note.
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import { identity } from "effect/Function"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
 import * as R from "effect/Record"
@@ -19,7 +20,9 @@ import {
   SheetChoiceReason,
   type SheetSummary,
   type SpreadsheetTable,
-  WorkbookFormat
+  WorkbookFormat,
+  formulaOf,
+  shownOf
 } from "./Spreadsheet.rules.ts"
 import { plural } from "../Words.rules.ts"
 import { fileProblem } from "@inventory/catalog-contract/FileProblem"
@@ -127,34 +130,53 @@ const totalWord = /^\s*(grand\s+|sub-?)?totals?\b/i
  * @example describeRows([9, 12]) // "rows 9 and 12"
  * @example describeRows([9, 12, 15, 21, 30, 31, 40]) // "rows 9, 12, 15 and 4 more"
  */
-export const describeRows = (rows: ReadonlyArray<number>): string => {
-  const shown = A.map(A.take(rows, 3), String)
-  const more = rows.length - shown.length
-  if (rows.length === 1) return `row ${rows[0]}`
-  if (more > 0) return `rows ${A.join(shown, ", ")} and ${more} more`
-  return `rows ${A.join(A.take(shown, shown.length - 1), ", ")} and ${shown[shown.length - 1]}`
-}
+export const describeRows = (rows: ReadonlyArray<number>): string =>
+  `${rows.length === 1 ? "row" : "rows"} ${listUpTo(A.map(rows, String), shownInList)}`
 
 /** "Row 9", "Rows 9 and 12": `describeRows` at the start of a sentence. */
 const Rows = (rows: ReadonlyArray<number>): string => Str.capitalize(describeRows(rows))
 
-const listOf = (items: ReadonlyArray<string>, limit = 3): string => {
+/**
+ * Items as words for a message, at most `limit` of them named and the rest counted: "a, b and c", "a, b, c and 4
+ * more". A message names a list only when it has something in it; an empty one reads "none".
+ *
+ * @example listUpTo(["C5", "C9"], 3) // "C5 and C9"
+ */
+const listUpTo = (items: ReadonlyArray<string>, limit: number): string => {
   const shown = A.take(items, limit)
   const more = items.length - shown.length
-  if (items.length === 1) return shown[0] ?? ""
   if (more > 0) return `${A.join(shown, ", ")} and ${more} more`
-  return `${A.join(A.take(shown, shown.length - 1), ", ")} and ${shown[shown.length - 1]}`
+  return A.matchRight(shown, {
+    onEmpty: () => "none",
+    onNonEmpty: (init, last) => (A.isReadonlyArrayNonEmpty(init) ? `${A.join(init, ", ")} and ${last}` : last)
+  })
 }
 
-const note = (kind: NoteKind, level: Note["level"], message: string, rows: ReadonlyArray<number> = []): Note => ({
+/** How many items a message names before it counts the rest. */
+const shownInList = 3
+
+/** `listUpTo` with the usual three named. */
+const listOf = (items: ReadonlyArray<string>): string => listUpTo(items, shownInList)
+
+/** The rows a note about a column, a sheet or the whole file names: none. */
+const noRows: ReadonlyArray<number> = []
+
+const note = (kind: NoteKind, level: Note["level"], message: string, rows: ReadonlyArray<number>): Note => ({
   kind,
   level,
   message,
   rows
 })
 
-const quote = (text: string, max = 60): string =>
+/** How much of a cell a message quotes before it cuts the text. */
+const quotedLength = 60
+
+/** A text in quotes for a message, cut at `max` characters with "...". */
+const quoteUpTo = (text: string, max: number): string =>
   `"${text.length > max ? `${Str.trimEnd(Str.slice(0, max)(text))}...` : text}"`
+
+/** `quoteUpTo` at the usual length. */
+const quote = (text: string): string => quoteUpTo(text, quotedLength)
 
 /** The header row, the columns it names and the data rows under it, with Notes. Shared by CSV and workbook. */
 interface Layout {
@@ -186,7 +208,7 @@ const layoutSheet = Effect.fn("SheetLayout.layoutSheet")(function* (input: {
       fileProblem.noHeaderRow({
         fileName: input.fileName,
         rows: headerSearchRows,
-        ...O.match(input.sheetName, { onNone: () => ({}), onSome: (sheet) => ({ sheet }) })
+        sheet: input.sheetName
       })
     )
   }
@@ -194,39 +216,39 @@ const layoutSheet = Effect.fn("SheetLayout.layoutSheet")(function* (input: {
   const notes: Array<Note> = []
 
   // Columns run from the header's first named cell to its last; letters stay the file's own.
-  const firstColumn = O.getOrElse(
-    A.findFirstIndex(headerRow.cells, (cell) => !CellType.is.empty(cell.type)),
-    () => 0
-  )
-  const lastColumn = O.getOrElse(
-    A.findLastIndex(headerRow.cells, (cell) => !CellType.is.empty(cell.type)),
-    () => 0
-  )
+  // The header row was chosen for its named cells, so it has a first and a last one.
+  const span = O.all({
+    first: A.findFirstIndex(headerRow.cells, (cell) => !CellType.is.empty(cell.type)),
+    last: A.findLastIndex(headerRow.cells, (cell) => !CellType.is.empty(cell.type))
+  })
+  if (O.isNone(span)) return yield* Effect.die("the header row has no named cell")
+  const firstColumn = span.value.first
+  const lastColumn = span.value.last
   const seen: Record<string, number> = {}
   const columns: Array<Column> = []
   const duplicates: Array<string> = []
   const unnamed: Array<string> = []
   const spaced: Array<string> = []
-  for (let i = firstColumn; i <= lastColumn; i++) {
-    const text = headerRow.cells[i]?.text ?? ""
+  A.forEach(A.take(A.drop(headerRow.cells, firstColumn), lastColumn - firstColumn + 1), (cell, offset) => {
+    const i = firstColumn + offset
+    const text = cell.text
     const letter = columnLetter(i)
     const trimmed = Str.trim(text)
     const key = Str.toLowerCase(trimmed)
+    const before = R.get(seen, key)
     let label = trimmed
     if (trimmed === "") {
       label = `Column ${letter}`
       unnamed.push(letter)
-    } else if (O.isSome(R.get(seen, key))) {
+    } else if (O.isSome(before)) {
       label = `${trimmed} (column ${letter})`
-      duplicates.push(
-        `${quote(trimmed)} (columns ${columnLetter(O.getOrElse(R.get(seen, key), () => i))} and ${letter})`
-      )
+      duplicates.push(`${quote(trimmed)} (columns ${columnLetter(before.value)} and ${letter})`)
     } else {
       seen[key] = i
     }
     if (trimmed !== "" && trimmed !== text) spaced.push(quote(text))
-    columns.push({ index: i - firstColumn, letter, header: text, label })
-  }
+    columns.push({ index: offset, letter, header: text, label })
+  })
   if (duplicates.length > 0) {
     notes.push(
       note(
@@ -303,14 +325,14 @@ const layoutSheet = Effect.fn("SheetLayout.layoutSheet")(function* (input: {
   const longCells: Array<string> = []
   const longRows: Array<number> = []
   let secondTable: O.Option<{ readonly first: number; readonly last: number; readonly names: string }> = O.none()
-  const start = O.getOrElse(
-    A.findFirstIndex(grid.rows, (row) => row.rowNumber === headerRow.rowNumber),
-    () => 0
-  )
+  // The header row is one of the grid's rows, so it has a place among them.
+  const start = A.findFirstIndex(grid.rows, (row) => row.rowNumber === headerRow.rowNumber)
+  if (O.isNone(start)) return yield* Effect.die("the header row is not in the grid")
   const width = lastColumn - firstColumn + 1
-  for (let r = start + 1; r < grid.rows.length; r++) {
-    const row = grid.rows[r]
-    if (row === undefined) continue
+  const under = A.drop(grid.rows, start.value + 1)
+  let at = -1
+  for (const row of under) {
+    at++
     if (isBlank(row)) {
       pendingBlank.push(row.rowNumber)
       continue
@@ -323,14 +345,17 @@ const layoutSheet = Effect.fn("SheetLayout.layoutSheet")(function* (input: {
         (cell) => CellType.is.empty(cell.type) || (CellType.is.text(cell.type) && !hasDigit.test(cell.text))
       )
     ) {
-      const rest = A.filter(grid.rows.slice(r), (other) => !isBlank(other))
+      const rest = A.prepend(
+        A.filter(A.drop(under, at + 1), (other) => !isBlank(other)),
+        row
+      )
       secondTable = O.some({
         first: row.rowNumber,
-        last: rest[rest.length - 1]?.rowNumber ?? row.rowNumber,
-        names: listOf(
+        last: A.lastNonEmpty(rest).rowNumber,
+        names: listUpTo(
           A.map(
             A.filter(row.cells, (cell) => !CellType.is.empty(cell.type)),
-            (cell) => quote(cell.text, 30)
+            (cell) => quoteUpTo(cell.text, 30)
           ),
           4
         )
@@ -340,15 +365,16 @@ const layoutSheet = Effect.fn("SheetLayout.layoutSheet")(function* (input: {
     for (const n of pendingBlank) blankInside.push(n)
     pendingBlank = []
 
-    const cells: Array<Cell> = []
-    for (let c = firstColumn; c <= lastColumn; c++) cells.push(row.cells[c] ?? emptyCell)
+    // A row that stops before the last column reads as empty cells there, as a spreadsheet shows it.
+    const cells: Array<Cell> = A.makeBy(width, (k) =>
+      O.match(A.get(row.cells, firstColumn + k), { onNone: () => emptyCell, onSome: identity })
+    )
     const extra: Array<ExtraCell> = []
-    for (let c = 0; c < row.cells.length; c++) {
-      const cell = row.cells[c]
-      if ((c < firstColumn || c > lastColumn) && cell !== undefined && !CellType.is.empty(cell.type)) {
+    A.forEach(row.cells, (cell, c) => {
+      if ((c < firstColumn || c > lastColumn) && !CellType.is.empty(cell.type)) {
         extra.push({ letter: columnLetter(c), cell })
       }
-    }
+    })
     if (row.cells.length < lastColumn + 1) short.push(row.rowNumber)
     if (extra.length > 0) withExtra.push(row.rowNumber)
     if (row.hidden) hiddenRows.push(row.rowNumber)
@@ -357,13 +383,11 @@ const layoutSheet = Effect.fn("SheetLayout.layoutSheet")(function* (input: {
       totals.push(row.rowNumber)
     }
     let rowHasSpaces = false
-    for (let c = 0; c < cells.length; c++) {
-      const cell = cells[c]
-      if (cell === undefined) continue
+    A.forEach(cells, (cell, c) => {
       const letter = columnLetter(c + firstColumn)
       const ref = `${letter}${row.rowNumber}`
       if (CellType.is.text(cell.type) && cell.text !== Str.trim(cell.text)) rowHasSpaces = true
-      if (cell.formula !== undefined) {
+      if (O.isSome(formulaOf(cell))) {
         if (CellType.is.empty(cell.type)) noResult.push(ref)
         else formulaCount++
         if (!A.contains(formulaColumns, letter)) formulaColumns.push(letter)
@@ -374,17 +398,19 @@ const layoutSheet = Effect.fn("SheetLayout.layoutSheet")(function* (input: {
       }
       if (CellType.is.date(cell.type)) {
         if (!A.contains(dateColumns, letter)) dateColumns.push(letter)
-        if (dateExample === "" && cell.shown !== undefined) dateExample = `${quote(cell.shown)} is ${cell.text}`
+        const shown = shownOf(cell)
+        if (dateExample === "" && O.isSome(shown)) dateExample = `${quote(shown.value)} is ${cell.text}`
       }
-      if (CellType.is.number(cell.type) && cell.shown !== undefined && /^0\d/.test(cell.shown)) {
-        zeroCells.push(`${ref} shows ${cell.shown}, stored as ${cell.text}`)
+      const zeroLed = O.filter(shownOf(cell), (shown) => /^0\d/.test(shown))
+      if (CellType.is.number(cell.type) && O.isSome(zeroLed)) {
+        zeroCells.push(`${ref} shows ${zeroLed.value}, stored as ${cell.text}`)
         zeroRows.push(row.rowNumber)
       }
       if (CellType.is.number(cell.type) && /^-?\d{16,}/.test(cell.text)) {
         longCells.push(`${ref} (${cell.text})`)
         longRows.push(row.rowNumber)
       }
-    }
+    })
     if (rowHasSpaces) spacedCells.push(row.rowNumber)
     rows.push({
       rowNumber: row.rowNumber,
@@ -464,7 +490,8 @@ const layoutSheet = Effect.fn("SheetLayout.layoutSheet")(function* (input: {
       note(
         "formulas",
         "info",
-        `${plural(formulaCount, "cell holds a formula", "cells hold formulas")} (${formulaColumns.length === 1 ? "column" : "columns"} ${listOf(A.sort(formulaColumns, Order.String))}); the result saved in the file was read.`
+        `${plural(formulaCount, "cell holds a formula", "cells hold formulas")} (${formulaColumns.length === 1 ? "column" : "columns"} ${listOf(A.sort(formulaColumns, Order.String))}); the result saved in the file was read.`,
+        noRows
       )
     )
   }
@@ -473,7 +500,8 @@ const layoutSheet = Effect.fn("SheetLayout.layoutSheet")(function* (input: {
       note(
         "formulaWithoutResult",
         "warning",
-        `${plural(noResult.length, "formula has", "formulas have")} no saved result (${listOf(noResult)}), so ${noResult.length === 1 ? "it reads" : "they read"} as empty. Open the file in Excel, save it, and choose it again.`
+        `${plural(noResult.length, "formula has", "formulas have")} no saved result (${listOf(noResult)}), so ${noResult.length === 1 ? "it reads" : "they read"} as empty. Open the file in Excel, save it, and choose it again.`,
+        noRows
       )
     )
   }
@@ -492,7 +520,8 @@ const layoutSheet = Effect.fn("SheetLayout.layoutSheet")(function* (input: {
       note(
         "dates",
         "info",
-        `Dates in ${dateColumns.length === 1 ? "column" : "columns"} ${listOf(dateColumns)} were read from the date stored in the file, not from how it is displayed${dateExample === "" ? "" : ` (${dateExample})`}, so day and month are not guessed.`
+        `Dates in ${dateColumns.length === 1 ? "column" : "columns"} ${listOf(dateColumns)} were read from the date stored in the file, not from how it is displayed${dateExample === "" ? "" : ` (${dateExample})`}, so day and month are not guessed.`,
+        noRows
       )
     )
   }
@@ -532,7 +561,8 @@ const layoutSheet = Effect.fn("SheetLayout.layoutSheet")(function* (input: {
       note(
         "hiddenColumns",
         "warning",
-        `${hiddenColumns.length === 1 ? "Column" : "Columns"} ${listOf(A.map(hiddenColumns, columnLetter))} ${hiddenColumns.length === 1 ? "is" : "are"} hidden in Excel and ${hiddenColumns.length === 1 ? "was" : "were"} read like any other column.`
+        `${hiddenColumns.length === 1 ? "Column" : "Columns"} ${listOf(A.map(hiddenColumns, columnLetter))} ${hiddenColumns.length === 1 ? "is" : "are"} hidden in Excel and ${hiddenColumns.length === 1 ? "was" : "were"} read like any other column.`,
+        noRows
       )
     )
   }
@@ -604,28 +634,38 @@ export const describeSheets = Effect.fn("SheetLayout.describeSheets")(function* 
   readonly notes: ReadonlyArray<Note>
   readonly grid: (index: number) => Effect.Effect<{ readonly grid: SheetGrid; readonly notes: ReadonlyArray<Note> }, E>
 }) {
-  const summaries: Array<SheetSummary> = A.map(input.sheets, (sheet, i) => ({
-    name: sheet.name,
-    position: i + 1,
-    visibility: sheet.visibility,
-    rowCount: sheet.rowCount
+  // Each sheet with its place and its summary, so a choice among them carries all three.
+  const entries = A.map(input.sheets, (sheet, index) => ({
+    index,
+    sheet,
+    summary: {
+      name: sheet.name,
+      position: index + 1,
+      visibility: sheet.visibility,
+      rowCount: sheet.rowCount
+    } satisfies SheetSummary
   }))
-  const sizes = A.map(input.sheets, (sheet) => sheet.filledCells)
-  const withData = A.filter(A.range(0, input.sheets.length - 1), (i) => (sizes[i] ?? 0) > 0)
-  const visibleWithData = A.filter(withData, (i) => input.sheets[i]?.visibility === "visible")
-  const largest = (indexes: ReadonlyArray<number>): number =>
-    A.reduce(indexes, indexes[0] ?? 0, (best, i) => ((sizes[i] ?? 0) > (sizes[best] ?? 0) ? i : best))
-  const asked = O.flatMap(input.sheet, (name) => A.findFirstIndex(input.sheets, (sheet) => sheet.name === name))
-  if (withData.length === 0 || input.sheets.length === 0) {
+  type Entry = (typeof entries)[number]
+  const summaries: Array<SheetSummary> = A.map(entries, (entry) => entry.summary)
+  const withData = A.filter(entries, (entry) => entry.sheet.filledCells > 0)
+  const visibleWithData = A.filter(withData, (entry) => entry.sheet.visibility === "visible")
+  // The first of the sheets holding the most cells.
+  const largest = (among: A.NonEmptyReadonlyArray<Entry>): Entry =>
+    A.reduce(A.tailNonEmpty(among), A.headNonEmpty(among), (best, entry) =>
+      entry.sheet.filledCells > best.sheet.filledCells ? entry : best
+    )
+  const asked = O.flatMap(input.sheet, (name) => A.findFirst(entries, (entry) => entry.sheet.name === name))
+  if (!A.isReadonlyArrayNonEmpty(withData)) {
     return yield* Effect.fail(fileProblem.noValues({ fileName: input.fileName, where: "on any sheet" }))
   }
-  const index = O.isSome(asked) ? asked.value : largest(visibleWithData.length > 0 ? visibleWithData : withData)
-  const sheet = input.sheets[index]
-  const summary = summaries[index]
-  if (sheet === undefined || summary === undefined) return yield* Effect.die("sheet index out of range")
-  const others = A.filter(visibleWithData, (i) => i !== index)
+  const chosen = O.match(asked, {
+    onNone: () => largest(A.isReadonlyArrayNonEmpty(visibleWithData) ? visibleWithData : withData),
+    onSome: identity
+  })
+  const { index, sheet, summary } = chosen
+  const others = A.filter(visibleWithData, (entry) => entry.index !== index)
   const othersText = listOf(
-    A.map(others, (i) => `"${summaries[i]?.name}" (${plural(summaries[i]?.rowCount ?? 0, "row", "rows")})`)
+    A.map(others, (entry) => `"${entry.summary.name}" (${plural(entry.summary.rowCount, "row", "rows")})`)
   )
   const reason: SheetChoiceReason = O.isSome(asked)
     ? "chosenByPerson"
@@ -644,19 +684,19 @@ export const describeSheets = Effect.fn("SheetLayout.describeSheets")(function* 
       `It has the most data (${plural(summary.rowCount, "row", "rows")}, ${plural(layout.columns.length, "column", "columns")}). ${others.length === 1 ? "Another sheet also has" : "Other sheets also have"} data: ${othersText}.`
   })
 
-  const hidden = A.filter(withData, (i) => i !== index && input.sheets[i]?.visibility !== "visible")
+  const hidden = A.filter(withData, (entry) => entry.index !== index && entry.sheet.visibility !== "visible")
   const notes: Array<Note> = [...input.notes, ...read.notes]
   if (hidden.length > 0) {
-    const names = A.map(hidden, (i) => {
-      const s = summaries[i]
-      const how = s?.visibility === "veryHidden" ? "hidden so that only a macro can show it" : "hidden"
-      return `"${s?.name}" (${how}, ${plural(s?.rowCount ?? 0, "row", "rows")})`
+    const names = A.map(hidden, ({ summary: s }) => {
+      const how = s.visibility === "veryHidden" ? "hidden so that only a macro can show it" : "hidden"
+      return `"${s.name}" (${how}, ${plural(s.rowCount, "row", "rows")})`
     })
     notes.push(
       note(
         "hiddenSheets",
         "warning",
-        `${hidden.length === 1 ? "A hidden sheet holds" : "Hidden sheets hold"} data that was not read: ${listOf(names)}. Choose ${hidden.length === 1 ? "it" : "one"} if it holds what you meant to import.`
+        `${hidden.length === 1 ? "A hidden sheet holds" : "Hidden sheets hold"} data that was not read: ${listOf(names)}. Choose ${hidden.length === 1 ? "it" : "one"} if it holds what you meant to import.`,
+        noRows
       )
     )
   }
@@ -700,11 +740,10 @@ export const describeWorkbook = Effect.fn("SheetLayout.describeWorkbook")(functi
     })),
     sheet: input.sheet,
     notes: input.notes,
-    grid: (index) => {
-      const sheet = input.sheets[index]
-      return sheet === undefined
-        ? Effect.die("sheet index out of range")
-        : Effect.succeed({ grid: sheet.grid, notes: [] })
-    }
+    grid: (index) =>
+      O.match(A.get(input.sheets, index), {
+        onNone: () => Effect.die("sheet index out of range"),
+        onSome: (sheet) => Effect.succeed({ grid: sheet.grid, notes: [] })
+      })
   })
 })

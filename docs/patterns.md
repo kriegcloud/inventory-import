@@ -485,12 +485,18 @@ const months = [
   { part: 3, label: "Mar", column: 9 }
 ] as const
 
-/** Each month with a quantity is its own record of its row. A row with none is kept as one entry by the review. */
+/**
+ * Each month with a quantity is its own record of its row. A row with none is kept as one entry by the review. The
+ * cell is read by `filledAt` (`@inventory/catalog-model/CellRules`): what it shows without the spaces round it, none
+ * for an empty cell or one the row ends before. A cell's clean-up is its reader's, never a `?? ""` and a trim here.
+ */
 export const byMonth: ItemsOfRow = ({ row, file }) =>
-  A.flatMap(months, (month) => {
-    const quantity = Str.trim(row.cells[month.column]?.text ?? "")
-    return quantity === "" ? [] : [{ part: month.part, label: month.label, file: { ...file, quantity } }]
-  })
+  A.flatMap(months, (month) =>
+    A.map(A.fromOption(filledAt(row, month.column)), (quantity) => ({
+      part: O.some({ number: month.part, label: month.label }),
+      file: { ...file, quantityOnHand: quantity }
+    }))
+  )
 
 export const recordsOfRow: ItemsOfRow = byMonth
 ```

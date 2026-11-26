@@ -17,12 +17,15 @@ import { type Cell, WorkbookFormat } from "../src/Reading/Spreadsheet.rules.ts"
 
 const t = (text: string): Cell => (text === "" ? emptyCell : { type: "text", text })
 const n = (value: number): Cell => ({ type: "number", text: numberText(value) })
-const grid = (rows: ReadonlyArray<ReadonlyArray<Cell>>, extra: Partial<SheetGrid> = {}): SheetGrid => ({
+/** A sheet of `rows`, with what `extra` says Excel knows besides: merges and hidden columns. */
+const gridWith = (rows: ReadonlyArray<ReadonlyArray<Cell>>, extra: Partial<SheetGrid>): SheetGrid => ({
   rows: A.map(rows, (cells, i): GridRow => ({ rowNumber: i + 1, cells, hidden: false })),
   merges: [],
   hiddenColumns: [],
   ...extra
 })
+/** A sheet of `rows` and nothing else: no merges, no hidden column. */
+const grid = (rows: ReadonlyArray<ReadonlyArray<Cell>>): SheetGrid => gridWith(rows, {})
 const sheet = (name: string, g: SheetGrid) => ({ name, visibility: "visible" as const, grid: g })
 const items = grid([
   [t("SKU"), t("Qty")],
@@ -100,7 +103,7 @@ describe("describeWorkbook", () => {
 
   it.effect("flags a formula without a saved result, a hidden column and merged cells inside the data", () =>
     Effect.gen(function* () {
-      const g = grid(
+      const g = gridWith(
         [
           [t("Group"), t("SKU"), t("Qty")],
           [t("Fasteners"), t("HB-M8-30"), { type: "empty", text: "", formula: "=B2*2" }],

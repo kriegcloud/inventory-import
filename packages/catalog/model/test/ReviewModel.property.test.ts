@@ -9,6 +9,7 @@ import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as S from "effect/Schema"
+import * as O from "effect/Option"
 import * as Str from "effect/String"
 import { Actor } from "../src/Actor/Actor.context.ts"
 import { Catalog, CatalogApi } from "../src/Catalog.model.ts"
@@ -92,7 +93,7 @@ describe("says what it is", () => {
   /** The names of the declarations that carry no description. */
   const silent = (declared: ReadonlyArray<{ readonly name: string; readonly description: string | undefined }>) =>
     A.map(
-      A.filter(declared, (one) => one.description === undefined || one.description === ""),
+      A.filter(declared, (one) => !O.exists(O.fromUndefinedOr(one.description), Str.isNonEmpty)),
       (one) => one.name
     )
 

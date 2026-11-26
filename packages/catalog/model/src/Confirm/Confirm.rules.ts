@@ -9,6 +9,7 @@ import { maxPart, RowNumber } from "@inventory/catalog-contract/Staged"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import type { Member } from "@inventory/kernel/Member"
 import { DisplayName } from "@inventory/kernel/Text"
+import { identity } from "effect/Function"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
@@ -46,6 +47,9 @@ const place = {
   sku: S.String.pipe(S.annotateKey({ description: "The row's SKU as the review reads it" })),
   name: S.String.pipe(S.annotateKey({ description: "The row's name as the review reads it" }))
 }
+/** The part a planned row of one item is written with: 0, the stored form's word for no part (`place.part`). */
+const oneItemPart = 0
+
 const written = {
   ...place,
   item: ItemFields,
@@ -171,17 +175,23 @@ export const confirmPlan = (input: {
   readonly actor: Member
 }): ConfirmPlan => {
   const { review, authors, actor } = input
-  const who = (rowId: string): string => O.getOrElse(R.get(authors, rowId), () => actor.name)
+  const who = (rowId: string): string => O.match(R.get(authors, rowId), { onNone: () => actor.name, onSome: identity })
+  // A name stored before names were checked, too long or empty, is said as the confirming person's.
   const person = (rowId: string): DecidedBy =>
-    decidedByPerson(O.getOrElse(S.decodeOption(DisplayName)(who(rowId)), () => actor.name))
+    decidedByPerson(O.match(S.decodeOption(DisplayName)(who(rowId)), { onNone: () => actor.name, onSome: identity }))
   const rows = A.map(review.rows, (row): PlannedRow => {
-    const at = { rowNumber: row.rowNumber, part: row.part ?? 0, sku: row.values.sku, name: row.values.name }
+    const at = {
+      rowNumber: row.rowNumber,
+      part: O.match(row.part, { onNone: () => oneItemPart, onSome: (part) => part.number }),
+      sku: row.values.sku,
+      name: row.values.name
+    }
     // Every problem of the row, so the not-imported rows and their download name each one.
     const why = fitted(row.reasons)
-    if (RowStatus.is.ready(row.status) && row.item !== null) {
+    if (RowStatus.is.ready(row.status) && O.isSome(row.item)) {
       const made = {
         ...at,
-        item: row.item,
+        item: row.item.value,
         changes: A.map(row.changes, (change) =>
           PlannedChange.make({
             change,

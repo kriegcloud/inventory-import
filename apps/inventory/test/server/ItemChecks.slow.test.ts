@@ -4,7 +4,8 @@
 // knows only ASCII, so the table holds the SKU's form itself, where the key is the SKU, rather than redoing the key
 // (Unicode spaces and case) in SQL. On a fresh D1, with the migrations applied.
 import { expect, layer } from "@effect/vitest"
-import { decimalPattern, ItemFields, skuKey, skuPattern, UnitCost } from "@inventory/catalog-contract/Item"
+import { decimalPattern, ItemFields, skuPattern, UnitCost } from "@inventory/catalog-contract/Item"
+import { skuKey } from "@inventory/catalog-contract/SkuKey"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
 import * as Result from "effect/Result"

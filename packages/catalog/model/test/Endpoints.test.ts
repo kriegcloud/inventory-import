@@ -5,8 +5,9 @@ import { assistantEndpoints } from "@inventory/catalog-model/AssistantHandler"
 import { Answerer, type AnswerSchema, type ModelAnswered, type ModelQuestion } from "@inventory/catalog-model/Answerer"
 import { importsEndpoints } from "@inventory/catalog-model/ImportsHandler"
 import { itemsEndpoints } from "@inventory/catalog-model/ItemsHandler"
-import { catalogMemory, CatalogMemoryRef } from "@inventory/catalog-model/Memory"
+import { catalogMemory, catalogMemoryWith, CatalogMemoryRef } from "@inventory/catalog-model/Memory"
 import { type ConfirmWrite, ImportStore } from "@inventory/catalog-model/ImportStore"
+import { noItemsRead } from "@inventory/catalog-model/Rematch"
 import { usedUpSentence } from "@inventory/catalog-model/AssistantHandler"
 import { memoryUsedUpWords } from "@inventory/catalog-model/ModelAllowance"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
@@ -37,7 +38,7 @@ import * as S from "effect/Schema"
 import { as, dana, elena, fiveLines, marcus, priya, stage, tableOf } from "./support.ts"
 
 const withCrypto = <A, E>(memory: Layer.Layer<A, E>) => Layer.mergeAll(memory, SecureRandom.layerWebCrypto)
-const App = withCrypto(catalogMemory())
+const App = withCrypto(catalogMemory)
 /** Runs `effect`, which must be refused, and expects the refusal to be of `kind`. */
 const refusedAs = <A, E, R>(effect: Effect.Effect<A, E, R>, kind: abstract new (...args: never) => unknown) =>
   Effect.map(Effect.flip(effect), (error) => {
@@ -149,9 +150,9 @@ describe("an import, over the twins", () => {
           expect(A.map(before.takeBack.changed, (item) => item.sku)).toEqual(["AAA-0001"])
           const payload = { confirms: before.takeBack.confirms }
           const back = yield* imports.takeBack({ params: { id }, payload }).pipe(as(marcus))
-          expect([back.status, O.getOrUndefined(back.result)?.takenBack, back.takeBack.keptCount]).toEqual([
+          expect([back.status, O.map(back.result, (result) => result.takenBack), back.takeBack.keptCount]).toEqual([
             "takenBack",
-            2,
+            O.some(2),
             1
           ])
           const got14 = yield* items.list().pipe(as(marcus))
@@ -175,10 +176,10 @@ describe("an import, over the twins", () => {
           const params = { id: view.id }
           const set = { "row-2": decisionFromFlags({ out: true }) }
           const first = yield* imports
-            .decide({ params, payload: { madeOn: R.map(set, () => view.revision), set, clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: R.map(set, () => view.revision), set, clear: [] } })
             .pipe(as(marcus))
           const second = yield* imports
-            .decide({ params, payload: { madeOn: R.map(set, () => view.revision), set, clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: R.map(set, () => view.revision), set, clear: [] } })
             .pipe(as(marcus))
           expect(second.revision).toBe(first.revision)
           // The answer says which save moved the draft: the first did, the same one again did not.
@@ -186,7 +187,7 @@ describe("an import, over the twins", () => {
           const after = yield* imports.get({ params }).pipe(as(marcus))
           expect(after.progress.ready).toBe(2)
           const cleared = yield* imports
-            .decide({ params, payload: { madeOn: {}, set: {}, clear: ["row-2"] } })
+            .decide({ params, payload: { over: {}, madeOn: {}, set: {}, clear: ["row-2"] } })
             .pipe(as(marcus))
           expect(cleared.revision).toBe(first.revision + 1)
           expect(cleared.changed).toBe(true)
@@ -211,6 +212,7 @@ describe("an import, over the twins", () => {
             .decide({
               params,
               payload: {
+                over: {},
                 madeOn: { "row-2": view.revision },
                 set: { "row-2": decisionFromFlags({ out: true }) },
                 clear: []
@@ -326,7 +328,7 @@ const Counting = Layer.succeed(
 )
 
 describe("the table assistant, over the twins", () => {
-  layer(withCrypto(catalogMemory({ answerer: Counting, calls: 1 })))("one call left", (it) => {
+  layer(withCrypto(catalogMemoryWith({ answerer: Counting, calls: 1 })))("one call left", (it) => {
     it.effect(
       "the model answers once and leaves one line; with the allowance used the rules answer and no model is asked",
       () =>
@@ -369,10 +371,13 @@ const danaSavesDuringTheConfirm = Layer.effect(
         const first = !(yield* Ref.getAndSet(raced, true))
         if (first) {
           const found = yield* inner.find(write.audit.organizationId, write.draft)
-          yield* inner.decide(dana, O.getOrThrow(found), {
-            set: { "row-2": decisionFromFlags({ out: true }) },
-            clear: []
-          })
+          yield* inner.decide(
+            dana,
+            O.getOrThrow(found),
+            { set: { "row-2": decisionFromFlags({ out: true }) }, clear: [] },
+            noItemsRead,
+            O.none()
+          )
         }
         return yield* inner.commit(write)
       })
@@ -381,7 +386,7 @@ const danaSavesDuringTheConfirm = Layer.effect(
 )
 
 describe("a confirm another save overtakes after the handler checked its revision", () => {
-  layer(withCrypto(Layer.provideMerge(danaSavesDuringTheConfirm, catalogMemory())))("the store's own check", (it) => {
+  layer(withCrypto(Layer.provideMerge(danaSavesDuringTheConfirm, catalogMemory)))("the store's own check", (it) => {
     it.effect("is DraftMoved at the revision the save left, and writes nothing", () =>
       Effect.gen(function* () {
         const imports = yield* importsEndpoints
@@ -409,7 +414,7 @@ describe("a confirm another save overtakes after the handler checked its revisio
 })
 
 describe("a revision the draft has not reached", () => {
-  layer(withCrypto(catalogMemory()))("is not taken on the client's word", (it) => {
+  layer(withCrypto(catalogMemory))("is not taken on the client's word", (it) => {
     it.effect(
       "a save whose row names a later madeOn, and a confirm naming a later revision, are refused and write nothing",
       () =>
@@ -420,7 +425,7 @@ describe("a revision the draft has not reached", () => {
           const accept = { "row-2": decisionFromFlags({ out: true }) }
           const save = yield* Effect.flip(
             imports
-              .decide({ params, payload: { madeOn: { "row-2": view.revision + 1 }, set: accept, clear: [] } })
+              .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision + 1 }, set: accept, clear: [] } })
               .pipe(as(marcus))
           )
           const confirm = yield* Effect.flip(
@@ -437,7 +442,7 @@ describe("a revision the draft has not reached", () => {
 })
 
 describe("an accept made before its column was matched again, over the twins", () => {
-  layer(withCrypto(catalogMemory()))("the twin holds the rule as D1 does", (it) => {
+  layer(withCrypto(catalogMemory))("the twin holds the rule as D1 does", (it) => {
     it.effect(
       "is not applied by a save, which names it, and a confirm that carries it is refused and writes nothing",
       () =>
@@ -454,7 +459,7 @@ describe("an accept made before its column was matched again, over the twins", (
           expect(matched.revision).toBe(view.revision + 1)
           const accept = { "row-2": decisionFromFlags({ accepted: ["unitCost"] }) }
           const saved = yield* imports
-            .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: accept, clear: [] } })
+            .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: accept, clear: [] } })
             .pipe(as(marcus))
           expect(saved.notApplied).toEqual([{ rowId: "row-2", field: "unitCost", kind: "accept" }])
           const after = yield* imports.get({ params }).pipe(as(marcus))

@@ -6,7 +6,7 @@ import { ImportId } from "@inventory/catalog-contract/Ids"
 import { maxSaid, said } from "@inventory/catalog-model/CellReading"
 import { maxReason } from "@inventory/catalog-contract/Import"
 import { ConfirmPlan, confirmPlan, fitted, maxSentence } from "@inventory/catalog-model/Confirm"
-import { maxRowsNamed, review } from "@inventory/catalog-model/Review"
+import { maxRowsNamed, review, noHistory } from "@inventory/catalog-model/Review"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
@@ -39,13 +39,16 @@ const tableOf = (lines: ReadonlyArray<ReadonlyArray<string>>): StagedTable => ({
   headerRowNumber: 1,
   columns: A.map(headings, (label, index) => ({ index, letter: "A", label })),
   notes: [],
-  rows: A.map(lines, (line, index) => ({ rowNumber: index + 2, cells: A.map(line, (text) => ({ text })) }))
+  rows: A.map(lines, (line, index) => ({
+    rowNumber: index + 2,
+    cells: A.map(line, (text) => ({ text, shown: O.none() }))
+  }))
 })
 
 const draft = ImportId.make("00000000-0000-4000-8000-000000000001")
 
 const longest = (lines: ReadonlyArray<ReadonlyArray<string>>): number => {
-  const current = review({ table: tableOf(lines), choices: [], decisions: {}, storedItems: [] })
+  const current = review({ ...noHistory, table: tableOf(lines), choices: [], decisions: {}, storedItems: [] })
   // The plan is made, and is one a store can be handed: no reason in it is past the bound.
   const plan = confirmPlan({ draft, review: current, authors: {}, actor: marcus })
   expect(S.is(ConfirmPlan)(plan)).toBe(true)
@@ -116,6 +119,7 @@ describe("the reasons of a row, whatever its cells hold", () => {
     )
     const count = `1${Str.repeat(5000)(",000")}`
     const current = review({
+      ...noHistory,
       table: tableOf([
         ["AAA-0001", "Oak Crate", "", "packaging", "EA", "12.50", count, "", "", "", tags, "", "", "", ""]
       ]),
@@ -132,6 +136,7 @@ describe("the reasons of a row, whatever its cells hold", () => {
     expect(said("12 boxes")).toBe('"12 boxes"')
     expect(said(Str.repeat(5000)("x"))).toBe(`"${Str.repeat(maxSaid)("x")}…" (5,000 characters)`)
     const current = review({
+      ...noHistory,
       table: tableOf([
         [
           "AAA-0001",

@@ -4,7 +4,6 @@
 import * as S from "effect/Schema"
 import { OrganizationId, MemberId } from "@inventory/kernel/Ids"
 import { Activity } from "@inventory/kernel/Activity"
-import * as O from "effect/Option"
 import * as SqlClient from "effect/sql/SqlClient"
 import { D1, NoRows } from "@beep/d1/D1"
 import { D1Instant } from "@beep/d1/D1Instant"
@@ -16,7 +15,7 @@ const Line = S.Struct({
   name: S.String,
   action: S.String,
   detail: S.String,
-  agent: S.NullOr(S.String),
+  agent: S.OptionFromNullOr(S.String),
   at: D1Instant
 }).annotate({ description: "One audit line as the activity table holds it" })
 
@@ -28,7 +27,7 @@ export const lineOf = (activity: Activity): typeof Line.Type => ({
   name: activity.actorName,
   action: activity.action,
   detail: activity.detail,
-  agent: O.getOrNull(activity.agent),
+  agent: activity.agent,
   at: activity.createdAt
 })
 

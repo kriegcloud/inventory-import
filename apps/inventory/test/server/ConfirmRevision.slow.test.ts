@@ -44,7 +44,7 @@ layer(TypedApp)("a confirm names the revision its screen showed", (it) => {
         const theirs = yield* client.imports
           .decide({
             params,
-            payload: { madeOn: R.map(acceptComma, () => staged.revision), set: acceptComma, clear: [] }
+            payload: { over: {}, madeOn: R.map(acceptComma, () => staged.revision), set: acceptComma, clear: [] }
           })
           .pipe(dana)
         expect(theirs).toEqual({ revision: staged.revision + 1, changed: true, notApplied: [], decidedSince: [] })
@@ -104,6 +104,7 @@ layer(TypedApp)("a confirm names the revision its screen showed", (it) => {
         .decide({
           params,
           payload: {
+            over: {},
             madeOn: { "row-2": staged.revision },
             set: { "row-2": decisionFromFlags({ out: true }) },
             clear: []

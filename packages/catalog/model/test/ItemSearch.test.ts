@@ -25,18 +25,20 @@ const asked = { page: 1, perPage: 20, sorting: [], filters: [], joinOperator: "a
 
 /** SQLite's LIKE with `ESCAPE '\'`, ignoring case: what the server compares a pattern with. */
 const like = (pattern: string, text: string): boolean => {
-  let source = ""
-  const characters = A.fromIterable(pattern)
-  for (let i = 0; i < characters.length; i++) {
-    const character = characters[i] ?? ""
-    if (character === "\\") {
-      source += Str.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")(characters[i + 1] ?? "")
-      i++
-    } else if (character === "%") source += "[\\s\\S]*"
-    else if (character === "_") source += "[\\s\\S]"
-    else source += Str.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")(character)
-  }
-  return new RegExp(`^${source}$`, "iu").test(text)
+  const literal = (character: string) => Str.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")(character)
+  // A backslash makes the character after it plain; a backslash at the end makes nothing.
+  const read = A.reduce(A.fromIterable(pattern), { source: "", escaping: false }, (state, character) =>
+    state.escaping
+      ? { source: state.source + literal(character), escaping: false }
+      : character === "\\"
+        ? { ...state, escaping: true }
+        : character === "%"
+          ? { ...state, source: `${state.source}[\\s\\S]*` }
+          : character === "_"
+            ? { ...state, source: `${state.source}[\\s\\S]` }
+            : { ...state, source: state.source + literal(character) }
+  )
+  return new RegExp(`^${read.source}$`, "iu").test(text)
 }
 
 describe("the search in the query", () => {
@@ -122,7 +124,7 @@ describe("a word with one letter different", () => {
             : edit === "wrong"
               ? [...A.take(stored, i), letter, ...A.drop(stored, i + 1)]
               : i + 1 < n
-                ? [...A.take(stored, i), stored[i + 1] ?? "", stored[i] ?? "", ...A.drop(stored, i + 2)]
+                ? [...A.take(stored, i), ...A.reverse(A.take(A.drop(stored, i), 2)), ...A.drop(stored, i + 2)]
                 : stored
       const word = A.join(typed, "")
       const text = `Item ${A.join(stored, "")} M8`

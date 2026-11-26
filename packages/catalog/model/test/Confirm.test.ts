@@ -6,7 +6,7 @@ import { ImportId, ItemId } from "@inventory/catalog-contract/Ids"
 import { DecidedBy, maxReason } from "@inventory/catalog-contract/Import"
 import { ConfirmPlan, confirmPlan, PlannedRow } from "@inventory/catalog-model/Confirm"
 import { ConfirmWrite } from "@inventory/catalog-model/ImportStore"
-import { review } from "@inventory/catalog-model/Review"
+import { review, noHistory } from "@inventory/catalog-model/Review"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
@@ -38,7 +38,7 @@ describe("confirmPlan", () => {
           line.out ? [[`row-${index + 2}`, decisionFromFlags({ out: true })] as const] : []
         )
       )
-      const current = review({ table, choices: [], decisions, storedItems: [] })
+      const current = review({ ...noHistory, table, choices: [], decisions, storedItems: [] })
       const plan = confirmPlan({ draft, review: current, authors: {}, actor: marcus })
       const count = (status: PlannedRow["status"]) => A.filter(plan.rows, PlannedRow.isAnyOf([status])).length
       const reviewed = (status: string) => A.filter(current.rows, (row) => row.status === status).length
@@ -68,7 +68,7 @@ describe("a plan a confirm can be handed", () => {
     [ConfirmPlan],
     ([plan]) => {
       for (const row of plan.rows) {
-        expect(rowId({ rowNumber: row.rowNumber, part: row.part })).toBe(
+        expect(rowId({ rowNumber: row.rowNumber, part: O.some(row.part) })).toBe(
           row.part === 0 ? `row-${row.rowNumber}` : `row-${row.rowNumber}.${row.part}`
         )
       }

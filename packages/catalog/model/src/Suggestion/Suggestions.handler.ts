@@ -111,18 +111,20 @@ export const propose = Effect.fn("Suggestions.propose")(function* <R>(input: {
     )
     .pipe(
       asAgent(suggester),
-      answeredByRules(() => null)
+      // The model's answer as an Option, so a rules' answer is none of it: the same answer, told by its case.
+      Effect.map((answered) => ({ value: O.some(answered.value), answeredBy: answered.answeredBy })),
+      answeredByRules(() => O.none<SuggestAnswer>())
     )
   // No model could answer (no key, busy, down, an answer that did not fit): the rules do, and the reason is said.
   const model = O.liftPredicate(answer.answeredBy, AnsweredBy.guards.Model)
-  if (answer.value === null || O.isNone(model)) {
+  if (O.isNone(answer.value) || O.isNone(model)) {
     const why = AnsweredBy.match(answer.answeredBy, {
       Rules: (rules) => rules.reason,
       Model: () => "No model answered."
     })
     return byRules(`${why} The rules answered instead.`)
   }
-  const checked = guard({ source: input.source, answer: answer.value, by: suggestedByModel(model.value.model) })
+  const checked = guard({ source: input.source, answer: answer.value.value, by: suggestedByModel(model.value.model) })
   const proposed: Proposed = {
     suggestions: checked.suggestions,
     answeredBy: answer.answeredBy,

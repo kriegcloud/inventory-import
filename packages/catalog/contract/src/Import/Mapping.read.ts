@@ -6,14 +6,12 @@ import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { Field, StagedColumn } from "../Staging/Staged.read.ts"
-import { nullAsNone } from "@inventory/kernel/Wire"
+import { absentAsNone, nullAsNone } from "@inventory/kernel/Wire"
 
-/** A column the person chose for a field. `column` null means none, on purpose. */
+/** A column the person chose for a field. `column` none (null on the wire) means none, on purpose. */
 export const MappingChoice = S.Struct({
   field: Field,
-  column: S.NullOr(S.Int).annotateKey({
-    description: "The file column's position, from 0; null for none, on purpose"
-  }),
+  column: S.Int.pipe(nullAsNone({ description: "The file column's position, from 0; null for none, on purpose" })),
   by: S.Literals(["person"]).annotateKey({ description: "Who chose it: always a person" }),
   at: S.Int.pipe(S.withDecodingDefaultKey(Effect.succeed(0))).annotateKey({
     description:
@@ -26,7 +24,7 @@ export const MappingChoice = S.Struct({
 /** The decoded value of `MappingChoice`: the column chosen for a field, or none. */
 export type MappingChoice = typeof MappingChoice.Type
 
-const ColumnIndex = S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0)))
+const ColumnIndex = S.Int.check(S.isGreaterThanOrEqualTo(0))
 
 /**
  * A field that began to read another column at a match: the field matched by hand, when its column changed, and any
@@ -46,12 +44,14 @@ export const ColumnMove = S.Struct({
   at: S.Int.check(S.isGreaterThanOrEqualTo(1)).annotateKey({
     description: "The revision the match moved the draft to: the first revision on which the field reads `column`"
   }),
-  was: ColumnIndex.annotateKey({ description: "The column the field read before the match; null for none" }),
-  column: ColumnIndex.annotateKey({ description: "The column the field reads from `at` on; null for none" }),
-  knownFrom: S.optionalKey(S.Int.check(S.isGreaterThanOrEqualTo(1))).annotateKey({
-    description:
-      "Only on the first move of a field matched before moves were kept: the revision of that match, the first one `was` is known for. Absent when `was` is known for every revision since the move before"
-  })
+  was: ColumnIndex.pipe(nullAsNone({ description: "The column the field read before the match; null for none" })),
+  column: ColumnIndex.pipe(nullAsNone({ description: "The column the field reads from `at` on; null for none" })),
+  knownFrom: S.Int.check(S.isGreaterThanOrEqualTo(1)).pipe(
+    absentAsNone({
+      description:
+        "Only on the first move of a field matched before moves were kept: the revision of that match, the first one `was` is known for. Absent when `was` is known for every revision since the move before"
+    })
+  )
 }).annotate({
   identifier: "ColumnMove",
   description: "A field that began to read another column at a match, and the column it read before"

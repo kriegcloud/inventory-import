@@ -311,14 +311,20 @@ export const linesTitle = (groups: ReadonlyArray<LineGroup>): string => {
 const rowsNamedInLine = 10
 
 /** What a match did to the field whose decisions it took back: matched again, cleared, or moved off its column. */
-const matchWords = ({ by, field, matched, reads }: MatchTakeBack): string =>
-  matched === undefined || matched === field
-    ? reads === false
-      ? `${by} cleared the column of ${label(field)}`
-      : `${by} matched ${label(field)} again`
-    : reads === false
-      ? `${by} gave the column of ${label(field)} to ${label(matched)}`
-      : `${by} gave the column of ${label(field)} to ${label(matched)}, and ${label(field)} now reads another`
+const matchWords = ({ by, field, matched, reads }: MatchTakeBack): string => {
+  // An entry stored before either was kept says the field was matched again.
+  const lost = O.exists(reads, (readsOne) => !readsOne)
+  return O.match(
+    O.filter(matched, (other) => other !== field),
+    {
+      onNone: () => (lost ? `${by} cleared the column of ${label(field)}` : `${by} matched ${label(field)} again`),
+      onSome: (other) =>
+        lost
+          ? `${by} gave the column of ${label(field)} to ${label(other)}`
+          : `${by} gave the column of ${label(field)} to ${label(other)}, and ${label(field)} now reads another`
+    }
+  )
+}
 
 /**
  * What one match took back, in a sentence: who did what to which field's column, how many decisions of which kind, and

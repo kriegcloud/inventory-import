@@ -208,15 +208,18 @@ const recordsPage = catalogApi.query((api, get) => {
     sort: query.sorting, filters: query.filters, joinOperator: query.joinOperator, search: query.globalFilter } })
 }, { reactivityKeys: catalogKeys.items })
 // 3. In the screen: the read, and the table, told how many pages there are. `urlState` keeps page, order and filters
-//    in the address. While the next page is fetched the read keeps the last one, marked waiting.
-const page = resultOf(useAtomValue(recordsPage))
-const { table } = useDataTable({ data: page.data?.data ?? [], columns, config: recordsTable,
-  pageCount: page.data?.pageCount ?? 0, urlState: true, getRowId: (record) => record.id })
+//    in the address. While the next page is fetched the read keeps the last one, marked waiting. The page is an
+//    Option until the first one comes, and the table is handed it at the screen's last step: before then, `noPage`
+//    (module level, `{ data: [], pageCount: 0 }`), never a `??` on each field.
+const read = useAtomValue(recordsPage)
+const page = O.match(AsyncResult.value(read), { onNone: () => noPage, onSome: identity })
+const { table } = useDataTable({ data: page.data, columns, config: recordsTable,
+  pageCount: page.pageCount, urlState: true, getRowId: (record) => record.id })
 return (
   <DataTable table={table} stickyHeader>
     <DataTableToolbar table={table} quick={["unit"]} search={
         <TableSearch table={table}
-          placeholder="Search records" working={page.updating} maxLength={200} shortcutHint />}>
+          placeholder="Search records" working={read.waiting} maxLength={200} shortcutHint />}>
       <DataTableSortMenu table={table} align="end" />
       <DataTableFilterMenu table={table} align="end" />
     </DataTableToolbar>

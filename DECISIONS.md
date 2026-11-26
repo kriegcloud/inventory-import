@@ -98,6 +98,7 @@ means I chose and the agent recommended the same.
 | "Why?" card | Kept, on every proposal, a word and its evidence, with Reject | I chose: "Keep it, style as hover card", "Every proposal", "A word and its evidence", "Reject this proposal" | opens by hover, click, keyboard |
 | Model help or the "Why flagged?" panel | Model help; the panel; both | same; the panel was added after the hour | both did not fit in the hour |
 | "Internal Notes" | Left out, and said; flag the 20 rows | same | 20 rows; no such field |
+| A dimensions cell with no unit | Read as cm, as before; ask cm or in; Cannot import | same (2026-11-23) | 0 of the sample's dimensions cells lack a unit |
 | Filters on Items, Activity, People | Items only; all three | same in the hour; all three since | Activity and People moved onto the data table |
 | Review's filter and column menus; scrollbars; the problems strip; messages | the table's menus; thin; one line of pills; top centre | Mine, in my words: "canonical filters dropdown form the datatable", "less 'thiccc' ... scroll bars", "scroll more naturally", "blocks page navigation controls" | seen on screen |
 | A stored SKU on a row that cannot be read yet | It waits; already there | the agent's default; I was told | rows 148, 195 |

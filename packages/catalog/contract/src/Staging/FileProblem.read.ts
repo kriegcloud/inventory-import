@@ -6,6 +6,8 @@
  * `FileProblem`; request errors stay for what is not the person's file (not signed in, not allowed, an upload that is
  * gone, the server broke).
  */
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import { dual } from "effect/Function"
 
@@ -96,6 +98,21 @@ const quoted = (fileName: string): string => `"${fileName}"`
 const megabytes = (bytes: number): string => `${(bytes / 1024 / 1024).toFixed(1)} MB`
 const again = "Choose the file again."
 
+// What to do, when the place that found the problem has nothing better to say: the usual sentence of each kind,
+// on the input's schema so a maker never falls back in code.
+const NotASpreadsheetInput = S.Struct({
+  fileName: S.String,
+  is: S.String,
+  todo: S.String.pipe(S.withConstructorDefault(Effect.succeed("Choose a .csv or .xlsx file.")))
+})
+const UnreadableInput = S.Struct({
+  fileName: S.String,
+  why: S.String,
+  todo: S.String.pipe(
+    S.withConstructorDefault(Effect.succeed("Open it in Excel and save it again, or save it as CSV UTF-8."))
+  )
+})
+
 /**
  * Each problem with its words, made in one place so the browser's reader and the server's staging word a kind the
  * same way.
@@ -105,13 +122,15 @@ const again = "Choose the file again."
  */
 export const fileProblem = {
   /** Neither CSV nor .xlsx: `is` says what it is ("a PDF"), `todo` what to do when choosing again is not enough. */
-  notASpreadsheet: (input: { readonly fileName: string; readonly is: string; readonly todo?: string }) =>
-    FileProblem.make({
+  notASpreadsheet: (made: (typeof NotASpreadsheetInput)["~type.make.in"]) => {
+    const input = NotASpreadsheetInput.make(made)
+    return FileProblem.make({
       kind: "wrongType",
       fileName: input.fileName,
       problem: `${quoted(input.fileName)} is not a spreadsheet: it is ${input.is}.`,
-      todo: input.todo ?? "Choose a .csv or .xlsx file."
-    }),
+      todo: input.todo
+    })
+  },
   /** An Excel 97-2003 workbook: no reader here handles it, and Excel converts it in two clicks. */
   oldExcel: (input: { readonly fileName: string }) =>
     FileProblem.make({
@@ -132,25 +151,29 @@ export const fileProblem = {
    * Damaged, cut short or broken mid-way. `why` follows "could not be read" and says how, when the reader can tell
    * (`": it looks damaged or incomplete"`, `" past row 12: a quote (\") there is never closed, ..."`).
    */
-  unreadable: (input: { readonly fileName: string; readonly why: string; readonly todo?: string }) =>
-    FileProblem.make({
+  unreadable: (made: (typeof UnreadableInput)["~type.make.in"]) => {
+    const input = UnreadableInput.make(made)
+    return FileProblem.make({
       kind: "unreadable",
       fileName: input.fileName,
       problem: `${quoted(input.fileName)} could not be read${input.why}.`,
-      todo: input.todo ?? "Open it in Excel and save it again, or save it as CSV UTF-8."
-    }),
-  /**
-   * No values at all: a file of no bytes (no `where`), or nothing in the place read (`where`: "in the file",
-   * `in the sheet "Empty"`, "on any sheet").
-   */
-  noValues: (input: { readonly fileName: string; readonly where?: string }) =>
+      todo: input.todo
+    })
+  },
+  /** A file of no bytes. */
+  emptyFile: (input: { readonly fileName: string }) =>
     FileProblem.make({
       kind: "empty",
       fileName: input.fileName,
-      problem:
-        input.where === undefined
-          ? `${quoted(input.fileName)} is empty.`
-          : `${quoted(input.fileName)} has no values ${input.where}.`,
+      problem: `${quoted(input.fileName)} is empty.`,
+      todo: "Choose the file that holds the rows to import."
+    }),
+  /** Nothing in the place read (`where`: "in the file", `in the sheet "Empty"`, "on any sheet"). */
+  noValues: (input: { readonly fileName: string; readonly where: string }) =>
+    FileProblem.make({
+      kind: "empty",
+      fileName: input.fileName,
+      problem: `${quoted(input.fileName)} has no values ${input.where}.`,
       todo: "Choose the file that holds the rows to import."
     }),
   /** Column names and nothing under them. */
@@ -162,11 +185,11 @@ export const fileProblem = {
       todo: "Choose the file that holds the rows to import."
     }),
   /** No row of the first `rows` reads as column names (words in two or more cells), in the file or one `sheet` of it. */
-  noHeaderRow: (input: { readonly fileName: string; readonly rows: number; readonly sheet?: string }) =>
+  noHeaderRow: (input: { readonly fileName: string; readonly rows: number; readonly sheet: O.Option<string> }) =>
     FileProblem.make({
       kind: "noHeaderRow",
       fileName: input.fileName,
-      problem: `No row of column names was found in the first ${input.rows} rows of ${input.sheet === undefined ? "" : `the sheet "${input.sheet}" of `}${quoted(input.fileName)}.`,
+      problem: `No row of column names was found in the first ${input.rows} rows of ${O.match(input.sheet, { onNone: () => quoted(input.fileName), onSome: (sheet) => `the sheet "${sheet}" of ${quoted(input.fileName)}` })}.`,
       todo: "Put the column names in one row above the data and choose the file again."
     }),
   /** Over the size the reader takes for its format, before anything is parsed. */

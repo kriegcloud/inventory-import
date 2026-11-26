@@ -22,6 +22,7 @@
     "./ItemQuery": "./src/Item/ItemQuery.command.ts",
     "./ItemSearch": "./src/Item/ItemSearch.read.ts",
     "./Mapping": "./src/Import/Mapping.read.ts",
+    "./SkuKey": "./src/Item/SkuKey.rules.ts",
     "./Staged": "./src/Staging/Staged.read.ts",
     "./Suggestion": "./src/Suggestion/Suggestion.read.ts",
     "./TableView": "./src/Assistant/View.read.ts",

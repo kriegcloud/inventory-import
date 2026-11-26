@@ -34,7 +34,7 @@ import * as A from "effect/Array"
 import * as Str from "effect/String"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
-import type { review } from "@inventory/catalog-model/Review"
+import { itemsOfRow, type review } from "@inventory/catalog-model/Review"
 import { call, callWrite, catalogRuntime } from "./Catalog.runtime.ts"
 import { importAddress } from "./internal/route.ts"
 import {
@@ -110,7 +110,9 @@ export const reviewInput = perKey((id: ImportId) =>
       // A server that sends only the row numbers: each row is then one item.
       createdIds: view.value.createdIds,
       // The stored suggestions, as the server reads them at the confirm: each is a proposal on its row.
-      suggestions: view.value.suggestions
+      suggestions: view.value.suggestions,
+      // Each row is read as items the way the server reads it at the confirm.
+      itemsOf: itemsOfRow
     }
     const same = O.exists(
       held,
@@ -235,7 +237,7 @@ const perform = (input: {
     Send: ({ delta, id: sent, madeOn, over }) =>
       onceSignedInKnown(registry, () => {
         if (!signedInAs({ registry, owner })) return happened(DraftEvent.SaveSignedOut({ id: sent }))
-        const payload = { madeOn, ...(R.isEmptyReadonlyRecord(over) ? {} : { over }), ...delta }
+        const payload = { madeOn, over, ...delta }
         void callWrite((api) => api.imports.decide({ params: { id }, payload })).then(
           ({ changed, decidedSince, notApplied, revision }) => {
             answered(registry, id)

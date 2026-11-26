@@ -7,13 +7,13 @@ import * as S from "effect/Schema"
 import { chunkProblem, uploadChunks } from "../src/Staging/Upload.rules.ts"
 import { chunkRows, piecesCarry } from "@inventory/catalog-contract/Upload"
 describe("pieces", () => {
-  const rows = A.makeBy(1_201, (i) => ({ rowNumber: i + 2, cells: [{ text: `SKU-${i}` }] }))
+  const rows = A.makeBy(1_201, (i) => ({ rowNumber: i + 2, cells: [{ text: `SKU-${i}`, shown: O.none() }] }))
 
   it.prop(
     "splits any file into pieces of at most 500, in order, losing none, that the server accepts as a whole",
     { count: S.Int.check(S.isBetween({ minimum: 1, maximum: 3_000 })) },
     ({ count }) => {
-      const file = A.makeBy(count, (i) => ({ rowNumber: i + 2, cells: [{ text: `SKU-${i}` }] }))
+      const file = A.makeBy(count, (i) => ({ rowNumber: i + 2, cells: [{ text: `SKU-${i}`, shown: O.none() }] }))
       const pieces = uploadChunks({ rows: file })
       expect(A.every(pieces, (piece) => piece.length >= 1 && piece.length <= chunkRows)).toBe(true)
       expect(A.flatten(pieces)).toEqual(file)
@@ -48,8 +48,7 @@ describe("pieces", () => {
         })
       )
     )
-    const [first, second, third] = pieces
-    if (first === undefined || second === undefined || third === undefined) throw new Error("three pieces")
+    const [first, second, third] = O.getOrThrow(O.all([A.get(pieces, 0), A.get(pieces, 1), A.get(pieces, 2)]))
     expect(check([first, first, third])).not.toEqual(O.none())
     // The second piece carries rows of the first again: the count adds up, the order does not.
     const overlapping = { seq: 1, rows: [...first.rows.slice(-1), ...second.rows.slice(0, -1)] }

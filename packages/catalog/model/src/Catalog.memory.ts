@@ -29,10 +29,10 @@ import {
   isActive,
   type ItemEdit,
   type ItemFields,
-  skuKey,
   Stocking,
   type StoredItem
 } from "@inventory/catalog-contract/Item"
+import { skuKey } from "@inventory/catalog-contract/SkuKey"
 import { FilterOperator, ItemFilterColumn, ItemSortColumn } from "@inventory/catalog-contract/ItemQuery"
 import type { ItemFacets, ItemFilter, ItemPage, ItemQuery, ItemSort } from "@inventory/catalog-contract/ItemQuery"
 import { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
@@ -61,6 +61,7 @@ import * as R from "effect/Record"
 import * as Ref from "effect/Ref"
 import * as Result from "effect/Result"
 import * as Str from "effect/String"
+import { identity } from "effect/Function"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as S from "effect/Schema"
 import { Answerer } from "./Answer/Answerer.external.ts"
@@ -98,13 +99,12 @@ import { abandonedAfterMinutes } from "./Staging/Upload.rules.ts"
 import {
   type CompareAtMatch,
   type ItemsAsRead,
-  noItemsRead,
   stillAsRead,
-  noComparison,
   planMatch,
   takenBackOfMatch,
   takenBackWords,
-  withTakeBacks
+  withTakeBacks,
+  sameColumn
 } from "./Import/Rematch.rules.ts"
 import { type StoreSuggestions, SuggestionStore } from "./Suggestion/SuggestionStore.store.ts"
 import { searchWords } from "./Item/ItemSearch.rules.ts"
@@ -781,19 +781,26 @@ const listOf = (value: ItemFilter["value"]): ReadonlyArray<string> => (P.isStrin
 const asNumber = (text: string): O.Option<number> =>
   Str.trim(text) === "" || !Number.isFinite(Number(text)) ? O.none() : O.some(Number(text))
 
+/**
+ * The text a value an item leaves out is compared as: empty, as the adapter's `IS NULL OR ... NOT LIKE` and
+ * `IS NULL OR = ''` treat a column with no value.
+ */
+const leftOutText = ""
+
 // None: the filter is half-typed or does not suit its column, and is left out, as the adapter leaves it out.
 const passes = (item: StoredItem, filter: ItemFilter): O.Option<boolean> => {
-  const has = textOf(item, filter.id)
+  const has = O.filter(textOf(item, filter.id), Str.isNonEmpty)
   const values = listOf(filter.value)
-  const first = O.getOrElse(A.head(values), () => "")
-  if (filter.operator === "isEmpty") return O.some(O.isNone(has) || O.getOrElse(has, () => "") === "")
-  if (filter.operator === "isNotEmpty") return O.some(O.isSome(has) && O.getOrElse(has, () => "") !== "")
-  const text = Str.toLowerCase(O.getOrElse(has, () => ""))
+  const typed = O.filter(A.head(values), Str.isNonEmpty)
+  const filled = O.isSome(has)
+  if (filter.operator === "isEmpty") return O.some(!filled)
+  if (filter.operator === "isNotEmpty") return O.some(filled)
+  const text = O.match(has, { onNone: () => leftOutText, onSome: Str.toLowerCase })
   return FilterOperator.matchOrElse(
     filter.operator,
     {
-      iLike: () => (first === "" ? O.none() : O.some(Str.includes(Str.toLowerCase(first))(text))),
-      notILike: () => (first === "" ? O.none() : O.some(!Str.includes(Str.toLowerCase(first))(text))),
+      iLike: () => O.map(typed, (first) => Str.includes(Str.toLowerCase(first))(text)),
+      notILike: () => O.map(typed, (first) => !Str.includes(Str.toLowerCase(first))(text)),
       inArray: () =>
         values.length === 0 ? O.none() : O.some(A.some(values, (value) => Str.toLowerCase(value) === text)),
       notInArray: () =>
@@ -802,8 +809,8 @@ const passes = (item: StoredItem, filter: ItemFilter): O.Option<boolean> => {
     (operator) => {
       const number = numberOf(item, filter.id)
       if (O.isNone(number)) {
-        if (operator === "eq") return first === "" ? O.none() : O.some(Str.toLowerCase(first) === text)
-        if (operator === "ne") return first === "" ? O.none() : O.some(Str.toLowerCase(first) !== text)
+        if (operator === "eq") return O.map(typed, (first) => Str.toLowerCase(first) === text)
+        if (operator === "ne") return O.map(typed, (first) => Str.toLowerCase(first) !== text)
         return O.none()
       }
       const n = number.value
@@ -816,7 +823,7 @@ const passes = (item: StoredItem, filter: ItemFilter): O.Option<boolean> => {
             O.match(high, { onNone: () => true, onSome: (max) => n <= max })
         )
       }
-      return O.map(asNumber(first), (wanted) =>
+      return O.map(O.flatMap(typed, asNumber), (wanted) =>
         FilterOperator.matchOrElse(
           operator,
           {
@@ -833,6 +840,9 @@ const passes = (item: StoredItem, filter: ItemFilter): O.Option<boolean> => {
   )
 }
 
+/** Where an item that leaves a sorted value out goes: before every value, as SQLite orders an empty column first. */
+const sortsFirst = { count: -1, day: "" } as const
+
 const sortKey = (item: StoredItem, column: ItemSort["id"]): string | number =>
   ItemSortColumn.match(column, {
     name: () => Str.toLowerCase(item.name),
@@ -841,8 +851,8 @@ const sortKey = (item: StoredItem, column: ItemSort["id"]): string | number =>
     uom: () => item.uom,
     unitCost: () => Number(costDigits(item.unitCost)),
     quantityOnHand: () => item.quantityOnHand,
-    reorderPoint: () => O.getOrElse(item.reorderPoint, () => -1),
-    firstReceivedOn: () => O.getOrElse(item.firstReceivedOn, () => ""),
+    reorderPoint: () => O.match(item.reorderPoint, { onNone: () => sortsFirst.count, onSome: identity }),
+    firstReceivedOn: () => O.match(item.firstReceivedOn, { onNone: () => sortsFirst.day, onSome: identity }),
     createdAt: () => DateTime.toEpochMillis(item.createdAt)
   })
 
@@ -864,7 +874,7 @@ const pageOf = (items: ReadonlyArray<StoredItem>, query: ItemQuery): ItemPage =>
   const words = A.map(searchWords(query.search), Str.toLowerCase)
   const haystack = (item: StoredItem): string =>
     Str.toLowerCase(
-      A.join([item.sku, item.name, O.getOrElse(item.description, () => ""), item.category, A.join(item.tags, " ")], " ")
+      A.join([item.sku, item.name, ...A.fromOption(item.description), item.category, A.join(item.tags, " ")], " ")
     )
   const searched = A.filter(items, (item) => A.every(words, (word) => Str.includes(word)(haystack(item))))
   const narrowed = A.filter(searched, (item) => {
@@ -1076,8 +1086,8 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       actor: Member,
       draft: Draft,
       delta: DecisionDelta,
-      read: ItemsAsRead = noItemsRead,
-      expected: O.Option<ComparedAt> = O.none()
+      read: ItemsAsRead,
+      expected: O.Option<ComparedAt>
     ) {
       const sets = yield* Effect.forEach(
         R.toEntries(delta.set),
@@ -1134,9 +1144,9 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
     const matchColumn = Effect.fnUntraced(function* (
       actor: Member,
       draft: Draft,
-      choice: { readonly field: Field; readonly column: number | null },
+      choice: { readonly field: Field; readonly column: O.Option<number> },
       detail: string,
-      compare: CompareAtMatch = noComparison
+      compare: CompareAtMatch
     ) {
       const id = yield* random.uuidV4()
       const at = yield* DateTime.now
@@ -1148,7 +1158,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         const entry = found.value
         const before = yield* S.decodeEffect(ChoicesJson)(entry.draft.choicesJson)
         // Choices that are already so are not a change: no audit line and no new revision.
-        if (A.some(before, (old) => old.field === choice.field && old.column === choice.column)) {
+        if (A.some(before, (old) => old.field === choice.field && sameColumn(old.column, choice.column))) {
           return O.some<ChoicesSaved>("same")
         }
         const head = yield* S.decodeEffect(StagedHeadJson)(entry.draft.headJson)
@@ -1809,20 +1819,31 @@ export const AssistantLogMemory: Layer.Layer<AssistantLog, never, CatalogMemoryR
   })
 )
 
+/** What the catalog in memory is set up with: the model that answers, and how many calls the day allows. */
+export interface CatalogMemoryOptions {
+  readonly answerer: Layer.Layer<Answerer>
+  readonly calls: number
+}
+
 /**
- * Every port of the catalog in memory, and the state they share. With no option there is no model and 40 calls a
- * day; a test that wants a model passes `Answerer.scripted(...)`, and one that wants the allowance used passes
- * `calls: 0`.
+ * The catalog in memory as most tests want it: no model, and the day's 40 calls, the access context's
+ * `dailyModelCalls` (the model package does not depend on the access context, so the number is written here).
  */
-export const catalogMemory = (options?: {
-  readonly answerer?: Layer.Layer<Answerer>
-  readonly calls?: number
-}): Layer.Layer<CatalogPorts | CatalogMemoryRef> =>
+export const offline: CatalogMemoryOptions = { answerer: Answerer.off, calls: 40 }
+
+/**
+ * Every port of the catalog in memory, and the state they share, set up as `options` says: a test that wants a model
+ * passes `Answerer.scripted(...)`, and one that wants the allowance used passes `calls: 0`.
+ */
+export const catalogMemoryWith = (options: CatalogMemoryOptions): Layer.Layer<CatalogPorts | CatalogMemoryRef> =>
   Layer.mergeAll(
     ImportStoreMemory,
     ItemStoreMemory,
     SuggestionStoreMemory,
     AssistantLogMemory,
-    options?.answerer ?? Answerer.off,
-    ModelAllowance.memory(options?.calls ?? 40)
+    options.answerer,
+    ModelAllowance.memory(options.calls)
   ).pipe(Layer.provideMerge(CatalogMemoryRef.layer))
+
+/** Every port of the catalog in memory, `offline`: no model and the day's 40 calls. */
+export const catalogMemory: Layer.Layer<CatalogPorts | CatalogMemoryRef> = catalogMemoryWith(offline)

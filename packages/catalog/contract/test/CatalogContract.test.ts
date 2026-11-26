@@ -108,11 +108,11 @@ describe("the wire", () => {
       })
       const stored = suggestionToStored(suggestion)
       expect([stored.rowId, stored.to, stored.by, stored.model, stored.column]).toEqual([
-        "row-7",
+        O.some("row-7"),
         "Nylon Coil",
         "model",
-        "test/model",
-        null
+        O.some("test/model"),
+        O.none()
       ])
       expect(suggestionFromStored(stored)).toEqual(O.some(suggestion))
       const change = yield* S.decodeEffect(Change)({ how: "typed", field: "name", from: "", to: "Nylon Coil" })

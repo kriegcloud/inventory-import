@@ -22,7 +22,7 @@ import { Member } from "@inventory/kernel/Member"
 import { type Draft, DraftEffect, DraftEvent, emptyDraft, shown, step, waiting } from "../src/Draft.machine.ts"
 import { keptForm } from "../src/internal/storedWaiting.ts"
 
-const App = Layer.mergeAll(catalogMemory(), SecureRandom.layerWebCrypto)
+const App = Layer.mergeAll(catalogMemory, SecureRandom.layerWebCrypto)
 
 const member = (id: string, name: string): Member =>
   Member.make({
@@ -50,7 +50,8 @@ const table: StagedTable = {
   rows: A.map(["BBB-0001", "BBB-0002", "BBB-0003"], (sku, index) => ({
     rowNumber: index + 2,
     cells: A.map(headings, (heading) => ({
-      text: heading === "sku" ? sku : heading === "name" ? `Rope ${index}` : heading === "category" ? "packaging" : "1"
+      text: heading === "sku" ? sku : heading === "name" ? `Rope ${index}` : heading === "category" ? "packaging" : "1",
+      shown: O.none()
     }))
   }))
 }
@@ -102,7 +103,7 @@ const opened = Effect.gen(function* () {
     sends.length = 0
     const payload = {
       madeOn: send.madeOn,
-      ...(R.isEmptyReadonlyRecord(send.over) ? {} : { over: send.over }),
+      over: send.over,
       ...send.delta
     }
     const answer = yield* imports.decide({ params, payload }).pipe(as(dana))
@@ -122,7 +123,7 @@ const opened = Effect.gen(function* () {
   const elsewhere = Effect.fnUntraced(function* (row: string, decision: SavedDecisions[string]) {
     const now = yield* read
     return yield* imports
-      .decide({ params, payload: { madeOn: { [row]: now.revision }, set: { [row]: decision }, clear: [] } })
+      .decide({ params, payload: { over: {}, madeOn: { [row]: now.revision }, set: { [row]: decision }, clear: [] } })
       .pipe(as(marcus))
   })
   const look = Effect.map(read, (view) => happen(arrived(view)))

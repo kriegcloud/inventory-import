@@ -1,6 +1,9 @@
 // Where an import's suggestions are stored: the `importSuggestion` table, read and written through the two mappers
 // of the contract, so the stored rows keep their shape. A write is one batch with its audit line.
+import * as O from "effect/Option"
 import * as S from "effect/Schema"
+import * as SchemaGetter from "effect/SchemaGetter"
+import { identity } from "effect/Function"
 import { SuggestionId, RowId, ImportId } from "@inventory/catalog-contract/Ids"
 import {
   SuggestionKind,
@@ -25,14 +28,19 @@ import { LiteralKit } from "@beep/schema/LiteralKit"
 const Stored = S.Struct({
   id: SuggestionId,
   kind: SuggestionKind,
-  rowId: S.Union([RowId, S.Literal("")]),
-  rowNumber: S.NullOr(S.Int),
+  rowId: S.Union([RowId, S.Literal("")]).pipe(
+    S.decodeTo(RowId.pipe(S.toType, S.Option), {
+      decode: SchemaGetter.transform((id) => (id === "" ? O.none() : O.some(id))),
+      encode: SchemaGetter.transform(O.match({ onNone: () => "" as const, onSome: identity }))
+    })
+  ),
+  rowNumber: S.OptionFromNullOr(S.Int),
   field: Field,
   from: S.String,
   to: S.String,
-  column: S.NullOr(S.Int),
+  column: S.OptionFromNullOr(S.Int),
   by: SuggestionByKind,
-  model: S.NullOr(S.String),
+  model: S.OptionFromNullOr(S.String),
   confidence: LiteralKit(["medium", "low"]),
   basis: S.String
 }).annotate({ description: "A suggestion as its table holds it: the row id is empty, not null, for a column" })

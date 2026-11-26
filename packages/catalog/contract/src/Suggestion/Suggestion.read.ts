@@ -2,7 +2,6 @@
 // never applies itself; the person accepts or rejects it. Its table's columns are read and written by the two
 // mappers here, so the stored rows keep their shape.
 import * as O from "effect/Option"
-import * as Str from "effect/String"
 import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
@@ -164,18 +163,22 @@ export const storedSuggestion = (input: { readonly id: SuggestionId; readonly ma
   return kind === "name" ? NameSuggestion.make({ id, ...cell }) : CategorySuggestion.make({ id, ...cell })
 }
 
-/** A suggestion as the columns of `importSuggestion` hold it: the row id is empty, not null, for a column. */
+/**
+ * A suggestion as the columns of `importSuggestion` hold it, decoded: a column suggestion has no row and a row's has
+ * no column, and only a model's names one. The table stores an empty row id, and nulls, for those; its adapter
+ * decodes them to none.
+ */
 export type StoredSuggestionRow = {
   readonly id: SuggestionId
   readonly kind: SuggestionKind
-  readonly rowId: RowId | ""
-  readonly rowNumber: number | null
+  readonly rowId: O.Option<RowId>
+  readonly rowNumber: O.Option<number>
   readonly field: Field
   readonly from: string
   readonly to: string
-  readonly column: number | null
+  readonly column: O.Option<number>
   readonly by: SuggestionByKind
-  readonly model: string | null
+  readonly model: O.Option<string>
   readonly confidence: "medium" | "low"
   readonly basis: string
 }
@@ -187,19 +190,26 @@ export const suggestionToStored = (suggestion: Suggestion): StoredSuggestionRow 
     kind: suggestion.kind,
     field: suggestionField(suggestion),
     by: suggestion.by.kind,
-    model: SuggestionBy.guards.model(suggestion.by) ? suggestion.by.model : null,
+    model: SuggestionBy.guards.model(suggestion.by) ? O.some(suggestion.by.model) : O.none<string>(),
     confidence: suggestion.confidence,
     basis: suggestion.basis
   }
   return Suggestion.guards.column(suggestion)
-    ? { ...shared, rowId: "", rowNumber: null, from: "", to: suggestion.heading, column: suggestion.column }
+    ? {
+        ...shared,
+        rowId: O.none(),
+        rowNumber: O.none(),
+        from: "",
+        to: suggestion.heading,
+        column: O.some(suggestion.column)
+      }
     : {
         ...shared,
-        rowId: suggestion.rowId,
-        rowNumber: suggestion.rowNumber,
+        rowId: O.some(suggestion.rowId),
+        rowNumber: O.some(suggestion.rowNumber),
         from: suggestion.from,
         to: suggestion.to,
-        column: null
+        column: O.none()
       }
 }
 
@@ -208,31 +218,28 @@ export const suggestionToStored = (suggestion: Suggestion): StoredSuggestionRow 
  * position, a row's suggestion with no row): such a row is never shown.
  */
 export const suggestionFromStored = (row: StoredSuggestionRow): O.Option<Suggestion> => {
-  const by =
-    row.by === "model" && row.model !== null && row.model !== "" ? suggestedByModel(row.model) : suggestedByRule
+  const by = O.match(
+    O.filter(row.model, (model) => row.by === "model" && model !== ""),
+    { onNone: () => suggestedByRule, onSome: suggestedByModel }
+  )
   const said = { by, confidence: row.confidence, basis: row.basis }
   if (row.kind === "column") {
-    return row.column === null
-      ? O.none()
-      : O.some(
-          storedSuggestion({
-            id: row.id,
-            made: { kind: "column", field: row.field, column: row.column, heading: row.to, ...said }
-          })
-        )
+    return O.map(row.column, (column) =>
+      storedSuggestion({ id: row.id, made: { kind: "column", field: row.field, column, heading: row.to, ...said } })
+    )
   }
-  return row.rowId === "" || row.rowNumber === null
-    ? O.none()
-    : O.some(
-        storedSuggestion({
-          id: row.id,
-          made: { kind: row.kind, rowId: row.rowId, rowNumber: row.rowNumber, from: row.from, to: row.to, ...said }
-        })
-      )
+  const { kind } = row
+  return O.map(O.all({ rowId: row.rowId, rowNumber: row.rowNumber }), ({ rowId, rowNumber }) =>
+    storedSuggestion({ id: row.id, made: { kind, rowId, rowNumber, from: row.from, to: row.to, ...said } })
+  )
 }
 
 // One of the listed categories, told by the category's own schema.
 const isCategory = S.is(Category)
+// A name as a model may propose it: no space before or after, and something in it.
+const isProposableName = S.is(S.Trimmed.check(S.isNonEmpty(), S.isMaxLength(maxNameLength)))
+// A cell that holds nothing but spaces, or nothing at all.
+const isBlank = S.is(S.String.check(S.isPattern(/^\s*$/)))
 
 /**
  * Whether a suggestion still fits its row: a name only for a row whose name is empty, at most 120 characters; a
@@ -244,9 +251,8 @@ export const suggestionFits = (input: {
   readonly to: string
   readonly file: Readonly<Record<Field, string>>
 }): boolean => {
-  const to = Str.trim(input.to)
   if (input.kind === "name") {
-    return Str.trim(input.file.name) === "" && to !== "" && to === input.to && to.length <= maxNameLength
+    return isBlank(input.file.name) && isProposableName(input.to)
   }
   if (input.kind === "category") {
     return isCategory(input.to) && !isCategory(input.file.category)

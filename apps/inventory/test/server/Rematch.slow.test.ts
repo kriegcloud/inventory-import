@@ -51,7 +51,7 @@ const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable => (
   notes: [],
   rows: A.map(lines, (line, index) => ({
     rowNumber: index + 2,
-    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "" }))
+    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "", shown: O.none() }))
   }))
 })
 
@@ -112,7 +112,7 @@ const seeded = Effect.gen(function* () {
   return { client, saving, matching }
 })
 
-const flags = (set: Readonly<Record<string, RowDecisionFlags>>) => R.map(set, decisionFromFlags)
+const flags = (set: Readonly<Record<string, RowDecisionFlags.Encoded>>) => R.map(set, decisionFromFlags)
 
 /**
  * One rule end to end: `rematch` on the first import, a save of `set` made before it (what it names, and the decisions
@@ -121,7 +121,7 @@ const flags = (set: Readonly<Record<string, RowDecisionFlags>>) => R.map(set, de
  */
 const scenario = Effect.fn("scenario")(function* (input: {
   readonly rematch: ReadonlyArray<{ readonly field: Field; readonly column: number }>
-  readonly set: Readonly<Record<string, RowDecisionFlags>>
+  readonly set: Readonly<Record<string, RowDecisionFlags.Encoded>>
   /** What else is stored for the import saved on, before anything is decided. */
   readonly before?: (id: string) => Effect.Effect<void, never, SqlClient.SqlClient>
 }) {
@@ -140,7 +140,7 @@ const scenario = Effect.fn("scenario")(function* (input: {
     )
   yield* rematch(saving.id)
   const saved = yield* client.imports
-    .decide({ params: { id: saving.id }, payload: { madeOn, set, clear: [] } })
+    .decide({ params: { id: saving.id }, payload: { over: {}, madeOn, set, clear: [] } })
     .pipe(marcus)
   const afterSave = yield* client.imports.get({ params: { id: saving.id } }).pipe(marcus)
   const refused = yield* Effect.flip(
@@ -152,7 +152,10 @@ const scenario = Effect.fn("scenario")(function* (input: {
   const items = yield* client.items.list().pipe(marcus)
 
   yield* client.imports
-    .decide({ params: { id: matching.id }, payload: { madeOn: R.map(set, () => matching.revision), set, clear: [] } })
+    .decide({
+      params: { id: matching.id },
+      payload: { over: {}, madeOn: R.map(set, () => matching.revision), set, clear: [] }
+    })
     .pipe(marcus)
   yield* rematch(matching.id)
   const afterMatch = yield* client.imports.get({ params: { id: matching.id } }).pipe(marcus)
@@ -285,11 +288,11 @@ layer(TypedApp)("a Replace judged after several re-matches of its column", (it) 
       const replace = flags({ "row-3": { stored: "replace" } })
       // Made while the cost read "unit_cost" (9.00, as "Net cost" reads): the comparison is the same, it stands.
       const before = yield* client.imports
-        .decide({ params, payload: { madeOn: { "row-3": saving.revision }, set: replace, clear: [] } })
+        .decide({ params, payload: { over: {}, madeOn: { "row-3": saving.revision }, set: replace, clear: [] } })
         .pipe(marcus)
       // Made while it read "List cost" (3, the stored cost): the comparison changed, it is taken back.
       const between = yield* client.imports
-        .decide({ params, payload: { madeOn: { "row-3": once.revision }, set: replace, clear: [] } })
+        .decide({ params, payload: { over: {}, madeOn: { "row-3": once.revision }, set: replace, clear: [] } })
         .pipe(marcus)
       expect([before.notApplied, between.notApplied]).toEqual([
         [],
@@ -358,7 +361,7 @@ layer(TypedApp)("what a match took back from the stored decisions", (it) => {
           "row-6": { edits: { name: "Hemp Rope 10m" } }
         })
         const decided = yield* client.imports
-          .decide({ params, payload: { madeOn: R.map(set, () => matching.revision), set, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: R.map(set, () => matching.revision), set, clear: [] } })
           .pipe(marcus)
         const matched = yield* client.imports
           .match({ params, payload: { field: "sku", column: O.some(column("Alt code")) } })
@@ -369,12 +372,12 @@ layer(TypedApp)("what a match took back from the stored decisions", (it) => {
           revision: matched.revision,
           by: "Dana Whitfield",
           field: "sku",
-          matched: "sku",
-          reads: true
+          matched: O.some("sku"),
+          reads: O.some(true)
         }
         const named = [
-          { ...by, kind: "stored", count: 2, rows: ["row-2", "row-3"], saved: { "row-2": at, "row-3": at } },
-          { ...by, kind: "twin", count: 2, rows: ["row-4", "row-5"], saved: { "row-4": at, "row-5": at } }
+          { ...by, kind: "stored", count: 2, rows: ["row-2", "row-3"], saved: O.some({ "row-2": at, "row-3": at }) },
+          { ...by, kind: "twin", count: 2, rows: ["row-4", "row-5"], saved: O.some({ "row-4": at, "row-5": at }) }
         ]
         expect(matched.takenBack).toEqual(named)
         const read = yield* client.imports.get({ params }).pipe(marcus)
@@ -407,7 +410,12 @@ layer(TypedApp)("a Replace whose row stops reading under the column its field is
       yield* client.imports
         .decide({
           params,
-          payload: { madeOn: { "row-2": view.revision }, set: flags({ "row-2": { stored: "replace" } }), clear: [] }
+          payload: {
+            over: {},
+            madeOn: { "row-2": view.revision },
+            set: flags({ "row-2": { stored: "replace" } }),
+            clear: []
+          }
         })
         .pipe(marcus)
       const matched = yield* client.imports
@@ -434,7 +442,7 @@ layer(TypedApp)("a Replace whose row one match stops reading under two fields at
         const params = { id: view.id }
         const replace = flags({ "row-2": { stored: "replace" } })
         const save = client.imports
-          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .decide({ params, payload: { over: {}, madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(marcus)
         yield* save
         // The quantity is pointed at the cost's column: "4.58" is no count, and the cost reads no column.
@@ -444,7 +452,7 @@ layer(TypedApp)("a Replace whose row one match stops reading under two fields at
         expect(R.get(matched.decisions, "row-2")).toEqual(O.some(decisionFromFlags({})))
         expect(
           A.map(matched.takenBack, (entry) => [entry.field, entry.matched, entry.reads, entry.kind, entry.rows])
-        ).toEqual([["unitCost", "quantityOnHand", false, "stored", ["row-2"]]])
+        ).toEqual([["unitCost", O.some("quantityOnHand"), O.some(false), "stored", ["row-2"]]])
         const again = yield* save
         expect(again.notApplied).toEqual([{ rowId: "row-2", field: "unitCost", kind: "stored" }])
       })
@@ -462,13 +470,18 @@ layer(TypedApp)("a take-back stored before what was matched and whether it reads
       yield* client.imports
         .decide({
           params,
-          payload: { madeOn: { "row-6": matching.revision }, set: flags({ "row-6": { reverted: ["uom"] } }), clear: [] }
+          payload: {
+            over: {},
+            madeOn: { "row-6": matching.revision },
+            set: flags({ "row-6": { reverted: ["uom"] } }),
+            clear: []
+          }
         })
         .pipe(marcus)
       const cleared = yield* client.imports.match({ params, payload: { field: "uom", column: O.none() } }).pipe(dana)
       expect(A.map(cleared.takenBack, (entry) => [entry.rows, entry.matched, entry.reads])).toEqual([
-        [["row-4"], undefined, undefined],
-        [["row-6"], "uom", false]
+        [["row-4"], O.none(), O.none()],
+        [["row-6"], O.some("uom"), O.some(false)]
       ])
     })
   )
@@ -506,7 +519,7 @@ layer(TypedApp)("a field matched by hand to the column it already reads", (it) =
         yield* client.imports
           .decide({
             params: { id: matching.id },
-            payload: { madeOn: R.map(set, () => matching.revision), set, clear: [] }
+            payload: { over: {}, madeOn: R.map(set, () => matching.revision), set, clear: [] }
           })
           .pipe(marcus)
         yield* picked(matching.id)
@@ -530,7 +543,9 @@ layer(TypedApp)("a field matched by hand to the column it already reads", (it) =
         const params = { id: saving.id }
         const madeOn = R.map(set, () => saving.revision)
         yield* picked(saving.id)
-        const saved = yield* client.imports.decide({ params, payload: { madeOn, set, clear: [] } }).pipe(marcus)
+        const saved = yield* client.imports
+          .decide({ params, payload: { over: {}, madeOn, set, clear: [] } })
+          .pipe(marcus)
         expect(saved.notApplied).toEqual([])
         const after = yield* client.imports.get({ params }).pipe(marcus)
         expect(decided(after.decisions, rows)).toEqual(asMade)
@@ -603,7 +618,7 @@ layer(TypedApp)("a Replace or Keep-stored on an import matched before moves were
       yield* client.imports
         .match({ params, payload: { field: "unitCost", column: O.some(column("List cost")) } })
         .pipe(dana)
-      const saved = yield* client.imports.decide({ params, payload: { madeOn, set, clear: [] } }).pipe(marcus)
+      const saved = yield* client.imports.decide({ params, payload: { over: {}, madeOn, set, clear: [] } }).pipe(marcus)
       expect(saved.notApplied).toEqual(named)
       const refused = yield* Effect.flip(
         client.imports.commit({ params, payload: { revision: saved.revision, madeOn, set, clear: [] } }).pipe(marcus)
@@ -612,7 +627,7 @@ layer(TypedApp)("a Replace or Keep-stored on an import matched before moves were
 
       const other = { id: matching.id }
       yield* client.imports
-        .decide({ params: other, payload: { madeOn: R.map(set, () => matching.revision), set, clear: [] } })
+        .decide({ params: other, payload: { over: {}, madeOn: R.map(set, () => matching.revision), set, clear: [] } })
         .pipe(marcus)
       yield* matchedLongAgo(matching.id)
       const further = yield* client.imports
@@ -630,7 +645,12 @@ layer(TypedApp)("a Replace or Keep-stored on an import matched before moves were
       const kept = yield* client.imports
         .decide({
           params: { id: third.id },
-          payload: { madeOn: { "row-2": since.revision }, set: flags({ "row-2": { stored: "replace" } }), clear: [] }
+          payload: {
+            over: {},
+            madeOn: { "row-2": since.revision },
+            set: flags({ "row-2": { stored: "replace" } }),
+            clear: []
+          }
         })
         .pipe(marcus)
       expect(kept.notApplied).toEqual([])
@@ -643,7 +663,7 @@ layer(TypedApp)("a Replace or Keep-stored on an import matched before moves were
       ]).toEqual([O.some(decisionFromFlags({})), [["unitCost", "stored", ["row-2"]]]])
       // Made before the match that kept no move: still not known, though the further match kept its own.
       const late = yield* client.imports
-        .decide({ params: other, payload: { madeOn: R.map(set, () => matching.revision), set, clear: [] } })
+        .decide({ params: other, payload: { over: {}, madeOn: R.map(set, () => matching.revision), set, clear: [] } })
         .pipe(marcus)
       expect(late.notApplied).toEqual(named)
     })
@@ -660,7 +680,12 @@ layer(TypedApp)("a Replace made after a match before moves were kept, and stored
       yield* client.imports
         .decide({
           params,
-          payload: { madeOn: { "row-2": long.revision }, set: flags({ "row-2": { stored: "replace" } }), clear: [] }
+          payload: {
+            over: {},
+            madeOn: { "row-2": long.revision },
+            set: flags({ "row-2": { stored: "replace" } }),
+            clear: []
+          }
         })
         .pipe(marcus)
       // Description moves to "Pack unit", empty on row 2 as its own column is: the cost was not matched again.

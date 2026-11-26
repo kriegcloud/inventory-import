@@ -199,7 +199,7 @@ describe("the undo history kept in the browser", () => {
         yield* settle
         first.run({ type: "leaveOut" as const, rowIds: ["row-2"] })
         yield* settle
-        expect(first.sent).toEqual([{ madeOn: { "row-2": 10 }, set: { "row-2": out }, clear: [] }])
+        expect(first.sent).toEqual([{ madeOn: { "row-2": 10 }, over: {}, set: { "row-2": out }, clear: [] }])
 
         // A refresh. Somebody else has left row 3 out meanwhile: the server holds that, and not row 2.
         const again = visit(id, { reads: "answered" })

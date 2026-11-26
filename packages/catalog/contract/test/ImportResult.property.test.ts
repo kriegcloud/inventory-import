@@ -58,9 +58,11 @@ describe("an import's result", () => {
     [Arbitrary.schema(ImportResult)],
     ([result]) => {
       for (const row of result.rows) {
-        const part = O.getOrUndefined(row.part)
-        expect(rowId({ rowNumber: row.rowNumber, part })).toBe(
-          part === undefined ? `row-${row.rowNumber}` : `row-${row.rowNumber}.${part}`
+        expect(rowId({ rowNumber: row.rowNumber, part: row.part })).toBe(
+          O.match(row.part, {
+            onNone: () => `row-${row.rowNumber}`,
+            onSome: (part) => `row-${row.rowNumber}.${part}`
+          })
         )
       }
     },

@@ -1,5 +1,6 @@
 // A value an import wrote that differs from its file: by a rule, by a proposal the person accepted, or typed. The
 // stored columns are read and written by the two mappers here.
+import { identity } from "effect/Function"
 import * as O from "effect/Option"
 import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
@@ -107,30 +108,36 @@ export const changeHowWords = {
   typed: "typed or chose a value"
 } as const satisfies Record<ChangeHow, string>
 
-/** A change as the columns of `importChange` store it. */
+/** A change as the columns of `importChange` store it; `basis` and `confidence` are null for a typed value. */
 export type StoredChange = {
   readonly field: Field
   readonly from: string
   readonly to: string
   readonly source: ChangeSource
   readonly how: (typeof changeHowWords)[ChangeHow]
-  readonly basis: string | null
-  readonly confidence: Confidence | null
+  readonly basis: O.Option<string>
+  readonly confidence: O.Option<Confidence>
 }
 
 /**
- * The change the stored columns say. A row of an older build with no basis or confidence on a proposal reads with an
- * empty basis and low confidence, the least it can claim.
+ * What a proposal stored by an older build, with no basis or confidence, reads as: no basis, and low confidence, the
+ * least it can claim. No recorded decision backs these two values; they are listed for Benjamin's ruling in
+ * goals/defaults-at-boundaries (SPEC, "Defaults nobody decided"). A row of the current build always has both.
  */
+const unrecorded: { readonly basis: string; readonly confidence: Confidence } = { basis: "", confidence: "low" }
+
+/** The change the stored columns say. */
 export const changeFromStored = (stored: StoredChange): Change => {
   const core = { field: stored.field, from: stored.from, to: stored.to }
-  const basis = stored.basis ?? ""
-  const confidence = stored.confidence ?? "low"
+  const said = {
+    basis: O.match(stored.basis, { onNone: () => unrecorded.basis, onSome: identity }),
+    confidence: O.match(stored.confidence, { onNone: () => unrecorded.confidence, onSome: identity })
+  }
   return stored.how === "typed or chose a value"
     ? TypedValue.make(core)
     : stored.how === "applied by a rule"
-      ? AppliedByRule.make({ ...core, basis, confidence })
-      : AcceptedProposal.make({ ...core, source: stored.source === "model" ? "model" : "rule", basis, confidence })
+      ? AppliedByRule.make({ ...core, ...said })
+      : AcceptedProposal.make({ ...core, source: stored.source === "model" ? "model" : "rule", ...said })
 }
 
 /** A change as `importChange`'s columns: the inverse of `changeFromStored`, with who put it in force. */
@@ -141,8 +148,8 @@ export const changeToStored = (change: Change): StoredChange & { readonly decide
   source: changeSource(change),
   decidedBy: changeDecidedBy(change),
   how: changeHowWords[change.how],
-  basis: O.getOrNull(changeBasis(change)),
-  confidence: O.getOrNull(changeConfidence(change))
+  basis: changeBasis(change),
+  confidence: changeConfidence(change)
 })
 
 /** A value a form-only rule wrote. */

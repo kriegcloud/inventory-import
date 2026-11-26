@@ -11,7 +11,7 @@ import * as Ref from "effect/Ref"
 import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { SuggestionId } from "@inventory/catalog-contract/Ids"
 import messy from "../../public/samples/items_messy.csv?raw"
-import { review } from "@inventory/catalog-model/Review"
+import { noHistory, review } from "@inventory/catalog-model/Review"
 import { decisionFromFlags, type RowDecisionFlags } from "@inventory/catalog-contract/Decision"
 import { storedSuggestion, suggestedByModel, type Suggestion } from "@inventory/catalog-contract/Suggestion"
 import { digest, guard, type SuggestSource } from "@inventory/catalog-model/Suggest"
@@ -25,11 +25,12 @@ import { stage } from "./support/files.ts"
 
 const sourceOf = (
   suggestions: ReadonlyArray<Suggestion> = [],
-  flags: Readonly<Record<string, RowDecisionFlags>> = {}
+  flags: Readonly<Record<string, RowDecisionFlags.Encoded>> = {}
 ) =>
   Effect.map(stage(new File([messy], "items_messy.csv")), (table): SuggestSource => ({
     table,
     review: review({
+      ...noHistory,
       table,
       choices: [],
       decisions: R.map(flags, decisionFromFlags),
@@ -106,13 +107,17 @@ describe("a stored suggestion", () => {
       )
       const waiting = yield* sourceOf(stored)
       const row = rowOf(waiting, 7)
-      expect([row.outcome, row.values.name, row.item, row.changes]).toEqual(["cannot", "", null, []])
-      expect(row.problems[0]?.proposal).toMatchObject({ to: "Nylon Coil", by: "model", lossless: false })
+      expect([row.outcome, row.values.name, row.item, row.changes]).toEqual(["cannot", "", O.none(), []])
+      expect(O.getOrThrow(O.flatMap(A.head(row.problems), (problem) => problem.proposal))).toMatchObject({
+        to: "Nylon Coil",
+        by: "model",
+        lossless: false
+      })
       // The counts are the ones the file had before anything was suggested.
       expect(waiting.review.counts).toEqual(blank.review.counts)
       const accepted = yield* sourceOf(stored, { "row-7": { accepted: ["name"] } })
       const taken = rowOf(accepted, 7)
-      expect([taken.status, taken.item?.name]).toEqual(["ready", "Nylon Coil"])
+      expect([taken.status, O.getOrThrow(taken.item).name]).toEqual(["ready", "Nylon Coil"])
       expect(taken.changes).toMatchObject([
         { how: "acceptedProposal", field: "name", to: "Nylon Coil", source: "model" }
       ])

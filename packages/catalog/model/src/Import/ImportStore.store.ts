@@ -423,15 +423,15 @@ export class ImportStore extends Context.Service<
      * that waited were compared at, when the save has any: nothing is saved, and no revision answered, once the draft is
      * at another revision or another save has named a row since (`moved`), an empty delta included. Every row the save
      * names records who saved it and the revision the save was made on, changed or not. Every check is part of the save's own write, so no match,
-     * no save and no item change can fall between the judgement and the write. `read` defaults to none (`noItemsRead`),
-     * and `expected` to any revision.
+     * no save and no item change can fall between the judgement and the write. A save that read nothing passes
+     * `noItemsRead`, and one that holds to no revision passes `O.none()` as `expected`.
      */
     decide(
       actor: Member,
       draft: Draft,
       delta: DecisionDelta,
-      read?: ItemsAsRead,
-      expected?: O.Option<ComparedAt>
+      read: ItemsAsRead,
+      expected: O.Option<ComparedAt>
     ): Effect.Effect<Decided>
     /** The columns people chose for fields, as stored with the draft. */
     choices(draft: Draft): Effect.Effect<ReadonlyArray<MappingChoice>>
@@ -462,9 +462,9 @@ export class ImportStore extends Context.Service<
     matchColumn(
       actor: Member,
       draft: Draft,
-      choice: { readonly field: Field; readonly column: number | null },
+      choice: { readonly field: Field; readonly column: O.Option<number> },
       detail: string,
-      compare?: CompareAtMatch
+      compare: CompareAtMatch
     ): Effect.Effect<ChoicesSaved>
     /**
      * The items of the file an earlier confirm of this import created and still has, by row and part (0 when the

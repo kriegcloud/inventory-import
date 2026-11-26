@@ -45,19 +45,22 @@ const noRange: Range = { min: O.none(), max: O.none() }
  * The list with one value written twice and its counts still adding up: one entry renamed to another's value when
  * there are two, or one entry's count cut in two. None when the list has neither (fewer than two items in it).
  */
-const doubled = (listed: Listed): O.Option<Listed> => {
-  const [first, second, ...rest] = listed
-  if (first !== undefined && second !== undefined) {
-    return O.some([first, { value: first.value, count: second.count }, ...rest])
-  }
-  if (first !== undefined && first.count >= 2) {
-    return O.some([
-      { value: first.value, count: 1 },
-      { value: first.value, count: first.count - 1 }
-    ])
-  }
-  return O.none()
-}
+const doubled = (listed: Listed): O.Option<Listed> =>
+  O.orElse(
+    O.map(O.all([A.get(listed, 0), A.get(listed, 1)]), ([first, second]): Listed => [
+      first,
+      { value: first.value, count: second.count },
+      ...A.drop(listed, 2)
+    ]),
+    () =>
+      O.map(
+        O.filter(A.head(listed), (first) => first.count >= 2),
+        (first): Listed => [
+          { value: first.value, count: 1 },
+          { value: first.value, count: first.count - 1 }
+        ]
+      )
+  )
 
 describe("what the Items filters offer", () => {
   it.prop(
@@ -65,10 +68,11 @@ describe("what the Items filters offer", () => {
     [Arbitrary.schema(ItemFacets), junkValue],
     ([facets, junk]) => {
       for (const name of listNames) {
-        const [first, ...rest] = facets[name]
-        if (first !== undefined) {
-          expect(accepted({ ...facets, [name]: [{ value: junk, count: first.count }, ...rest] })).toBe(false)
-        }
+        A.matchLeft(facets[name], {
+          onEmpty: () => undefined,
+          onNonEmpty: (first, rest) =>
+            expect(accepted({ ...facets, [name]: [{ value: junk, count: first.count }, ...rest] })).toBe(false)
+        })
       }
     },
     runs
@@ -189,10 +193,13 @@ describe("what the Items filters offer", () => {
       expect(accepted(facets)).toBe(true)
       expect(accepted({ ...facets, total: facets.total + 1 })).toBe(false)
       for (const name of listNames) {
-        const [first, ...rest] = facets[name]
-        if (first !== undefined) {
-          expect(accepted({ ...facets, [name]: [{ value: first.value, count: first.count + 1 }, ...rest] })).toBe(false)
-        }
+        A.matchLeft(facets[name], {
+          onEmpty: () => undefined,
+          onNonEmpty: (first, rest) =>
+            expect(accepted({ ...facets, [name]: [{ value: first.value, count: first.count + 1 }, ...rest] })).toBe(
+              false
+            )
+        })
       }
     },
     runs

@@ -38,7 +38,11 @@ Write these correctly the first time. Each one costs a fix cycle.
    (`S.decodeTo` with `SchemaTransformation` or `SchemaGetter`). A handler decodes once at its boundary and trusts the
    type after that line. No `??`, no `|| ""`, no `O.getOrElse`, no `=== undefined`, no `=== null`, no `O.getOrUndefined`, no `Str.trim` or
    `.toLowerCase()` outside a schema: `defaults:check` refuses a new one, and the edit hook says so at once with the
-   line. An old one in a file you are changing is not yours to clean unless the brief says so.
+   line. An old one in a file you are changing is not yours to clean unless the brief says so. The shape, from
+   `packages/catalog/host/src/ImportStore.adapter.ts`: a column that may be NULL is `lastSavedById:
+   S.OptionFromNullOr(S.String)` in the read's `Result`, and the code after it reads `A.fromOption(row.lastSavedById)`;
+   a bind that may be none is `S.OptionFromNullOr(S.Int)` in the `Request`, and the SQL says what none means
+   (`revision = coalesce(${r.expected}, revision)`), so no `=== null` is written on either side.
 4. **Optional properties and indexing.** Never pass `undefined`: our own fields are Options; for another library's
    optional property, `...O.match(x, { onNone: () => ({}), onSome: (x) => ({ x }) })`. `rows[0]` may miss: take
    `A.head(rows)`, an Option. `if (count > 0)`, not `if (count)`.

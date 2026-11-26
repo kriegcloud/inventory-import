@@ -430,12 +430,3 @@ export const isoDate = (input: { readonly year: number; readonly month: number; 
   }
   return O.some(`${year}-${Str.padStart(2, "0")(`${month}`)}-${Str.padStart(2, "0")(`${day}`)}`)
 }
-
-/**
- * The form of a SKU used to decide whether two rows are the same item: no spaces, upper case. "One item per SKU"
- * must hold for `blt-0042 ` and `BLT-0042`, so both the file check and the database's unique index compare this key,
- * never the text as typed.
- *
- * @example skuKey({ sku: "blt-0042 " }) // "BLT-0042"
- */
-export const skuKey = (input: { readonly sku: string }): string => Str.toUpperCase(Str.replace(/\s+/g, "")(input.sku))

@@ -1907,3 +1907,49 @@ and 14, and the law still counts them. Reverse, for parameter defaults: take the
 baseline's `reads` no longer matches, so it is written anew). Reverse, for an exemption: taking a file off
 `exemptions` counts its places again, and the baseline does not rise to hold them, so they move onto a schema in the
 same commit. That is what the reversal means: those cells no longer keep their reader.
+
+### 2026-11-23 — the defaults sweep's pilot: cell readers, cell rules and the SKU key
+
+Question: three things the pilot reached that the law's first entry left open or did not foresee: whether a cell
+reader's fallbacks and absence checks are exempt as its clean-ups are; where the cell reading in `Review.rules.ts`
+and `Suggest.rules.ts` goes; and where `skuKey` goes, since as a schema transformation it would need
+`S.decodeSync`, which the type-check refuses (`schemaSync`).
+Answer: I chose each; the agent recommended the same each time.
+
+- A cell reader is exempt for clean-ups only. Its fallbacks and absence checks move like any other: the vendors and
+  dimensions JSON in a cell is decoded by its schema with `Option` fields, and a regex group is read as an `Option`.
+  `CellReading.rules.ts` keeps its trims and changes of case, and nothing else. Rejected: all four kinds exempt.
+- The cell reading in `Review.rules.ts` and `Suggest.rules.ts` moves to a new `Review/CellRules.rules.ts`, each
+  field's check and proposal, and that file goes on `exemptions` for clean-ups. `Review.rules.ts` keeps the fold,
+  the counts and the decisions with no clean-up. Rejected: listing `Review.rules.ts` and `Suggest.rules.ts`
+  themselves; moving everything into `CellReading.rules.ts`.
+- `skuKey` moves to its own file, `Item/SkuKey.rules.ts`, on `exemptions` for clean-ups, its reason beside it.
+  Rejected: decoding a `SkuKey` once where a SKU enters, which changes the staged and stored row shapes.
+
+Also: the main checkout is mine while the sweep runs; the sweep works in `.claude/worktrees/defaults-check` on
+`feat/defaults-contract-step`, and the branches are joined when I say so.
+
+### 2026-11-23 — the defaults sweep's pilot: word comparers, and the defaults nobody decided
+
+Question: 43 trims and changes of case in the pilot sit in pure code that reads no file cell: the table assistant's
+words, the search's words, the in-memory twin's filters, a sheet's header keys, a heading's key, the item editor's
+boxes and the D1 adapter's number filters. And the defaults nobody decided (SPEC), which the pilot kept as they were
+and moved onto schemas.
+Answer: I chose each; the agent recommended the same each time.
+
+- Files that compare words or headings go on `exemptions` for clean-ups only: `Assistant/TableView.rules.ts`,
+  `Item/ItemSearch.rules.ts`, `Catalog.memory.ts`, `Reading/SheetLayout.rules.ts`, `Review/Mapping.rules.ts`. They
+  never store the cleaned text. Rejected: every one a schema transformation; leaving them counted.
+- The item query's number filters are trimmed by a contract schema, `TypedNumberText` (`ItemQuery.command.ts`), which
+  the D1 adapter decodes. The item editor's boxes are read with the cell readers (`cellValue`, `isBlank` in
+  `CellRules.rules.ts`), because the editor reads a box exactly as the import reads a cell, which its file already
+  says. That is not the schema the recommendation named: a schema there would decode a string that cannot fail and
+  hand back an Option with nothing to fall back to.
+- The question's premise was only half right. `S.decodeSync` is refused in pure code (`schemaSync`), but
+  `S.decodeUnknownOption` is not: `CellReading.rules.ts` already uses it. The reason the word comparers stay as they
+  are is that last point (an Option where nothing can be absent), not that a decode is impossible.
+- A dimensions cell that names no unit reads as cm, as it did (root DECISIONS.md). The other defaults nobody decided
+  keep their behaviour and stay listed in SPEC: Confirm's credit to the decider, a stored value before a kept one,
+  and `recheckRow`'s empty field. None touches a row of the messy sample. Rejected: putting each one to me now.
+
+Reverse: taking a file off `exemptions` counts its places again, and they move onto a schema in the same commit.

@@ -34,11 +34,15 @@ const draw = <T>(schema: S.Codec<T, unknown>) =>
  * `DateTime`, not through the item's own reading of a day, so the two can be told apart.
  */
 const onTheCalendar = (day: string): boolean => {
-  const [year, month, date] = A.map(Str.split("-")(day), Number)
-  if (year === undefined || month === undefined || date === undefined) return false
-  const landed = DateTime.toPartsUtc(DateTime.makeUnsafe({ year, month, day: date }))
-  const written = `${year}-${twoDigits(`${month}`)}-${twoDigits(`${date}`)}`
-  return written === day && year >= 1000 && year <= 9999 && landed.month === month && landed.day === date
+  const parts = A.map(Str.split("-")(day), Number)
+  return O.match(O.all([A.get(parts, 0), A.get(parts, 1), A.get(parts, 2)]), {
+    onNone: () => false,
+    onSome: ([year, month, date]) => {
+      const landed = DateTime.toPartsUtc(DateTime.makeUnsafe({ year, month, day: date }))
+      const written = `${year}-${twoDigits(`${month}`)}-${twoDigits(`${date}`)}`
+      return written === day && year >= 1000 && year <= 9999 && landed.month === month && landed.day === date
+    }
+  })
 }
 
 // A year, a month and a day of the month up to 31: about one in twenty is no day (the 31st of a 30-day month, the 29th

@@ -546,7 +546,7 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         // goes, written only over what the server may hold of it (nothing, when it was decided, or the save that failed).
         t.registry.mount(followDraft(id))
         yield* settle
-        expect(A.map(t.saves, (save) => save.payload.over)).toEqual([undefined, { "row-2": [O.none(), O.some(out)] }])
+        expect(A.map(t.saves, (save) => save.payload.over)).toEqual([{}, { "row-2": [O.none(), O.some(out)] }])
         // The server holds Lee's decision, which is none of those: it writes nothing, and says so.
         yield* Deferred.succeed(t.saves[1]!.answer, {
           revision: 5,

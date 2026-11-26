@@ -82,10 +82,14 @@ export const TotalCells = Object.assign(
       })
   }).pipe($I.annoteSchema("TotalCells", { description: "A row's text completed for every region column" })),
   {
-    /** Reads complete text; the single fallback covers a column outside the declared domain. */
-    text: (cells: Completed, column: string): string => cells[column] ?? ""
+    /** Reads owned text, including empty declared cells; an unknown column has no value. */
+    text: (cells: Completed, column: string): O.Option<string> => R.get<string, string>(cells, column)
   }
 )
+
+// A fix or edit may name a file-only column absent from the source. Keep its recorded before-value unchanged.
+const originText = (cells: TotalCells, column: string): string =>
+  O.match(TotalCells.text(cells, column), { onNone: () => "", onSome: identity })
 
 /** Complete row text; a sparse record cannot be assigned to this type. */
 export type TotalCells = Completed
@@ -325,7 +329,7 @@ function build(
       else auto = true
       marks[fix.column] = {
         state: "applied" as const,
-        from: TotalCells.text(original, fix.column),
+        from: originText(original, fix.column),
         to: fix.to,
         by: sourceOf(fix),
         fix: O.some(fix),
@@ -343,7 +347,7 @@ function build(
       const fix = candidate.fix.value
       marks[fix.column] = {
         state: "applied" as const,
-        from: TotalCells.text(original, fix.column),
+        from: originText(original, fix.column),
         to: fix.to,
         by: sourceOf(fix),
         fix: O.some(fix),
@@ -364,7 +368,7 @@ function build(
   for (const [column, value] of R.toEntries(edits)) {
     marks[column] = {
       state: "applied" as const,
-      from: TotalCells.text(original, column),
+      from: originText(original, column),
       to: value,
       by: "you",
       fix: O.none(),
@@ -387,7 +391,7 @@ function build(
     const fix = proposal.value
     marks[fix.column] = {
       state: "proposed" as const,
-      from: TotalCells.text(complete, fix.column),
+      from: originText(complete, fix.column),
       to: fix.to,
       by: sourceOf(fix),
       fix
@@ -608,7 +612,7 @@ export function waitingGroups(input: {
     if (O.isSome(input.kind) && !O.exists(view.problem, (problem) => O.contains(input.kind, problem.kind))) continue
     const fix = proposed.value
     const groupId = proposed.value.group.value
-    const from = TotalCells.text(view.original, fix.column)
+    const from = originText(view.original, fix.column)
     const seen = MutableHashMap.get(found, groupId)
     if (O.isSome(seen)) seen.value.add(view.row.id, from, fix)
     else MutableHashMap.set(found, groupId, gathered({ fix, rowId: view.row.id, from }))
@@ -1190,7 +1194,13 @@ export function heldCsv(input: {
   for (const view of input.views) {
     if (view.status === "ready") continue
     const reason = reasonOf({ view, kinds, words: input.words })
-    lines.push([rowName(view.row), reason, ...input.columns.map((column) => TotalCells.text(view.original, column.id))])
+    lines.push([
+      rowName(view.row),
+      reason,
+      ...input.columns.map((column) =>
+        O.match(TotalCells.text(view.original, column.id), { onNone: () => "", onSome: identity })
+      )
+    ])
   }
   return lines.map((line) => line.map(csvField).join(",")).join("\n")
 }
@@ -1426,10 +1436,14 @@ export const shownWith = (
   const shown = column.display(text)
   return O.match(column.unitFrom, {
     onNone: () => shown,
-    onSome: (id) => {
-      const unit = ReviewText.comparison(TotalCells.text(cells, id))
-      return unit !== "" && /^-?\d[\d,]*(\.\d+)?$/.test(ReviewText.comparison(shown)) ? `${shown} ${unit}` : shown
-    }
+    onSome: (id) =>
+      O.match(TotalCells.text(cells, id), {
+        onNone: () => shown,
+        onSome: (text) => {
+          const unit = ReviewText.comparison(text)
+          return unit !== "" && /^-?\d[\d,]*(\.\d+)?$/.test(ReviewText.comparison(shown)) ? `${shown} ${unit}` : shown
+        }
+      })
   })
 }
 
@@ -1459,7 +1473,10 @@ export const pickedChoice = (view: RowView): O.Option<Choice> => {
   const choices = O.flatMap(view.row.problem, (problem) => problem.choices)
   if (O.isNone(column) || O.isNone(choices) || !O.exists(R.get(view.marks, column.value), (mark) => mark.by === "you"))
     return O.none()
-  return A.findFirst(choices.value, (choice) => choice.value === TotalCells.text(view.cells, column.value))
+  return O.match(TotalCells.text(view.cells, column.value), {
+    onNone: () => A.findFirst(choices.value, (choice) => choice.value === ""),
+    onSome: (text) => A.findFirst(choices.value, (choice) => choice.value === text)
+  })
 }
 
 /**

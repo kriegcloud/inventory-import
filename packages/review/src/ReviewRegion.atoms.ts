@@ -186,7 +186,7 @@ const col = createColumnHelper<DataTableFeatures, RowView>()
 const defsOf = (columns: ReadonlyArray<ReviewColumn>) =>
   col.columns(
     columns.map((column, index) =>
-      col.accessor((view) => TotalCells.text(view.cells, column.id), {
+      col.accessor((view) => O.match(TotalCells.text(view.cells, column.id), { onNone: () => "", onSome: identity }), {
         id: column.id,
         header: column.label,
         enableHiding: index !== 0,
@@ -276,7 +276,9 @@ const facetsOf = (
     >()
     const keyOf = (value: string): string => ReviewText.facet(value)
     for (const view of views) {
-      const value = TotalCells.text(view.cells, column.id)
+      const text = TotalCells.text(view.cells, column.id)
+      if (O.isNone(text)) continue
+      const value = text.value
       const key = keyOf(value)
       if (key === "") continue
       const entry = O.match(MutableHashMap.get(found, key), {
@@ -292,7 +294,9 @@ const facetsOf = (
       MutableHashMap.set(found, key, entry)
     }
     for (const view of list) {
-      const key = keyOf(TotalCells.text(view.cells, column.id))
+      const text = TotalCells.text(view.cells, column.id)
+      if (O.isNone(text)) continue
+      const key = keyOf(text.value)
       O.map(MutableHashMap.get(found, key), (entry) => {
         MutableHashMap.set(found, key, { ...entry, n: entry.n + 1 })
       })
@@ -436,7 +440,9 @@ const makeRegion: {
     return wanted.length === 0
       ? rows
       : A.filter(rows, (view) =>
-          A.every(wanted, (facet) => HashSet.has(facet.values, TotalCells.text(view.cells, facet.column)))
+          A.every(wanted, (facet) =>
+            O.exists(TotalCells.text(view.cells, facet.column), (text) => HashSet.has(facet.values, text))
+          )
         )
   })
   const tableData = Atom.map(shown, (rows) => [...rows])

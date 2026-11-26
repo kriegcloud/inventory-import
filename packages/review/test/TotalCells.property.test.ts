@@ -1,6 +1,6 @@
 // A complete drawing row must never change the sparse cells sent back to the caller or stored in a draft.
 import { describe, expect, it } from "@effect/vitest"
-import { assertDefined } from "@effect/vitest/utils"
+import { assertDefined, assertNone, assertSome } from "@effect/vitest/utils"
 import * as A from "effect/Array"
 import * as R from "effect/Record"
 import * as Arbitrary from "effect/Arbitrary"
@@ -40,16 +40,16 @@ describe("row completion at entry", () => {
   it("fills declared columns, retains file-only and reserved keys, and rejects sparse construction through nested codecs", () => {
     const source = { name: "File", extra: "Kept", ["__proto__"]: "Own proto", constructor: "Own constructor" }
     const cells = totalCells(columns, source)
-    expect(TotalCells.text(cells, "missing")).toBe("")
-    expect(TotalCells.text(cells, "extra")).toBe("Kept")
+    assertSome(TotalCells.text(cells, "missing"), "")
+    assertSome(TotalCells.text(cells, "extra"), "Kept")
     expect(totalCells(columns, source)).toBe(cells)
     const replaced = totalCells(columns, { ...source, name: "Changed" })
-    expect(TotalCells.text(replaced, "name")).toBe("Changed")
-    expect(TotalCells.text(cells, "name")).toBe("File")
-    expect(TotalCells.text(cells, "__proto__")).toBe("Own proto")
-    expect(TotalCells.text(cells, "constructor")).toBe("Own constructor")
-    expect(TotalCells.text(cells, "toString")).toBe("")
-    expect(TotalCells.text(cells, "valueOf")).toBe("")
+    assertSome(TotalCells.text(replaced, "name"), "Changed")
+    assertSome(TotalCells.text(cells, "name"), "File")
+    assertSome(TotalCells.text(cells, "__proto__"), "Own proto")
+    assertSome(TotalCells.text(cells, "constructor"), "Own constructor")
+    assertSome(TotalCells.text(cells, "toString"), "")
+    assertNone(TotalCells.text(cells, "valueOf"))
     expect(S.is(TotalCells)(source)).toBe(false)
     expect(O.isNone(S.decodeUnknownOption(TotalCells)(source))).toBe(true)
     const row = ReviewRow.make({ id: "one", line: 2, cells: source })
@@ -91,16 +91,16 @@ describe("row completion at entry", () => {
       assertDefined(view)
       expect(R.keys<string, string>(view.cells)).toEqual(A.map(columns, (column) => column.id))
       expect(row.cells).toEqual({ name: "File" })
-      expect(TotalCells.text(view.original, "missing")).toBe("")
+      assertSome(TotalCells.text(view.original, "missing"), "")
       return { view, views }
     }
     const open = read(emptyState)
-    expect(TotalCells.text(open.view.cells, "missing")).toBe("")
+    assertSome(TotalCells.text(open.view.cells, "missing"), "")
     expect(open.view.written).toEqual({ name: "File" })
     expect(read(emptyState).view).toBe(open.view)
     const accepted = act({ ...input, state: emptyState, action: { type: "accept", rowIds: [row.id] } }).state
     const proposed = read(accepted)
-    expect(TotalCells.text(proposed.view.cells, "missing")).toBe("Proposed")
+    assertSome(TotalCells.text(proposed.view.cells, "missing"), "Proposed")
     expect(proposed.view.written).toEqual({ name: "File", missing: "Proposed" })
     const typed = act({
       ...input,
@@ -108,14 +108,14 @@ describe("row completion at entry", () => {
       action: { type: "edit", rowId: row.id, column: "missing", value: "Typed" }
     }).state
     const changed = read(typed)
-    expect(TotalCells.text(changed.view.cells, "missing")).toBe("Typed")
+    assertSome(TotalCells.text(changed.view.cells, "missing"), "Typed")
     expect(rechecks).toEqual([{ name: "File", missing: "Typed" }])
     const undone = act({ ...input, state: typed, action: { type: "undo" } }).state
-    expect(TotalCells.text(read(undone).view.cells, "missing")).toBe("Proposed")
+    assertSome(TotalCells.text(read(undone).view.cells, "missing"), "Proposed")
     const redone = act({ ...input, state: undone, action: { type: "redo" } }).state
-    expect(TotalCells.text(read(redone).view.cells, "missing")).toBe("Typed")
-    expect(TotalCells.text(read(restored(saved(redone))).view.cells, "missing")).toBe("Typed")
-    expect(TotalCells.text(read(fromDraft(toDraft(redone))).view.cells, "missing")).toBe("Typed")
+    assertSome(TotalCells.text(read(redone).view.cells, "missing"), "Typed")
+    assertSome(TotalCells.text(read(restored(saved(redone))).view.cells, "missing"), "Typed")
+    assertSome(TotalCells.text(read(fromDraft(toDraft(redone))).view.cells, "missing"), "Typed")
     const imported = result({ views: changed.views, problemKinds: [], words: defaultReviewWords }).ready[0]
     assertDefined(imported)
     expect(imported.cells).toEqual({ name: "File", missing: "Typed" })

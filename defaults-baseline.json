@@ -22,7 +22,5 @@
     "Result.getOrThrow/O.getOrThrow/Effect.runSync calls in src, outside tests",
     "unwrapped S.optionalKey in contract/model/host"
   ],
-  "files": {
-    "packages/review/src/ReviewDraft.rules.ts": [1, 0, 0, 0]
-  }
+  "files": {}
 }

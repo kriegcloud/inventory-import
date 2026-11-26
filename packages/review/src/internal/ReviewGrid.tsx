@@ -138,8 +138,12 @@ const actionsLeast = 240
 const actionsQuiet = 120
 const actionsMost = 360
 
+// Decide how an absent cell is drawn only where the screen needs text.
+const cellText = (cells: TotalCells, column: string): string =>
+  O.match(TotalCells.text(cells, column), { onNone: () => "", onSome: (text) => text })
+
 const nameOf = (view: RowView, first: O.Option<ReviewColumn>): string => {
-  const name = O.match(first, { onNone: () => "", onSome: (column) => TotalCells.text(view.cells, column.id) })
+  const name = O.match(first, { onNone: () => "", onSome: (column) => cellText(view.cells, column.id) })
   return name === "" ? `row ${rowName(view.row)}` : name
 }
 
@@ -184,7 +188,7 @@ function Compare(props: {
 }) {
   const { view, other } = props
   const differing = props.columns.filter(
-    (column, index) => index === 0 || TotalCells.text(view.cells, column.id) !== TotalCells.text(other.cells, column.id)
+    (column, index) => index === 0 || cellText(view.cells, column.id) !== cellText(other.cells, column.id)
   )
   return (
     <>
@@ -195,8 +199,8 @@ function Compare(props: {
         {differing.slice(0, 6).map((column) => (
           <Fragment key={column.id}>
             <span className="text-muted-foreground">{column.label}</span>
-            <CutText text={TotalCells.text(view.cells, column.id)} className={cn("font-medium", codeFace(column))} />
-            <CutText text={TotalCells.text(other.cells, column.id)} className={cn("font-medium", codeFace(column))} />
+            <CutText text={cellText(view.cells, column.id)} className={cn("font-medium", codeFace(column))} />
+            <CutText text={cellText(other.cells, column.id)} className={cn("font-medium", codeFace(column))} />
           </Fragment>
         ))}
       </div>
@@ -325,9 +329,9 @@ const measureNeeds = (input: {
     let widest = 0
     for (const value of longest(
       views.map((view) =>
-        TotalCells.text(view.cells, column.id) === "" && O.isSome(column.byDefault)
+        cellText(view.cells, column.id) === "" && O.isSome(column.byDefault)
           ? `${shownWith(column, column.byDefault.value, view.cells)}, default`
-          : shownWith(column, TotalCells.text(view.cells, column.id), view.cells)
+          : shownWith(column, cellText(view.cells, column.id), view.cells)
       ),
       40
     ))
@@ -491,7 +495,7 @@ const Row = memo(function Row(props: {
   const choices = O.flatMap(fix, choicesOf)
   // One status mark per row: the tag. Only a required cell with nothing in it is also tinted, because an empty cell
   // has no ink to point at; a bad value is red text, a proposal is its own mark.
-  const subjectEmpty = O.isSome(subject) && TotalCells.text(view.cells, subject.value) === ""
+  const subjectEmpty = O.isSome(subject) && cellText(view.cells, subject.value) === ""
   const hiddenSubject =
     out ||
     O.isNone(subject) ||
@@ -633,7 +637,7 @@ const Row = memo(function Row(props: {
       )
     }
     const isSubject = O.contains(subject, column.id)
-    const text = TotalCells.text(view.cells, column.id)
+    const text = cellText(view.cells, column.id)
     return (
       <span
         className={cn(
@@ -715,7 +719,7 @@ const Row = memo(function Row(props: {
     if (O.isNone(problem)) return null
     const label = O.match(HashMap.get(props.labels, subject), { onNone: () => subject, onSome: (label) => label })
     const own = O.flatMap(props.cellEditor, (editor) =>
-      editor({ row: view.row, column: subject, value: TotalCells.text(view.cells, subject) })
+      editor({ row: view.row, column: subject, value: cellText(view.cells, subject) })
     )
     return (
       <Overlay
@@ -763,7 +767,7 @@ const Row = memo(function Row(props: {
                 <EditForm
                   label={label}
                   size="sm"
-                  value={TotalCells.text(view.cells, subject)}
+                  value={cellText(view.cells, subject)}
                   onSave={(next) => {
                     close()
                     actions.edit(view.row.id, subject, next)
@@ -945,7 +949,7 @@ const Row = memo(function Row(props: {
                   <del className="block font-normal text-muted-foreground">
                     <CutText text={name} />
                   </del>
-                ) : TotalCells.text(view.cells, first.id) === "" && O.isNone(R.get(view.marks, first.id)) ? (
+                ) : cellText(view.cells, first.id) === "" && O.isNone(R.get(view.marks, first.id)) ? (
                   // An empty name with a suggestion for it shows the suggestion (who made it, Why?, Reject) instead.
                   <span className="font-normal text-destructive">Empty</span>
                 ) : (
@@ -1175,7 +1179,7 @@ function Detail(props: { readonly view: RowView; readonly columns: ReadonlyArray
           </dt>
           <dd className={cn("min-w-0 whitespace-normal", codeFace(column))}>
             <CellValue
-              value={TotalCells.text(view.cells, column.id)}
+              value={cellText(view.cells, column.id)}
               display={(text) => shownWith(column, text, view.cells)}
               mark={view.status === "out" ? O.none() : R.get(view.marks, column.id)}
               accepted={O.contains(view.decided, "accepted")}

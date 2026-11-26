@@ -264,6 +264,7 @@ const noReason = { reason: S.Literal(""), decidedBy: S.Null, decidedByName: S.Nu
 const alreadyReason = { reason: OutcomeReason, decidedBy: S.Null, decidedByName: S.Null }
 // A row left out by a person, with the name they had then; or one nobody had settled.
 const leftOutByPerson = { reason: OutcomeReason, decidedBy: S.Literal("person"), decidedByName: DisplayName }
+const leftOutUnrecorded = { reason: OutcomeReason, decidedBy: S.Literal("person"), decidedByName: S.Null }
 const leftOutByNobody = { reason: OutcomeReason, decidedBy: S.Literal("nobody"), decidedByName: S.Null }
 
 /**
@@ -274,6 +275,7 @@ export const OutcomeInsert = S.Union([
   S.Struct({ ...outcomePlace, status: S.Literals(["ready", "update"]), ...noReason }),
   S.Struct({ ...outcomePlace, status: S.Literal("already"), ...alreadyReason }),
   S.Struct({ ...outcomePlace, status: S.Literal("notImported"), ...leftOutByPerson }),
+  S.Struct({ ...outcomePlace, status: S.Literal("notImported"), ...leftOutUnrecorded }),
   S.Struct({ ...outcomePlace, status: S.Literal("notImported"), ...leftOutByNobody })
 ]).annotate({ description: "The review's verdict on one row, before the confirm knows whether its item landed" })
 
@@ -296,13 +298,23 @@ export const outcomeInsertOf = (row: PlannedRow): typeof OutcomeInsert.Type => {
     }),
     notImported: (out): typeof OutcomeInsert.Type =>
       DecidedBy.match(out.decidedBy, {
-        person: (person): typeof OutcomeInsert.Type => ({
-          ...at,
-          status: "notImported",
-          reason: out.reason,
-          decidedBy: "person",
-          decidedByName: person.name
-        }),
+        person: (person): typeof OutcomeInsert.Type =>
+          O.match(person.name, {
+            onNone: (): typeof OutcomeInsert.Type => ({
+              ...at,
+              status: "notImported",
+              reason: out.reason,
+              decidedBy: "person",
+              decidedByName: null
+            }),
+            onSome: (name): typeof OutcomeInsert.Type => ({
+              ...at,
+              status: "notImported",
+              reason: out.reason,
+              decidedBy: "person",
+              decidedByName: name
+            })
+          }),
         nobody: (): typeof OutcomeInsert.Type => ({
           ...at,
           status: "notImported",
@@ -318,8 +330,8 @@ export const outcomeInsertOf = (row: PlannedRow): typeof OutcomeInsert.Type => {
  * What the confirms did with one item of the file, as `importOutcome` holds it, read as any version of the app wrote
  * it: the stored row is a boundary. A created, replaced or taken-back row holds no reason (`''`) and nobody; a reason
  * written before a rule on its form existed reads as it was written, a blank one too; and who decided is read as an
- * Option, so a row that names a person whose name is not one a person can read (from before names had a rule) says
- * nobody, as the result always said of it; a reason longer than the result reads is cut to it. The strict rules are on what is written (`OutcomeInsert`).
+ * Option, so a row a person left out whose name is missing, or is not one a person can read (from before names had a
+ * rule), says a person did and names no one; a reason longer than the result reads is cut to it. The strict rules are on what is written (`OutcomeInsert`).
  */
 export const OutcomeRow = S.Struct({
   ...outcomePlace,
@@ -329,14 +341,14 @@ export const OutcomeRow = S.Struct({
   decidedByName: S.OptionFromNullOr(S.String)
 }).annotate({ description: "What the confirms did with one item of the file, as stored by any version" })
 
-/** The person a stored row names as having left it out: only when it says a person did, by a name a person can read. */
-const leftOutBy = (row: typeof OutcomeRow.Type): O.Option<DisplayName> =>
-  O.flatMap(
+/** Whether a stored row says a person left it out, and their name when it holds one a person can read. */
+const leftOutBy = (row: typeof OutcomeRow.Type): O.Option<O.Option<DisplayName>> =>
+  O.map(
     O.filter(row.decidedBy, (who) => who === "person"),
     () => O.flatMap(row.decidedByName, S.decodeOption(DisplayName))
   )
 
-/** What the result says of one stored outcome row: a person who left it out is named, else nobody decided. */
+/** What the result says of one stored outcome row: a person left it out, named where a name is recorded, else nobody decided. */
 export const storedOutcome = (row: typeof OutcomeRow.Type): RowOutcome =>
   outcomeOf({
     rowNumber: row.rowNumber,

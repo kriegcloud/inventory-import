@@ -17,31 +17,36 @@ export const problemKinds: ReadonlyArray<ProblemKind> = [
     id: "unit",
     label: "Unknown unit",
     tone: "decision",
-    help: O.some("The unit is not on your unit list.")
+    help: O.some("The unit is not on your unit list."),
+    fixable: true
   }),
   ProblemKind.make({
     id: "cost",
     label: "No cost",
     tone: "blocker",
-    help: O.some("Each needs a cost before it can be imported.")
+    help: O.some("Each needs a cost before it can be imported."),
+    fixable: true
   }),
   ProblemKind.make({
     id: "copy",
     label: "Same SKU",
     tone: "decision",
-    help: O.some("Two different rows share a SKU. Give one a new SKU, or leave one out.")
+    help: O.some("Two different rows share a SKU. Give one a new SKU, or leave one out."),
+    fixable: true
   }),
   ProblemKind.make({
     id: "below",
     label: "Below zero",
     tone: "blocker",
-    help: O.some("Stock cannot be below zero. Type the count.")
+    help: O.some("Stock cannot be below zero. Type the count."),
+    fixable: true
   }),
   ProblemKind.make({
     id: "name",
     label: "No name",
     tone: "blocker",
-    help: O.some("No name in the file. The SKU is offered as the name.")
+    help: O.some("No name in the file. The SKU is offered as the name."),
+    fixable: true
   })
 ]
 

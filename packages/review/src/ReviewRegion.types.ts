@@ -72,10 +72,9 @@ export class ProblemKind extends S.Opaque<ProblemKind, { readonly brand: unique 
         description:
           "`false` when nothing on this screen can settle a row of this kind (the item it names is not in the system " +
           "yet): such rows are counted apart from Needs you, under their own tab, with their reason and no answer to " +
-          "press, and they never hold the import back. Left out, a kind can be settled here."
-      }),
-      S.withDecodingDefaultTypeKey(Effect.succeed(true)),
-      S.withConstructorDefault(Effect.succeed(true))
+          "press, and they never hold the import back. Every kind says which it is: a kind that left it out was once " +
+          "counted as one the person can settle, so a forgotten flag put rows nobody could fix under Needs you."
+      })
     )
   }).pipe($I.annoteSchema("ProblemKind", { description: "One reason a row can need the person" }))
 ) {}

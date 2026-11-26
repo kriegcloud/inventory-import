@@ -600,7 +600,7 @@ export const importsEndpoints = Effect.gen(function* () {
     const unsaved: DecisionDelta = { set: payload.set, clear: payload.clear }
     const table = yield* imports.table(draft, actor.organizationId)
     const { current, authors } = yield* reviewOf(actor, draft, table, O.some(unsaved))
-    const plan = confirmPlan({ draft: draft.id, review: current, authors, actor })
+    const plan = confirmPlan({ draft: draft.id, review: current, authors })
     // The ids of the confirm and of each item it creates are made here, so the store only writes.
     const confirm = yield* random.uuidV4()
     const itemIds = yield* Effect.forEach(
@@ -816,13 +816,19 @@ export const importsEndpoints = Effect.gen(function* () {
     // `openImportsShown` are sent and the rest are counted.
     open: Effect.fn("imports.open")(function* () {
       const actor = yield* CurrentActor
-      const { drafts, total } = yield* imports.listOpen(openImportsShown, actor.organizationId)
+      const { drafts, total } = yield* imports.listOpen({
+        organizationId: actor.organizationId,
+        limit: openImportsShown
+      })
       const views = yield* Effect.forEach(drafts, (draft) => viewOf(actor, draft), { concurrency: 1 })
       return { views, older: Math.max(0, total - views.length) }
     }),
     past: Effect.fn("imports.past")(function* () {
       const actor = yield* CurrentActor
-      const { imports: listed, total } = yield* imports.listPast(pastImportsShown, actor.organizationId)
+      const { imports: listed, total } = yield* imports.listPast({
+        organizationId: actor.organizationId,
+        limit: pastImportsShown
+      })
       return { imports: listed, older: Math.max(0, total - listed.length) }
     }),
     changes: Effect.fn("imports.changes")(function* () {

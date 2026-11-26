@@ -141,7 +141,7 @@ describe("items_messy.csv", () => {
       expect(
         A.every(
           A.flatMap(fixed, (row) => row.changes),
-          (c) => c.how === "appliedByRule" && c.confidence === "high"
+          (c) => c.how === "appliedByRule" && O.contains(c.confidence, "high")
         )
       ).toBe(true)
       expect(rowOf(result, 18).changes).toEqual([
@@ -151,7 +151,7 @@ describe("items_messy.csv", () => {
           from: "bx",
           to: "BX",
           basis: '"bx" on 2 rows; 58 rows say BX.',
-          confidence: "high"
+          confidence: O.some("high")
         }
       ])
       const expectedSome5 = rowOf(result, 173).item

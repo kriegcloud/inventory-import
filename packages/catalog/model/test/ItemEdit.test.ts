@@ -33,6 +33,19 @@ describe("the edit form", () => {
     expect(ItemFormReading.$is("Edit")(atLimit)).toBe(true)
   })
 
+  it("refuses an empty quantity and says so, and still reads a typed 0", () => {
+    const problem = "Quantity on hand is empty. Write it as digits, for example 120, or 0 when there is none."
+    // Cleared, or spaces only: nothing is read as 0, so a slip never stores 0 for an item that holds 1952.
+    for (const quantityOnHand of ["", "  "]) {
+      expect(readItemForm({ form: { ...form, quantityOnHand }, revision: 1 })).toEqual(
+        ItemFormReading.Problems({ problems: { quantityOnHand: problem } })
+      )
+    }
+    expect(ItemFormReading.$is("Edit")(readItemForm({ form: { ...form, quantityOnHand: "0" }, revision: 1 }))).toBe(
+      true
+    )
+  })
+
   it.effect("reads nothing the edit's own schema then refuses", () =>
     Effect.gen(function* () {
       const read = readItemForm({ form: { ...form, description: Str.repeat(maxDescriptionLength)("x") }, revision: 1 })

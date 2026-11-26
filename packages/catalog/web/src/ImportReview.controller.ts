@@ -51,7 +51,9 @@ export const regionKinds: ReadonlyArray<ProblemKind> = problemKinds.map((kind) =
   ProblemKind.make({
     id: kind.id,
     label: kind.label,
-    tone: kind.tone
+    tone: kind.tone,
+    // Every kind of the import is one the person can settle on the review screen.
+    fixable: true
   })
 )
 

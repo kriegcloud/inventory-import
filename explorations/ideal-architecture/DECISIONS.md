@@ -1953,3 +1953,30 @@ Answer: I chose each; the agent recommended the same each time.
   and `recheckRow`'s empty field. None touches a row of the messy sample. Rejected: putting each one to me now.
 
 Reverse: taking a file off `exemptions` counts its places again, and they move onto a schema in the same commit.
+
+### 2026-11-25 — the defaults sweep's lanes: what a literal `onNone` is, the cell's two keys, and `getOrThrow`
+
+Question: the first Codex lanes (the access packages, the kernel and drivers, the catalog under the law's new kinds)
+came back with the law at zero and the question still in the code: twelve `Result.getOrThrow(S.decodeResult(...))`
+in the access packages (one a decode per character in the password compare), predicates turned into double
+negations and sentences into schemas with a default, to get past `onNone: () => true` and `onNone: () => "the file"`.
+And two plain optional keys, `Cell.shown` and `Cell.formula`, that the pilot left because the table crosses the
+reader's worker.
+Answer: I chose each; the agent recommended the same each time.
+
+- A literal `onNone` is counted only where it stands in for data: a number, `""`, `[]`, `{}`, `null`, `undefined`.
+  `true`, `false` and text that is not empty are a case said in words, and are left alone. Rejected: every literal
+  counted (6 places in the catalog lane were rewritten to dodge it; 1 was left, `SheetLayout.rules.ts`, no sheet name
+  reads "the file"); every literal counted and files exempted one by one.
+- `Reading/Spreadsheet.rules.ts` goes on `exemptions` for absence: `Cell.shown` and `Cell.formula` stay keys left out
+  (2 places, `{ type: "number", text: "123", shown: "00123" }`), because the table crosses the worker by
+  `postMessage`, where an Option loses its prototype; `shownOf` and `formulaOf` read them as Options. Rejected:
+  crossing the worker encoded, as upload chunks do; leaving them in the baseline.
+- The law counts `Result.getOrThrow` and `Effect.runSync` in src folders, as a fallback. One file of ours holds one
+  today (`packages/client/src/Http.runtime.ts`). Rejected: leaving it to review.
+- Housekeeping: the seven merged `defaults` branches, local and on origin, and the worktrees `defaults-check` and
+  `defaults-law` are removed. The `wf_*` worktrees stay: 26 of 27 hold uncommitted files and 4 hold commits not on
+  main. The main checkout is on `main` again, and the sweep works only in worktrees.
+
+Reverse: widening the literal list or taking the file off `exemptions` counts those places again, and they are
+cleared in the same commit.

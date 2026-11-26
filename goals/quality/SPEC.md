@@ -23,7 +23,8 @@ which is why `from` names it; the other four rest on no exploration, and each sa
 2. The prover reads the `status` a state's case gives by itself, so a `make` of a state no longer writes it out.
 3. An aggregate's transitions say their claim as the model's invariants now do, if the prover reads a helper; if it
    does not, that is written down and the transitions stay.
-4. No file of our own code is longer than 1,000 lines, starting with the five longest.
+4. No file of our own code is longer than 1,000 lines, starting with the five longest outside the repository's own
+   CLI.
 5. `CLAUDE.md` is a page an agent reads in one go: the long tables live under `docs/standards/`, and the two agent
    files name folders that exist.
 6. The small loose ends are closed: the push rule, the two warnings of `docs:check`, the explorations that ended.
@@ -60,8 +61,11 @@ which is why `from` names it; the other four rest on no exploration, and each sa
 - [ ] Either `Group`, `Row` and `Import` say their transitions through helpers and `bun run --cwd packages/catalog/model verify`
   passes on a lock written again on purpose, or `scratchpad/LOG.md` has the line that says the prover does not read
   one and why.
-- [ ] `git ls-files '*.ts' '*.tsx' | grep -v -e '^vendor/' -e '^\.agents/' -e '^packages/ui/src/components/' -e '^packages/foundation/' | xargs wc -l | awk '$1 > 1000 && $2 != "total"'`
-  prints only test files, and none of the five named in the plan.
+- [ ] `git ls-files '*.ts' '*.tsx' | grep -v -e '^vendor/' -e '^\.agents/' -e '^packages/ui/src/components/' -e '^packages/foundation/modeling/identity/' -e '^packages/foundation/modeling/schema/' -e '^packages/foundation/modeling/utils/' -e '^packages/foundation/primitive/types/' | xargs wc -l | awk '$1 > 1000 && $2 != "total"'`
+  prints only test files, and none of the five named in the plan. What it leaves out is what is not ours to split:
+  the Alchemy packages, the skills, the vendored components, and beep-effect's kit, which is the four packages under
+  `packages/foundation/` that hold a `vendor.json`. `@beep/csv`, `@beep/xlsx` and `@beep/vocabulary` are ours and are
+  counted.
 - [ ] `wc -l CLAUDE.md` is under 400, `bun run docs:check` passes, and `grep -n "src/domain" .claude/agents/*.md`
   finds nothing.
 - [ ] `bun run docs:check` prints no warning; `.claude/settings.json` on `main` asks before a push; the explorations'

@@ -139,6 +139,14 @@ this step is done as "no".
 The cuts are guesses from the names: none of the five was read through. Read the file before choosing its cut, and
 say the cut before making it.
 
+**Six more are past the line**, counted on 2026-11-25 with the acceptance command, and come after the five, longest
+first: `packages/tooling/tool/cli/src/commands/Infra/InfraSetup.rules.ts` (1,900: longer than three of the five, and
+left for later because it is the CLI's and nothing a person sees runs it), `packages/review/src/ReviewDraft.rules.ts`
+(1,314), `packages/tooling/tool/cli/src/commands/Scratch/Scratch.rules.ts` (1,165),
+`packages/review/src/ReviewRegion.types.ts` (1,115), `packages/tooling/tool/cli/src/commands/Release/Release.rules.ts`
+(1,079) and `packages/review/src/ReviewRegion.component.tsx` (1,017). `packages/catalog/web/test/support/draftWorld.ts`
+(1,590) is under `test/` and is no test file: whether it counts is part of the question below.
+
 **Rules for each.** One file a pull request. No behaviour changes: a function moves with its JSDoc and its tests keep
 passing untouched, which is the proof. The old path keeps exporting what other packages import, or every importer
 moves in the same commit. A file a model's task reads goes into `packages/catalog/model/turbo.json`. A file of screens

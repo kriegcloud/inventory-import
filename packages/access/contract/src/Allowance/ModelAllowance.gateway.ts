@@ -6,6 +6,7 @@
  */
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import type { CurrentActor } from "@inventory/kernel/Actor"
+import { aboutScheme } from "@inventory/kernel/TermsPointer"
 import { Sentence } from "@inventory/kernel/Text"
 import * as Context from "effect/Context"
 import type * as Effect from "effect/Effect"
@@ -21,14 +22,15 @@ export const dailyModelCalls = 40
 /**
  * What a model call is for: the table assistant reading a request (`view`), the check that the key works, or
  * suggestions for an import's rows the rules cannot fix (`suggest`). The same three words the `modelCall` table's
- * check allows.
+ * check allows, and each the notation of a concept of `inv:ModelCallPurposeScheme` (report 18 section 5).
  *
  * @category schemas
  */
 export const ModelCallPurpose = LiteralKit(["view", "check", "suggest"]).pipe(
   $I.annoteSchema("ModelCallPurpose", {
     description:
-      "What a model call is for: the table assistant reading a request, the check that the key works, or suggestions for an import"
+      "What a model call is for: the table assistant reading a request, the check that the key works, or suggestions for an import",
+    ...aboutScheme("inv:ModelCallPurposeScheme")
   })
 )
 

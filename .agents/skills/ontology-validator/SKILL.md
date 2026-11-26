@@ -26,10 +26,10 @@ skill.
 ## In this repository
 
 Read `../_shared/project-profile.md` first; it wins over this file. Terms live in one TypeScript vocabulary module,
-record rules in Effect Schemas, and every Turtle file is generated. The thin thread is built: the module
-`packages/kernel/src/Terms.vocab.ts`, the projector in `packages/ontology`, the generated Turtle, CQ-P06 and CQ-P11,
-the law `bun run beep laws ontology-terms`, and the reasoner step. SHACL over the stored rows, alignments and any term
-beyond the thread's 22 are not built. Report a gate as run only when its command ran. Report the rest as "not built",
+record rules in Effect Schemas, and every Turtle file is generated. The thin thread and the party slice are built: the
+module `packages/kernel/src/Terms.vocab.ts`, the projector in `packages/ontology`, the generated Turtle, CQ-P06 and
+CQ-P11 and the party questions, the law `bun run beep laws ontology-terms`, and the reasoner step. SHACL over the
+stored rows, alignments and any term beyond the module's are not built. Report a gate as run only when its command ran. Report the rest as "not built",
 never as run or passed. ROBOT is not on the PATH; do not download it without asking. The reasoner script fetches its jar.
 
 | Upstream step or output | Here |
@@ -37,8 +37,8 @@ never as run or passed. ROBOT is not on the PATH; do not download it without ask
 | Byte-compare and re-parse of the Turtle (not upstream) | Built, in `bun run check` (decision 6). `bun run ontology:write` writes the three files under `packages/ontology/generated/` |
 | Step 1 reasoner | Built. Task `reason` of `@inventory/ontology`: `packages/ontology/scripts/reason.ts`, ROBOT v1.9.11 with HermiT under Java 17, pinned in `packages/ontology/robot.lock.json`. Part of `bun run check:full` and of the CI job `reason` (decisions 112, 113, 114). Report it only when that task ran |
 | Step 2 ROBOT report | No ROBOT report gate. Read `skos:prefLabel` and `skos:definition` (decision 11) on the generated Turtle with rdflib. Do not download ROBOT to run `robot report` |
-| Step 3 SHACL over the ontology | The generated shapes over the 155 stored rows of the messy sample plus must-fail fixtures, a slow test. Not built. The sample stores items only: a party term has no stored row. CQ-P06 and CQ-P11 answer over a hand-written two-organization fixture and the lift of two member rows, not over those stored rows. Which data proves the party model is Benjamin's |
-| Step 4 CQ suite | Built for CQ-P06 and CQ-P11 in `packages/ontology/test/Questions.test.ts` (Oxigraph), queries in `packages/ontology/fixtures/cq/`. Report them only when that test ran. Any other question is not built |
+| Step 3 SHACL over the ontology | The generated shapes over the 155 stored rows of the messy sample plus must-fail fixtures, a slow test. Not built. The sample stores items only: a party term has no stored row. CQ-P06 and CQ-P11 answer over a hand-written two-organization fixture and the lift of two member rows, not over those stored rows; the party questions answer over named `test_` fixtures in the packet (decision 36) |
+| Step 4 CQ suite | Built for CQ-P06 and CQ-P11 in `packages/ontology/test/Questions.test.ts` (Oxigraph), queries in `packages/ontology/fixtures/cq/`, and for CQ-P01 to CQ-P05, CQ-P07 and CQ-P09's party half in the same file, queries and fixtures in `explorations/erp-ontology/assets/requirements/cq/`. Report them only when that test ran. Any other question is not built |
 | Step 5 metrics, Step 6 dimensions | Apply, from whatever gates exist; a gate not built is not a 0% or a PASS |
 | Step 7 diff | `git diff` of `packages/ontology/generated` |
 | Also check | No `owl:inverseOf`, no `owl:sameAs`, every IRI under the `example.org` placeholder. The law is `bun run beep laws ontology-terms` (root script `ontology-terms:check`, part of `bun run check`). Report it only when that command ran |
@@ -180,7 +180,7 @@ Standard shapes:
 
 ### Step 4: CQ Test Suite (Level 4)
 
-> Here: CQ-P06 and CQ-P11 run in `packages/ontology/test/Questions.test.ts` (Oxigraph), over a hand-written two-organization fixture and the lift of two member rows, not over the stored rows of the messy sample. Report them only when that test ran. Any other question is "not built".
+> Here: CQ-P06 and CQ-P11 run in `packages/ontology/test/Questions.test.ts` (Oxigraph), over a hand-written two-organization fixture and the lift of two member rows, not over the stored rows of the messy sample; the party questions run in the same file over `test_` fixtures in `explorations/erp-ontology/assets/requirements/cq/`. Report them only when that test ran. Any other question is "not built".
 
 `tests/cq-test-manifest.yaml`, written by `ontology-requirements`, names
 each CQ's query, fixture graph, expected result (`tests/expected/`),

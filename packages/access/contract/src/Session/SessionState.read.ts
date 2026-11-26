@@ -8,6 +8,7 @@ import { LiteralKit } from "@beep/schema/LiteralKit"
 import { OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { Role } from "@inventory/kernel/Role"
+import { aboutClass, aboutProperty, noTerm } from "@inventory/kernel/TermsPointer"
 import { DisplayName } from "@inventory/kernel/Text"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
@@ -38,6 +39,9 @@ export type AccountEmail = typeof AccountEmail.Type
 /**
  * An organization a test account belongs to, and its role there.
  *
+ * It stands for no term (decision 21): it holds no member id, so it names no membership, only what the sign-in page
+ * shows of one. Its own annotations say so, and none of its fields carries a mark (gate 5's P15).
+ *
  * @category schemas
  */
 export class Membership extends S.Opaque<Membership, { readonly brand: unique symbol }>()(
@@ -46,7 +50,8 @@ export class Membership extends S.Opaque<Membership, { readonly brand: unique sy
     role: Role
   }).pipe(
     $I.annoteSchema("Membership", {
-      description: "An organization the account belongs to, earliest first, and its role there."
+      description: "An organization the account belongs to, earliest first, and its role there.",
+      ...noTerm("screen")
     })
   )
 ) {}
@@ -137,15 +142,27 @@ export class SignInFeatures extends S.Opaque<SignInFeatures, { readonly brand: u
 /**
  * An organization the signed-in person belongs to, for the switch in the account menu.
  *
+ * It points at `inv:Tenant` (report 18 section 7): `id` is the subject's id and `name` the tenant's `name`.
+ *
  * @category schemas
  */
 export class OrganizationChoice extends S.Opaque<OrganizationChoice, { readonly brand: unique symbol }>()(
   S.Struct({
-    id: OrganizationId,
+    // Marked with no description: a description here would change the OpenAPI document, which a mark must not.
+    id: OrganizationId.pipe(S.annotateKey(aboutClass("inv:Tenant"))),
     name: DisplayName.pipe(
-      S.annotateKey({ description: "The organization's name, for the switch", examples: ["Example Works (test)"] })
+      S.annotateKey({
+        description: "The organization's name, for the switch",
+        examples: ["Example Works (test)"],
+        ...aboutProperty("inv:name")
+      })
     )
-  }).pipe($I.annoteSchema("OrganizationChoice", { description: "One of the person's organizations." }))
+  }).pipe(
+    $I.annoteSchema("OrganizationChoice", {
+      description: "One of the person's organizations.",
+      ...aboutClass("inv:Tenant")
+    })
+  )
 ) {}
 
 /**

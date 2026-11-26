@@ -1,0 +1,12 @@
+# Planted, never a question: it asks for organizations with a bare type step, so it misses every node typed by a
+# subclass of `inv:Organization`, such as a tenant. Decision 27 has every question walk from `rdf:type` down
+# `rdfs:subClassOf*` instead; gate 8 asks this one of `bare-type.fixture.ttl` and the OWL file, and sees no row.
+PREFIX inv: <https://example.org/inventory-import/ontology/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?organization
+WHERE {
+  ?organization a inv:Organization .
+}
+ORDER BY ?organization

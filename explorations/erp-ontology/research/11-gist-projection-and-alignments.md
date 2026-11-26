@@ -682,7 +682,8 @@ Q5 is decision 68, Q6 is 29, Q7 is 30, Q8 is 28. Each of those is still open.
   not on ISA-95's definitions.
 - Sutton: only the eight public articles named, and the search listing for titles. Not read: the Quotes, Sales orders,
   Purchase orders, transfer, container, BOM, quality, roles and release-notes pages. Sutton's GraphQL schema is behind
-  a token and was not sought. Carrier and contract manufacturer as account flags were not seen on a public page.
+  a token and was not sought. It was read on 2026-11-26: [report 16](16-sutton-schema-check.md) says which of the Sutton
+  rows above it confirms and which it overturns. The rows here are not yet corrected. Carrier and contract manufacturer as account flags were not seen on a public page.
 - FIBO and OMG Commons files were parsed but not hashed; FIBO was read at `master/latest`, which moves. The restored
   FIBO "Contact" row names no class IRI: those files were not re-opened for one.
 - The thin thread's disjointness was not run in a reasoner. Of the 24 pairs, three have both sides among the seven gist

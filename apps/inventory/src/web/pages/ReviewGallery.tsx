@@ -6,6 +6,8 @@ import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Atom from "effect/reactivity/Atom"
 import * as Str from "effect/String"
+import * as S from "effect/Schema"
+import * as Effect from "effect/Effect"
 import { toast } from "sonner"
 import { AppShell } from "@/components/app/AppShell"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
@@ -48,15 +50,26 @@ const states = [
 
 type GalleryState = (typeof states)[number][0]
 
+/** The selected gallery case, including the existing starting view for an absent or unknown URL state. */
+class GallerySelection extends S.Opaque<GallerySelection, { readonly brand: unique symbol }>()(
+  S.Struct({
+    state: S.Literals(A.map(states, ([id]) => id)).pipe(
+      S.annotateKey({ description: "The gallery case selected by its address" }),
+      S.withConstructorDefault(Effect.succeed<GalleryState>("default"))
+    )
+  }).annotate({ description: "The gallery's selected example" })
+) {}
+
 const readState = (): GalleryState => {
   const wanted = new URLSearchParams(window.location.search).get("state")
-  return O.getOrElse(
-    O.map(
-      A.findFirst(states, ([id]) => id === wanted),
-      ([id]) => id
-    ),
-    (): GalleryState => "default"
-  )
+  return GallerySelection.make(
+    R.getSomes({
+      state: O.map(
+        A.findFirst(states, ([id]) => id === wanted),
+        ([id]) => id
+      )
+    })
+  ).state
 }
 
 /** Rows whose items are in stock already: nothing is written for them and nothing is asked. */
@@ -143,8 +156,26 @@ const monthItems = [
   { name: "Weld wire 0.9 mm", sku: "WW-09", unit: "kg", counts: ["15", "12"] }
 ]
 
+/** Comparison text only: the reviewed cell keeps its original spelling in the row and its reason. */
+const MonthComparison = S.Trim.annotate({ description: "Whitespace-insensitive comparison of a monthly stock cell" })
+const readMonthComparison = S.decodeOption(MonthComparison)
+
+/** The monthly recheck's two cells; missing sparse input retains the gallery's existing empty-cell policy. */
+class MonthCheck extends S.Opaque<MonthCheck, { readonly brand: unique symbol }>()(
+  S.Struct({
+    month: S.String.pipe(
+      S.annotateKey({ description: "Month supplied by the recheck, empty when absent" }),
+      S.withConstructorDefault(Effect.succeed(""))
+    ),
+    onHand: S.String.pipe(
+      S.annotateKey({ description: "New stock cell, otherwise the row's stock cell, empty when both are absent" }),
+      S.withConstructorDefault(Effect.succeed(""))
+    )
+  }).annotate({ description: "The complete monthly stock comparison requested by the review" })
+) {}
+
 const belowZero = (month: string, onHand: string) =>
-  Str.startsWith("-")(Str.trim(onHand))
+  O.exists(readMonthComparison(onHand), Str.startsWith("-"))
     ? Problem.makeOption({
         kind: "below",
         column: O.some("onHand"),
@@ -211,9 +242,15 @@ const galleryLooking = Atom.map(galleryState, (state) => state === "readonly")
 const monthColumnsAtom = Atom.make(monthColumns)
 const monthRowsAtom = Atom.make(monthRows)
 const monthRecheck = Atom.make(
-  O.some((asked: { readonly row: ReviewRow; readonly cells: Readonly<Record<string, string>> }) =>
-    belowZero(asked.cells.month ?? "", asked.cells.onHand ?? asked.row.cells.onHand ?? "")
-  )
+  O.some((asked: { readonly row: ReviewRow; readonly cells: Readonly<Record<string, string>> }) => {
+    const check = MonthCheck.make(
+      R.getSomes({
+        month: R.get(asked.cells, "month"),
+        onHand: O.orElse(R.get(asked.cells, "onHand"), () => R.get(asked.row.cells, "onHand"))
+      })
+    )
+    return belowZero(check.month, check.onHand)
+  })
 )
 const monthDecisions = Atom.make(proposing(monthRows))
 

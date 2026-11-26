@@ -24,15 +24,12 @@
   ],
   "files": {
     "apps/inventory/src/web/components/app/AppShell.tsx": [0, 1, 0, 0],
-    "apps/inventory/src/web/pages/ReviewGallery.tsx": [4, 0, 0, 1],
-    "apps/inventory/src/web/pages/gallery/JobsReview.tsx": [0, 1, 0, 0],
     "apps/inventory/test/web/support/page.ts": [1, 0, 0, 0],
     "packages/catalog/web/src/ImportPage.screen.tsx": [0, 1, 0, 0],
     "packages/catalog/web/src/ItemsPage.screen.tsx": [1, 0, 0, 0],
     "packages/catalog/web/test/Conversation.test.ts": [1, 0, 0, 0],
     "packages/catalog/web/test/KeptRows.test.ts": [2, 0, 0, 0],
     "packages/catalog/web/test/ReviewHistory.test.ts": [2, 0, 0, 0],
-    "packages/catalog/web/test/ReviewModelFold.fold.test.ts": [5, 0, 0, 0],
     "packages/catalog/web/test/SessionAsked.test.ts": [1, 0, 0, 0],
     "packages/catalog/web/test/TabRows.test.ts": [3, 0, 0, 0],
     "packages/catalog/web/test/TableAssistant.test.ts": [1, 0, 0, 0],
@@ -55,6 +52,6 @@
     "packages/ui/src/ListTable.component.tsx": [1, 0, 0, 0],
     "packages/ui/src/PageHeader.component.tsx": [0, 2, 0, 0],
     "packages/ui/src/ProposedValue.component.tsx": [0, 4, 0, 0],
-    "packages/ui/src/Skeletons.component.tsx": [1, 7, 0, 0]
+    "packages/ui/src/Skeletons.component.tsx": [0, 7, 0, 0]
   }
 }

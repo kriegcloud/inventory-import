@@ -4,7 +4,8 @@
 // generated text with stray quotes, quoted line breaks and an unclosed quote, read whole and in pieces of any size.
 // The papaparse reader's results were recorded in test/fixtures/csv-expected/ while it was still installed (run with
 // CSV_RECORD=true to write them); the comparison now reads those.
-import { readFileSync, writeFileSync } from "node:fs"
+import { writeFileSync } from "node:fs"
+import { readBytes, readText } from "./support/fixture.ts"
 import { describe, expect, it } from "@effect/vitest"
 import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
@@ -28,7 +29,7 @@ const plain = (result: Result.Result<SpreadsheetTable, unknown>) =>
   )
 
 describe("@beep/csv reads every CSV as the papaparse reader did", () => {
-  for (const { name, bytes } of csvCorpus(readFileSync)) {
+  for (const { name, bytes } of csvCorpus(readBytes)) {
     it.effect(name, () =>
       Effect.gen(function* () {
         const record = yield* Config.Boolean("CSV_RECORD").pipe(Config.withDefault(false))
@@ -43,7 +44,7 @@ describe("@beep/csv reads every CSV as the papaparse reader did", () => {
           const text = yield* old.pipe(plain, Effect.flatMap(S.encodeEffect(Json)))
           writeFileSync(expectedUrl(name), `${text}\n`)
         }
-        const expected = yield* S.decodeEffect(Json)(readFileSync(expectedUrl(name), "utf8"))
+        const expected = yield* S.decodeEffect(Json)(readText(expectedUrl(name)))
         for (const pieceChars of pieces) {
           const next = yield* readCsv({ fileName: name, bytes, notes: [], pieceChars, onProgress: () => {} }).pipe(
             Effect.result

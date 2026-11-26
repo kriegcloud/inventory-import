@@ -7,7 +7,8 @@ import { identity } from "effect/Function"
 // hand. The SheetJS reader's results were recorded in test/fixtures/xlsx-expected/ while it was still installed;
 // the comparison reads those. XLSX_RECORD=true writes them again from the reader as it is now, which is only for a
 // change of the table's shape that is meant.
-import { readFileSync, writeFileSync } from "node:fs"
+import { writeFileSync } from "node:fs"
+import { readBytes, readText } from "./support/fixture.ts"
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
@@ -19,8 +20,7 @@ import { SpreadsheetTable } from "@inventory/catalog-model/Spreadsheet"
 import { readXlsx } from "../src/internal/spreadsheet/xlsx.ts"
 import { builtCases, fixtureNames, lyingExtent, type XlsxCase } from "./xlsxCorpus.ts"
 
-const bytesOf = (name: string): Uint8Array =>
-  new Uint8Array(readFileSync(new URL(`./fixtures/spreadsheet/${name}`, import.meta.url)))
+const bytesOf = (name: string): Uint8Array => readBytes(new URL(`./fixtures/spreadsheet/${name}`, import.meta.url))
 const Json = S.fromJsonString(S.Unknown)
 const expectedUrl = (name: string) => new URL(`./fixtures/xlsx-expected/${name}.json`, import.meta.url)
 
@@ -69,7 +69,7 @@ describe("@beep/xlsx reads every workbook as the SheetJS reader did", () => {
           const text = yield* old.pipe(plain, Effect.flatMap(S.encodeEffect(Json)))
           writeFileSync(expectedUrl(item.name), `${text}\n`)
         }
-        const expected = yield* S.decodeEffect(Json)(readFileSync(expectedUrl(item.name), "utf8"))
+        const expected = yield* S.decodeEffect(Json)(readText(expectedUrl(item.name)))
         const next = yield* readXlsx({ onProgress: () => {}, fileName, bytes, sheet: item.sheet, notes: [] }).pipe(
           Effect.result
         )

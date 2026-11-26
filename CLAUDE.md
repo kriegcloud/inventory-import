@@ -337,7 +337,7 @@ packages/ontology/       @inventory/ontology: what is made from the vocabulary a
                         writer (generated/ holds the OWL and SKOS Turtle, never edited by hand: `bun run
                         ontology:write`), the lift of a record to triples, the competency questions and their fixtures,
                         and seven of the vocabulary's nine gates as tests, the last a reasoner (`scripts/reason.ts`,
-                        pinned in `robot.lock.json`); the other two are the type-check and the `ontology-terms` law. Nothing imports it. Its goal is goals/erp-vocabulary.
+                        pinned in `robot.lock.json`); the other two are the type-check and the `ontology-terms` law. Nothing imports it. Its goals are goals/erp-vocabulary and goals/party-slice.
 packages/infra/          @beep/infra: what is deployed, per stage. The stage plan as a schema and a pure function
                         (`StagePlan.rules.ts`: what each stage gets, decided from its name), the app's Alchemy stack
                         (`Inventory.stack.ts`: one D1 database, one Worker) and the repository's (`GitHub.stack.ts`:

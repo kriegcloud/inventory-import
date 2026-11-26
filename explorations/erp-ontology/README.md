@@ -4,7 +4,7 @@ title: ERP ontology
 description: A taxonomy and ontology for an operations ERP and WMS such as Sutton, built from published ontologies and what is public about Sutton, and tied to this repository's domain model.
 status: graduated
 stage: graduated
-next: Build steps 9 to 12 of goals/party-slice: the party slice's terms, accepted as decision 176 (report 18), enter the vocabulary module.
+next: Close goals/party-slice (step 15, its quality review); the slices after it are not specified.
 goals: [erp-vocabulary, party-slice]
 ---
 
@@ -21,7 +21,9 @@ owed from Benjamin for the thread now. Benjamin said the brief matches (119), an
 121), and the thread's gate 8 runs CQ-P11 beside CQ-P06 (120). A commit that changes an
 expected-rows file says so, and the release notes name the question with its old and new answer (118). The
 thread is built, on branch `docs/erp-ontology-packet`, its commits not pushed: the goal's
-[PLAN](../../goals/erp-vocabulary/PLAN.md) says what was built and checked. No later slice is.
+[PLAN](../../goals/erp-vocabulary/PLAN.md) says what was built and checked. Slice 1 is built too, on branch
+`goal/party-slice`, its commits not pushed: its [PLAN](../../goals/party-slice/PLAN.md) says what was built and
+checked. No slice after it is.
 
 ROBOT v1.9.11 was approved and tried outside the repository (112). Its jar is 82,708,624 bytes, sha256
 `53cd275c8e4c0dad1fc2c1c34174876795cd7d6b6926e1444adcbb0cb3c7ab26`. Under Java 17.0.2 the DL profile check
@@ -30,7 +32,9 @@ is pinned by major version (113); Java 27 was never tried and is not the pin. CI
 the jar restored from a cache keyed by its sha256, fetched only on a miss and hash-checked (114).
 
 Slice 1, the party slice, follows the thread and is specified as [goals/party-slice](../../goals/party-slice/SPEC.md),
-whose nineteen questions (O1 to O19) I answered on 2026-11-26 as decisions 129 to 147, with 148 to 153. Benjamin will take each of the 47 open decisions with a concrete record
+whose nineteen questions (O1 to O19) I answered on 2026-11-26 as decisions 129 to 147, with 148 to 153; 154 to 175
+answer report 18's questions, 176 accepts it as the text of the slice's terms, and 177 to 179 answer what the steps
+that built them set aside. Benjamin will take each of the 47 open decisions with a concrete record
 when the slice that needs it is specified; slice 1's were answered on 2026-11-26. Decision 116 asks how a grant names the location or field it covers;
 organization scope remains enough for the thread (115). Gate 10 is not built (decision 27, answered (a)).
 
@@ -53,7 +57,7 @@ organization scope remains enough for the thread (115). Gate 10 is not built (de
 | [15 What the foundational audit of the thread found](research/15-audit-findings.md) | The auditor's two runs, what its adversary landed, why the audit is advisory (decision 107) and five design points still to rule on. |
 | [16 Sutton's API schema against the packet's Sutton rows](research/16-sutton-schema-check.md) | What the schema confirms and overturns in report 11's 28 Sutton rows, the records Sutton has that the packet lacks, and three questions (decisions 125 to 127). |
 | [17 A plan for modelling Sutton whole](research/17-sutton-whole-model-plan.md) | Sutton's 200 record types placed against the packet, eight slices with what each waits on and which pointers run forward, 45 findings where schema and design disagree, 24 new questions, and what a review disputed. The readers' output is `assets/sutton/readings.json`. |
-| [18 The party slice's terms](research/18-party-slice-terms.md) | Slice 1's terms for one accepting decision, final to decisions 154 to 175: 10 new classes, 53 properties (27 object, 26 datatype), 7 schemes and 24 concepts with `Member`'s and `membershipIn`'s new wording and `Party`'s exception entry, each property's evidence and step, fifteen gist links, the gist parents, disjoint pairs and gist properties read from the pinned file, Sutton's slice-1 fields as placed, the questions each term serves, the choices it makes, the questions answered since its first draft, and one open question, the accepting decision's number. Nothing is built from it. |
+| [18 The party slice's terms](research/18-party-slice-terms.md) | Slice 1's terms for one accepting decision, final to decisions 154 to 175: 10 new classes, 53 properties (27 object, 26 datatype), 7 schemes and 24 concepts with `Member`'s and `membershipIn`'s new wording and `Party`'s exception entry, each property's evidence and step, fifteen gist links, the gist parents, disjoint pairs and gist properties read from the pinned file, Sutton's slice-1 fields as placed, the questions each term serves, the choices it makes and the questions answered since its first draft. Accepted as decision 176; steps 9 to 12 of `goals/party-slice` built its terms. |
 
 Inputs kept outside the repository: the two seed reports of 2026-11-22, and Benjamin's earlier private notes (a
 first class list, a decision log and a product model read from public sources).
@@ -119,3 +123,7 @@ first class list, a decision log and a product model read from public sources).
   moved. One question remains, the accepting decision's number (recommended: 176).
 - 2026-11-26: I accepted report 18 as decision 176. Decisions 154 to 175 answered its questions; no term is in the
   module yet (steps 9 to 12 of `goals/party-slice`).
+- 2026-11-26: steps 9 to 14 of `goals/party-slice` built the slice: report 18's terms in the module (17 classes, 62
+  properties, 9 schemes, 28 concepts), the access records enrolled, CQ-P01 to CQ-P05, CQ-P07 and CQ-P09's party half
+  on `test_` fixtures, gate 9 on each fixture, and gate 4 reading report 18's coverage table against the module;
+  decisions 177 to 179 answered what steps 9 to 12 set aside. Step 15 corrected the documents the build made false.

@@ -28,8 +28,9 @@ that is the architect's job.
 
 Read `../_shared/project-profile.md` first; it wins over this file. The steward is Benjamin. A ratified term is one with
 a `rat-` record under `explorations/erp-ontology/assets/audit/<name>/governance/ratifications/` (mirrored in the
-packet's `DECISIONS.md`); decisions 1 to 7 ratify no term by name. The thin thread's terms are the exception: they are
-ratified as a set by decision 111 in `DECISIONS.md`, with no `rat-` file (decision 107), and are already in the module. There is no `ontologies/{name}/`.
+packet's `DECISIONS.md`); decisions 1 to 7 ratify no term by name. The thin thread's and the party slice's terms are the
+exception: they are ratified as sets by decisions 111 and 176 in `DECISIONS.md`, with no `rat-` file (decisions 107
+and 129), and are already in the module. There is no `ontologies/{name}/`.
 
 | Upstream step or output | Here |
 | --- | --- |
@@ -37,17 +38,19 @@ ratified as a set by decision 111 in `DECISIONS.md`, with no `rat-` file (decisi
 | Step 2 `conceptual-model.yaml` | A report section; each edge a `subClassOf` entry in a typed sketch of `Terms.vocab.ts` |
 | Step 2.5 layering | Foundational is the gist projection; IOF, ISA-95, schema.org, Sutton are alignment rows only |
 | Step 3 upper alignment | One gist parent per top class (`../_shared/gist-categories.md`); the BFO procedure does not apply |
-| Step 4 `property-design.yaml` | Domain and range in the design; cardinality and datatype in the record schema. With no record yet, give a provisional range marked "moves to the record schema", and name the owning context as a question for Benjamin. No inverse |
+| Step 4 `property-design.yaml` | Domain and range in the design; cardinality and datatype in the record schema. With no record yet, give a provisional range marked "moves to the record schema", and name the owning context: a party record's is the party context (decision 37), any other's a question for Benjamin. No inverse |
 | Step 5 `axiom-plan.yaml` | A report section; disjointness in the vocabulary sketch; no `owl:sameAs`, no HasKey |
 | Step 6 anti-patterns | Applies as written |
 | Tool commands | OLS search reads external terms. The generated Turtle is `packages/ontology/generated/inventory.owl.ttl`. Show a hierarchy you did not query as a nested list |
 | Outputs | `explorations/erp-ontology/research/NN-title.md`, data in `assets/`; then `bun run docs:check` |
 | Handoff | The design goes to `ontology-architect`, which writes the vocabulary-module diff for Benjamin |
 
-The thin thread is built: the vocabulary module, the projector, the generated Turtle, CQ-P06 and CQ-P11, and the
-reasoner step. Not built, so never run or report as run: SHACL over the stored rows, alignments, any term beyond the
-thread's 22, the party slice. A party's identity is "tenant and a source id, never a name" (report 01),
-open as criterion or key (profile); an Account is an `Organization` with role flags; IRIs stay under the `example.org` placeholder.
+The thin thread and the party slice are built: the vocabulary module, the projector, the generated Turtle, CQ-P06 and
+CQ-P11, the party questions, and the reasoner step. Not built, so never run or report as run: SHACL over the stored
+rows, alignments, any term beyond the module's, the slices after the party slice. A party's identity is "tenant and
+a source id, never a name" (report 01), open as criterion or key (profile); a Sutton Account is an `Organization`
+(a `Person` when its kind is `individual`), its role flags on the tenant's `SourceRecord` (profile, decision 3);
+IRIs stay under the `example.org` placeholder.
 
 ## When to Activate
 
@@ -73,7 +76,7 @@ before beginning work:
 
 ### Step 1: Glossary of Terms
 
-> Here: the ratification record is the `rat-` file under `explorations/erp-ontology/assets/audit/<name>/governance/ratifications/` (for a thread term, decision 111 in `DECISIONS.md`); the glossary is a table in a research report, not `glossary.csv`, and its upper column is the gist parent.
+> Here: the ratification record is the `rat-` file under `explorations/erp-ontology/assets/audit/<name>/governance/ratifications/` (for a thread term, decision 111 in `DECISIONS.md`; for a party-slice term, decision 176); the glossary is a table in a research report, not `glossary.csv`, and its upper column is the gist parent.
 
 INPUT RULE (governs every step below): this skill operates on RATIFIED
 terms — `governance/ratifications/` records plus the proposals they
@@ -243,7 +246,7 @@ Output as `ontologies/{name}/docs/property-design.yaml`.
 
 ### Step 5: Axiom Pattern Selection
 
-> Here: plan disjointness and subsumption in the vocabulary sketch; never select `owl:sameAs` or HasKey (two records that may be one party are settled by a recorded identity decision). CQ-P06 and CQ-P11 run in `packages/ontology/test/Questions.test.ts`. Say "not built" for any other competency-question test, and never report one as run.
+> Here: plan disjointness and subsumption in the vocabulary sketch; never select `owl:sameAs` or HasKey (two records that may be one party are settled by a recorded identity decision). CQ-P06, CQ-P11 and the party questions (CQ-P01 to CQ-P05, CQ-P07, CQ-P09's party half) run in `packages/ontology/test/Questions.test.ts`. Say "not built" for any other competency-question test, and never report one as run.
 
 For each CQ, choose the needed axiom pattern from the Pattern Selection
 Guide in `../_shared/axiom-patterns.md` (it maps each CQ wording to a

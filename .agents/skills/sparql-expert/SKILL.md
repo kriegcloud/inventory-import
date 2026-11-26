@@ -22,16 +22,17 @@ coverage metrics, and ad hoc data exploration.
 ## In this repository
 
 Read `../_shared/project-profile.md` first; it wins over this file. The ontology work lives in
-`explorations/erp-ontology/`. The thin thread is built (`goals/erp-vocabulary`). Query the generated Turtle:
+`explorations/erp-ontology/`. The thin thread and the party slice are built (`goals/erp-vocabulary`, `goals/party-slice`). Query the generated Turtle:
 `packages/ontology/generated/inventory.owl.ttl`, `inventory.skos.ttl` and `generated/fixtures/CQ-P06.graph.ttl`.
 CQ-P06 and CQ-P11 run in `packages/ontology/test/Questions.test.ts` (Oxigraph), over a hand-written two-organization
-fixture and the lift of two member rows, not over the stored rows of the messy sample. SHACL, alignments and any term
-beyond the thread's 22 are not built. For those, say "not built"; never report a query as run against them.
+fixture and the lift of two member rows, not over the stored rows of the messy sample; the party questions run there
+over `test_` fixtures in `explorations/erp-ontology/assets/requirements/cq/`. SHACL, alignments and any term beyond
+the module's are not built. For those, say "not built"; never report a query as run against them.
 
 | Upstream step or output | Here |
 | --- | --- |
 | Step 1 target: endpoint or local file | An external ontology file (gist, IOF, a published vocabulary), or the generated Turtle above. No endpoint, no triple store |
-| Step 2 schema lookup | Take `gist:`, `inv:` (example only), `iof-core:` and the alignment prefixes from `namespaces.json`. Our terms are `packages/kernel/src/Terms.vocab.ts` (7 classes, 9 properties, 2 schemes, 4 concepts). gist labels are `skos:prefLabel` (no `rdfs:label`): a query over gist reads that |
+| Step 2 schema lookup | Take `gist:`, `inv:` (example only), `iof-core:` and the alignment prefixes from `namespaces.json`. Our terms are `packages/kernel/src/Terms.vocab.ts` (17 classes, 62 properties, 9 schemes, 28 concepts). gist labels are `skos:prefLabel` (no `rdfs:label`): a query over gist reads that |
 | Step 4 syntax check | Runs as written, with `uv run --no-project --with rdflib` (checked 2026-11-22) |
 | Step 5 ROBOT query | Does not apply to a skill: ROBOT is not on the PATH, and a skill does not download it. The reasoner script fetches its own jar. Use the rdflib form |
 | Step 5 over our ontology | Query the generated Turtle above with rdflib. SHACL is not built |

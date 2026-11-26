@@ -93,7 +93,8 @@ of its fields is placed in this slice, left for a later slice, or given no term.
 ## Where the goal differs from the brief and the reports
 
 The decisions of 2026-11-26 came after the brief's slice-1 text. Where they and the brief or a report disagree, they
-win.
+win. Each O-row named below is answered, as recommended (decisions 129 to 147), and step 15 corrected the brief to
+them; the bullets are kept as they were put.
 
 - **The membership stage is in.** The brief keeps `MembershipStatusScheme` out of the module; decision P2 gives a
   Member a stage from the invitation, "a concept of a membership status scheme (pending, active, revoked)". Its
@@ -135,7 +136,8 @@ win.
 
 Report 17's slice-1 row, with its forward-pointer rule: a field that points at a record of a later slice is placed
 when that slice lands (O3). Names only (decision 123). Every term named here enters with O1's accepted text. The whole
-table is the agent's proposal until O3 and O14 are answered.
+table was the agent's proposal until O3 and O14 were answered (decisions 131 and 142); it is kept as it was put, and
+report 18 section 9 is the table with the answers of decisions 130 to 175, which gate 4 reads against the module.
 
 | Sutton type | Term | Placed in this slice | Left for a later slice | No term (O14) | Waits on |
 | --- | --- | --- | --- | --- | --- |
@@ -192,7 +194,7 @@ links to those rows (PLAN step 6).
 
 Each line names what proves it; one marked "waits" holds only once those rows are answered.
 
-- [ ] The metamodel takes decision 18's nine kind tags with the tag and identity agreement the metamodel can hold
+- [x] The metamodel takes decision 18's nine kind tags with the tag and identity agreement the metamodel can hold
       (stated or inherited, none on a category; C11 stands); local category parents beside one identity-bearing
       parent with no identity criterion on a category, and C3's cycle walk following category parents (12); a
       deprecation whose replacement rules (report 05's V14) do not fail an earlier replacement when its successor
@@ -200,41 +202,41 @@ Each line names what proves it; one marked "waits" holds only once those rows ar
       and range C9 compares, and rule C9, on gist lists planted in the tests (16, 17); and `xsd:boolean` in the RDF
       registry. Each refused on a planted mistake in `@beep/vocabulary`'s tests, in `bun run check`; the module's
       own gist list gains no property in this step. Which other parts of report 05 come now waits on O18.
-- [ ] Gate 5 takes the same constructs: `lineage` and `domainFits` follow category parents, so a `Person` record
+- [x] Gate 5 takes the same constructs: `lineage` and `domainFits` follow category parents, so a `Person` record
       filling a property whose domain is `Party` passes; P8 passes a retired notation kept in a record's `Literals`
       (V12, 33); a term pointer at a deprecated term is refused (V14): `Pointers.test.ts`, on in-memory vocabularies,
       each with a planted mistake.
-- [ ] On in-memory copies of the vocabulary, the projector writes one `rdfs:subClassOf` per category parent, the three
+- [x] On in-memory copies of the vocabulary, the projector writes one `rdfs:subClassOf` per category parent, the three
       deprecation triples with no logical axiom on the retired term, `rdfs:subPropertyOf` to a gist property with
       that property's declaration, and boolean and date-time literals; gate 3 refuses each new predicate, and a gist
       subject typed a property, while its list lacks it: `Generated.test.ts`. No kind tag, identity criterion, scope
       or ratification reaches the Turtle (19), nor a gist property's domain or range (16).
-- [ ] The lift writes a literal for a datatype property, none for an absent `Option` and one for a present one, a
+- [x] The lift writes a literal for a datatype property, none for an absent `Option` and one for a present one, a
       date-time in its encoded ISO form, and a boolean on a planted struct; it lifts `Person.role` to its `Grant` with
       the tenant given beside the rows (PLAN, "Choices made"): `Lift.test.ts`.
-- [ ] Every query walks `rdf:type/rdfs:subClassOf*`; CQ-P06, its mutant M5 (still differing from the question by its
+- [x] Every query walks `rdf:type/rdfs:subClassOf*`; CQ-P06, its mutant M5 (still differing from the question by its
       join alone) and CQ-P11 return their rows unchanged over their fixture and the OWL file, and a planted query
       written `a inv:Organization` misses a node typed only `inv:Tenant`; an ASK runs through a boolean runner with
       its own refusal test; guard 3 reads every hand-written fixture, not CQ-P06's alone: `Questions.test.ts`, in
       `bun run check`.
-- [ ] The party fixtures and queries are under `explorations/erp-ontology/assets/requirements/cq/`, named in the
+- [x] The party fixtures and queries are under `explorations/erp-ontology/assets/requirements/cq/`, named in the
       `test` inputs of `packages/ontology/turbo.json`; an edit to a fixture alone changes the `test` task's hash
       (`bunx turbo run test --filter=@inventory/ontology --dry=json`, said in PLAN); `bun run docs:check` passes with
       them there.
-- [ ] O1 to O19 are rows of the exploration's Open table, each answer is under a `### <n>. ` heading in its
+- [x] O1 to O19 are rows of the exploration's Open table, each answer is under a `### <n>. ` heading in its
       `DECISIONS.md`, and report 18 is in its `research/` (PLAN steps 6 and 8): `bun run docs:check`, and C12
       reading the accepting decision's heading (the module's line below).
-- [ ] Waits on O4, O7, O17 and O18. What the answers ask of the metamodel and gate 5 (PLAN step 7), each refused on a
+- [x] Waits on O4, O7, O17 and O18. What the answers ask of the metamodel and gate 5 (PLAN step 7), each refused on a
       planted mistake in `@beep/vocabulary`'s tests and `Pointers.test.ts`; no generated byte changes.
-- [ ] Waits on O1, O2. The module holds the accepted terms and gate 4 passes; `Coherence.test.ts` asserts that each new
+- [x] Waits on O1, O2. The module holds the accepted terms and gate 4 passes; `Coherence.test.ts` asserts that each new
       term and `Party`'s exception entry name the accepting decision, and that each thread term names what O1's
       second part says: 111 for all but `Member` and `membershipIn` under (d) and decision 169.
-- [ ] Waits on O1 and O16. `Member`'s definition is the accepted wording; the version is `0.2.0` (`Terms.test.ts`);
+- [x] Waits on O1 and O16. `Member`'s definition is the accepted wording; the version is `0.2.0` (`Terms.test.ts`);
       `packages/ontology/RELEASES.md` holds the release line the constraints describe
       (`rg -n '^- 0\.2\.0: the party slice' packages/ontology/RELEASES.md`), marked breaking only from step 11;
       `bun run ontology:write` rewrites the generated files and a second run changes no byte:
       `git diff --exit-code packages/ontology/generated`.
-- [ ] Waits on O1 and O2. Every property of the module is named by a mark of an enrolled record or stated by a named
+- [x] Waits on O1 and O2. Every property of the module is named by a mark of an enrolled record or stated by a named
       fixture: gate 5's P11 and guard 3 pass, and under O2 (a) guard 3 and gate 9 read `model-call.ttl` and
       `sutton-party.ttl`.
 - [ ] Waits on O1. `AgentRun`, `OrganizationChoice`, `ModelCallPurpose` and `Membership` (`noTerm`, reason screen) are
@@ -243,9 +245,9 @@ Each line names what proves it; one marked "waits" holds only once those rows ar
       mark changes is the same before and after its step (measured as the thread measured `Activity.json`). The
       placement of `Member.name`, `Member.organizationName` and `OrganizationChoice.name` waits on O4 and O5,
       `Person.email` on O6, and `Activity.agent` and `AgentRun` on O7.
-- [ ] Waits on O1. A pointer at a party term that does not exist, and one of the wrong kind, fail the type-check:
+- [x] Waits on O1. A pointer at a party term that does not exist, and one of the wrong kind, fail the type-check:
       `packages/kernel/test/TermsPointer.types.ts`, under `@ts-expect-error`.
-- [ ] Waits on O1. In `Questions.test.ts`, each with its expected rows and the must-fail cases of the BRIEF's "Slice 1
+- [x] Waits on O1. In `Questions.test.ts`, each with its expected rows and the must-fail cases of the BRIEF's "Slice 1
       is done" paragraphs and report 04 sections 3.1 and 4, which this list names and does not replace: CQ-P01
       (`isCustomer` removed from `test_CoPacker`'s record loses the row; `test_SharedCo` is listed for neither tenant;
       an `individual` record is never listed as an organization); CQ-P02 (only flags stated false; the open-reading
@@ -256,20 +258,20 @@ Each line names what proves it; one marked "waits" holds only once those rows ar
       tenant's decisions give no row; `owl:sameAs` added, from a fixture file and never as text in code, and the
       decision removed: no row, and the ASK answers true); the party half of CQ-P09 (a party record with no
       `inTenant`, and one with two: one violation each).
-- [ ] Waits on O1 and O12: CQ-P03, one person billing contact at one account and receiving contact at another, each
+- [x] Waits on O1 and O12: CQ-P03, one person billing contact at one account and receiving contact at another, each
       purpose at its own account only, and an assignment with no purpose under no purpose. Waits on O1 and O8:
       CQ-P07, one violation when the only admin is removed and one for a tenant with no members, none for
       `test_FlourMill`. Waits on O4 to O6: CQ-P06 with the person's name and the sign-in email, its changed rows
       named in `RELEASES.md`. Each in `Questions.test.ts`.
-- [ ] Waits on O1. Gate 9 passes in `bun run check:full` on a run that started the reasoner: each slice-1 fixture is DL-valid and
+- [x] Waits on O1. Gate 9 passes in `bun run check:full` on a run that started the reasoner: each slice-1 fixture is DL-valid and
       consistent, and a fixture whose `SourceRecord` is also typed `inv:Organization` is reported inconsistent (the
       reason decision 34 gives, on the pair the gist projection states).
-- [ ] Waits on O3. Each type of the coverage table has its term in the module and each field is placed as the table
+- [x] Waits on O3. Each type of the coverage table has its term in the module and each field is placed as the table
       says: a `Coherence.test.ts` assertion that every term the table names is a term of the module.
 - [ ] Each new planted mistake fails its own gate and no other (PLAN step 14).
-- [ ] PLAN step 15: nothing imports `@inventory/ontology`: `bun run beep laws boundaries`. No package is added:
+- [x] PLAN step 15: nothing imports `@inventory/ontology`: `bun run beep laws boundaries`. No package is added:
       `git diff --diff-filter=A --name-only main -- '**/package.json'` prints nothing.
-- [ ] PLAN's table of what the design left unchecked has an outcome in every row: `rg -n '\| \|$' goals/party-slice/PLAN.md`
+- [x] PLAN's table of what the design left unchecked has an outcome in every row: `rg -n '\| \|$' goals/party-slice/PLAN.md`
       prints nothing.
 
 ## Decisions

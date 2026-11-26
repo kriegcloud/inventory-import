@@ -31,7 +31,7 @@ identifier of an item specification, which may be missing (Sutton allows an item
 ```mermaid
 flowchart TB
   U["Upper: a small gist projection<br/>Person, Organization, Commitment, Agreement, Offer, Specification, Event, Place"]
-  P["Party and access<br/>Party, Person, Organization with role flags, ContactPoint, Grant"]
+  P["Party and access<br/>Party, Person, Organization, SourceRecord with role flags, ContactPoint, Grant"]
   C["Catalog<br/>ItemSpecification, ItemRevision, Bom, Routing, UnitConversion"]
   W["Warehouse and stock<br/>Site, Location, Container, Lot, Label, SerialUnit, StockPosition, InventoryMeasure"]
   K["Commitments<br/>Quote, SalesOrder, PurchaseOrder, ManufacturingOrder, TransferOrder, and their lines"]
@@ -80,7 +80,7 @@ Proposed classes, in OntoClean terms (rigid kinds carry identity; roles do not):
 | `Party` | abstract, rigid | its subclass | never instantiated directly |
 | `Person` | rigid kind | tenant and a source id, never a name | the same person can be a contact for two accounts |
 | `Organization` | rigid kind | tenant and a source id | Sutton's Account; also the tenant itself and its sites' operators |
-| `Organization.isCustomer`, `isVendor`, `isCarrier`, `isContractManufacturer` | role flags on the organization | the organization | Sutton's Account is an `Organization` with these flags (decision 3). Several can be true at once |
+| `SourceRecord.isCustomer`, `isVendor` | role flags on the tenant's record of the organization | the record | Sutton's Account is an `Organization` (a `Person` when its kind is `individual`, decision 125), and its flags sit on the tenant's `SourceRecord` (decisions 3 and 34). Two flags only: carrier and contract manufacturer are not flags (decision 89). Both can be true at once |
 | `ContactAssignment` | relator, a person at an organization for a purpose | person, organization, purpose | Sutton's Contact; schema.org `ContactPoint` and ORG `Membership` both fit |
 | `ContactPoint`, `PostalAddress` | records with a purpose (billing, shipping, receiving dock) | owner and purpose | a ship-to address is not the customer |
 | `PartyIdentifier` | value with a scheme | scheme and value | tax id, GLN, LEI, the source system's id |
@@ -93,6 +93,8 @@ organization, and a person cannot be an Account. Reversing it is conditional: ea
 positive role record in that tenant, with no known start or end date and none of the relationship's own commercial
 terms. An explicit false is recovered only where negative evidence was kept or the account's role set was declared
 complete; without either, a missing role reads as unknown. Going back from roles to flags drops the dates.
+Decision 34 since moved the flags to the tenant's `SourceRecord`, decision 89 kept two of the four, and decision 125
+struck "a person cannot be an Account".
 
 `IdentityDecision` is where this repository already lives: the import's review of near-duplicate rows is master-data
 matching, and its rule "two rows that look alike are still two records" is the same rule as "never `owl:sameAs`".

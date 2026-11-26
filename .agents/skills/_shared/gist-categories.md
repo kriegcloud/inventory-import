@@ -21,8 +21,8 @@ How to place a class of this repository's ERP ontology under the gist projection
 ## What the projection takes, and what it leaves
 
 A gist class enters when a term needs it (decision 13). Its named gist ancestors come with it as names and subclass
-links only (decision 14). Our terms use `skos:prefLabel` and `skos:definition` in English (`@en`, decision 11). The list of projected terms lives in the vocabulary module, which is not built yet; until then a proposed
-list is a TypeScript sketch in a research report.
+links only (decision 14). Our terms use `skos:prefLabel` and `skos:definition` in English (`@en`, decision 11). The list of projected terms lives in the vocabulary module, `packages/kernel/src/Terms.vocab.ts` (its `gist`
+entry); a name it does not hold is proposed as a TypeScript sketch in a research report.
 
 gist often states a parent inside an `owl:equivalentClass` intersection rather than as `rdfs:subClassOf`
 (`gist:Agreement` is defined as `gist:Intention` and some restrictions). The projection writes that named operand
@@ -48,7 +48,7 @@ Decision 13 admits the seven gist classes in bold for the thin thread (report 14
 | --- | --- | --- | --- | --- |
 | Person | **`gist:Person`** | `gist:LivingThing` | A human being, living or dead | A signed-in member, a contact at a vendor |
 | Living thing | **`gist:LivingThing`** | `gist:PhysicalIdentifiableItem` | An organism | Ancestor of `gist:Person` |
-| Organization | **`gist:Organization`** | none | A structured body formed for goals; may have no members | A Sutton Account, with role flags (decision 3) |
+| Organization | **`gist:Organization`** | none | A structured body formed for goals; may have no members | A Sutton Account of kind `company` (decisions 3 and 125); its role flags sit on the tenant's `SourceRecord` (decision 34) |
 | Membership | **`gist:TemporalRelation`** | none | A relationship that holds for a time | `Member` links a person to a tenant |
 | Grant | **`gist:Assignment`** | `gist:TemporalRelation` | A relationship made by assigning something | `Grant` assigns a role to a member at a scope |
 | Agreement | `gist:Agreement` | `gist:Intention` | An arrangement where two or more parties commit to each other | A signed supply agreement |
@@ -94,7 +94,8 @@ Properties gist offers for these classes (all exist in 14.1.0 as named): `gist:h
 gist itself defines no `gist:hasPart`, and none is added here. The thin thread takes no gist property; the party slice
 takes `gist:isCategorizedBy` and `gist:isAbout` first, then `gist:atDateTime`, then `gist:name`, then `gist:hasAddress`
 (report 18 section 8, decision 176). When
-a slice takes one, copy its named `rdfs:subPropertyOf` links, never its domain or range. Put an `inv:` property under it
+a slice takes one, copy its named `rdfs:subPropertyOf` links, never its domain or range; none of the five has one,
+and the module's field for one comes with the first term that needs it (decision 150). Put an `inv:` property under it
 only if the local property's domain and range fall under the gist property's (decision 16).
 
 ## Decision procedure
@@ -110,8 +111,9 @@ Ask in order; the first yes places the class. Each answer is a proposal until Be
 3. **Does it say what a kind of thing is, so that real things can conform to it?** `gist:Specification`; for what a
    buyer pays for, `gist:CatalogItem`; for goods, `gist:ProductSpecification`; for work done,
    `gist:ServiceSpecification`. Physical stock links to it with `gist:conformsTo`.
-4. **Is it a person or an organization?** `gist:Person` or `gist:Organization`. Customer, vendor, carrier and
-   contract manufacturer are flags on the organization, not classes (decision 3).
+4. **Is it a person or an organization?** `gist:Person` or `gist:Organization`. Customer and vendor are flags on the
+   tenant's `SourceRecord` of the party, not classes (decisions 3 and 34); carrier and contract manufacturer are not
+   flags (decision 89).
 5. **Is it a physical thing?** Countable: `gist:PhysicalIdentifiableItem` (`gist:Equipment` for a machine or
    tool). An uncountable amount: `gist:PhysicalSubstance`.
 6. **Is it a place, or a way to reach one?** A place on earth: `gist:GeoLocation`, `gist:GeoRegion` or
@@ -135,9 +137,9 @@ the candidates and why each fails, and put it to Benjamin as a question.
 
 | Mistake | Why it is wrong | Instead |
 | --- | --- | --- |
-| A Sutton Account under `gist:Account` | `gist:Account` is an agreement that has a balance, a financial account | `gist:Organization` with role flags (decision 3) |
+| A Sutton Account under `gist:Account` | `gist:Account` is an agreement that has a balance, a financial account | `gist:Organization` (`gist:Person` for kind `individual`, decision 125), its role flags on the tenant's `SourceRecord` (decisions 3 and 34) |
 | The item master under `gist:PhysicalIdentifiableItem` | The item record describes a kind of good; it is not a unit on a shelf | `gist:ProductSpecification`; stock `gist:conformsTo` it |
-| Customer or Vendor as a subclass of Organization | They are roles one organization holds at once | Role flags (decision 3); no role classes, no disjointness between them |
+| Customer or Vendor as a subclass of Organization | They are roles one organization holds at once | Role flags on the tenant's `SourceRecord` (decisions 3 and 34); no role classes, no disjointness between them |
 | An address placed under `gist:GeoLocation` | In gist an address is content that a routing method resolves, not the place | `gist:PhysicalAddress`; the place, if needed, is a `gist:GeoLocation` it refers to |
 | A SKU treated as the item's identity, or two rows with one SKU merged | gist notes two IDs with the same text can refer to different things; identity here is report 01's "tenant and a source id" (`project-profile.md`) | `gist:ID` via `gist:isIdentifiedBy`; no `owl:sameAs` |
 | A quantity as a bare number | The unit is part of the fact (250 kg, not 250) | `gist:Magnitude` with `gist:numericValue` and `gist:hasUnitOfMeasure` |

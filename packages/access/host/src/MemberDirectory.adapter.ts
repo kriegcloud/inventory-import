@@ -28,7 +28,7 @@ const AccountRow = S.Struct({
 }).annotate({ description: "A test account's membership, read from user, member and organization." })
 
 /** A user and, when they chose one, the organization they act in. */
-const Chosen = S.Struct({ userId: UserId, organizationId: S.NullOr(OrganizationId) }).annotate({
+const Chosen = S.Struct({ userId: UserId, organizationId: S.OptionFromNullOr(OrganizationId) }).annotate({
   description: "A user and the organization they chose, or null for their earliest"
 })
 
@@ -57,10 +57,9 @@ export const MemberDirectoryD1: Layer.Layer<MemberDirectory, never, SqlClient.Sq
     const findMembership = SqlSchema.findOneOption({
       Request: Chosen,
       Result: Member,
-      execute: ({ organizationId, userId }) =>
-        organizationId === null
-          ? sql`${select} WHERE m.userId = ${userId} ORDER BY m.createdAt, m.id LIMIT 1`
-          : sql`${select} WHERE m.userId = ${userId} AND m.organizationId = ${organizationId}`
+      execute: ({ organizationId, userId }) => sql`${select}
+        WHERE m.userId = ${userId} AND m.organizationId = coalesce(${organizationId}, m.organizationId)
+        ORDER BY m.createdAt, m.id LIMIT 1`
     })
 
     const findInOrganization = SqlSchema.findAll({
@@ -94,7 +93,7 @@ export const MemberDirectoryD1: Layer.Layer<MemberDirectory, never, SqlClient.Sq
       actorFor: Effect.fn("Members.findByUser")(function* (user: SignedInUser) {
         return yield* findMembership({
           userId: user.userId,
-          organizationId: O.getOrNull(user.active)
+          organizationId: user.active
         }).pipe(Effect.orDie)
       }),
       inOrganization: Effect.fn("Members.inOrganization")(function* (organizationId: OrganizationId) {

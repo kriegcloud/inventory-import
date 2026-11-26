@@ -47,7 +47,10 @@ export const AuditTrailStoreD1: Layer.Layer<AuditTrailStore, never, SqlClient.Sq
       }, Effect.orDie),
       count: Effect.fn("Activities.count")(function* (organization: OrganizationId) {
         const found = yield* countOf(organization)
-        return O.match(found, { onNone: () => 0, onSome: (row) => row.n })
+        return yield* O.match(found, {
+          onNone: () => Effect.die("COUNT(*) returned no activity count row"),
+          onSome: (row) => Effect.succeed(row.n)
+        })
       }, Effect.orDie)
     })
   })

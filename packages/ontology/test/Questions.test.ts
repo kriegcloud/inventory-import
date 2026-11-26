@@ -442,6 +442,8 @@ describe("gate 8, the guards on the fixture's two parts", () => {
     })
   )
 
+  // No plant here fails if guard 3 reads CQ-P06's text alone: `bare-type.fixture.ttl` states only `rdf:type`. The
+  // first fixture that states a property no other text states brings that plant (PLAN, Step 5).
   it.effect("guard 3 reads every hand-written fixture text: with CQ-P06's left out, its property is unshown", () =>
     Effect.gen(function* () {
       const { context } = yield* parts

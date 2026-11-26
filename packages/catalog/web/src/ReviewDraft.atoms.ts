@@ -177,15 +177,14 @@ const onlyAccepts = (accepts: ReadonlyArray<StaleAccept>): boolean =>
 /** The scope this browser keeps one import's review under, for the person signed in; none while nobody is. */
 const scopeFor = (signedIn: O.Option<{ readonly organizationId: string; readonly id: string }>, id: ImportId) =>
   signedIn.pipe(
-    O.map((actor) => ({ organizationId: actor.organizationId, memberId: actor.id, screen: `import:${id}` })),
-    O.getOrUndefined
+    O.map((actor) => ({ organizationId: actor.organizationId, memberId: actor.id, screen: `import:${id}` }))
   )
 
 /** A confirm ends the draft and its undo history: nothing of either comes back on the next visit. */
 const forget = (registry: AtomRegistry.AtomRegistry, id: ImportId): void => {
   const scope = scopeFor(registry.get(member), id)
   registry.set(progressOf(scope), O.none())
-  if (scope !== undefined) catalogRuntime().runFork(dropFile(scope).pipe(Effect.ignore))
+  O.map(scope, (scope) => catalogRuntime().runFork(dropFile(scope).pipe(Effect.ignore)))
 }
 
 /**

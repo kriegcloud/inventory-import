@@ -507,7 +507,7 @@ describe("the region's decisions for one import", () => {
         rows,
         state: before,
         action: { type: "leaveOut" as const, rowIds: ["row-2"] },
-        recheck: undefined,
+        recheck: O.none(),
         fixable: () => false,
         rejects: false
       }).state
@@ -523,7 +523,7 @@ describe("the region's decisions for one import", () => {
         rows,
         state: left,
         action: { type: "undo" as const },
-        recheck: undefined,
+        recheck: O.none(),
         fixable: () => false,
         rejects: false
       })
@@ -569,7 +569,7 @@ describe("the region's decisions for one import", () => {
         rows: rowsOf,
         state: t.registry.get(mine),
         action: { type: "leaveOut" as const, rowIds: ["row-2"] },
-        recheck: undefined,
+        recheck: O.none(),
         fixable: () => false,
         rejects: false
       }).state

@@ -68,10 +68,10 @@ const isActionUndo = Action.guards.undo
 const isActionRedo = Action.guards.redo
 
 /** The caller's rule for a row whose value the person typed: what is still wrong with it, or nothing. */
-export type Recheck = (input: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => Problem | undefined
+export type Recheck = (input: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => O.Option<Problem>
 
 /** The caller's own answer on a row that needs the person, or nothing for a row it does not fit. */
-export type RowActionFor = (row: ReviewRow) => RowAction | undefined
+export type RowActionFor = (row: ReviewRow) => O.Option<RowAction>
 
 /**
  * What a region is made from: the caller's atoms. Everything the region's atoms work from is one of these, so
@@ -112,11 +112,11 @@ export type Wanted = Data.TaggedEnum<{
    * A row (none: the one action left on the screen). `toGroup`: after a decision, a row under a group's heading hands
    * the focus to the heading's accept. `waited`: frames waited for the row to come into the list.
    */
-  Row: { readonly rowId: string | undefined; readonly toGroup: boolean; readonly waited: number }
+  Row: { readonly rowId: O.Option<string>; readonly toGroup: boolean; readonly waited: number }
   /** A kind was just unfolded to step into it: its first row as drawn among these (its last, stepping backwards). */
-  Among: { readonly rowId: string | undefined; readonly ids: ReadonlyArray<string>; readonly last: boolean }
+  Among: { readonly rowId: O.Option<string>; readonly ids: ReadonlyArray<string>; readonly last: boolean }
   /** The kind that was on screen has nothing left: on down the work list from it, to the next kind with rows. */
-  Advance: { readonly from: string | undefined }
+  Advance: { readonly from: O.Option<string> }
   /** A new kind was just put on screen: its first row that needs the person. */
   First: {}
 }>
@@ -124,8 +124,8 @@ export const Wanted = Data.taggedEnum<Wanted>()
 
 /** What the region owns and draws besides the decisions: where the person is in the review. */
 export type RegionUi = {
-  readonly picked: FilterId | undefined
-  readonly kind: string | undefined
+  readonly picked: O.Option<FilterId>
+  readonly kind: O.Option<string>
   readonly activityOpen: boolean
   readonly whyOpen: boolean
   readonly confirmOpen: boolean
@@ -163,7 +163,7 @@ export interface Opened {
 /** Where focus is going: the move wanted once the list has changed, and the row "Next problem" last went to. */
 export interface Nav {
   readonly wanted: O.Option<Wanted>
-  readonly stepped: string | undefined
+  readonly stepped: O.Option<string>
 }
 
 /** The set with `id` taken out when it was in, put in when it was not: a tick or a fold pressed again. */
@@ -206,7 +206,7 @@ export interface Region {
   readonly filter: Atom.Atom<FilterId>
   readonly work: Atom.Atom<ReturnType<typeof workList>>
   /** The kind the table shows under "Needs you" on a desk and a tablet; none on a phone and in every other view. */
-  readonly activeKind: Atom.Atom<string | undefined>
+  readonly activeKind: Atom.Atom<O.Option<string>>
   /** The rows of the view on screen, before the table sorts and searches them. */
   readonly list: Atom.Atom<ReadonlyArray<RowView>>
   /** `list` with the facets the person ticked applied: a row shows when each ticked facet lists its value. */
@@ -226,7 +226,7 @@ export interface Region {
   /** The columns the problems on screen are about: they stay in the table. */
   readonly subjects: Atom.Atom<HashSet.HashSet<string>>
   /** The work list beside the table on a desk, a row of chips above it on a tablet; only while deciding. */
-  readonly listMode: Atom.Atom<"rail" | "chips" | undefined>
+  readonly listMode: Atom.Atom<O.Option<"rail" | "chips">>
   /** The table's room: the page's, less the card's margins and border, and the rail beside it. */
   readonly gridRoom: Atom.Atom<number>
   readonly nav: Atom.Writable<Nav>
@@ -275,8 +275,9 @@ const facetsOf = (
       MutableHashMap.set(found, key, entry)
     }
     for (const view of list) {
-      const entry = O.getOrUndefined(MutableHashMap.get(found, keyOf(view.cells[column.id] ?? "")))
-      if (entry !== undefined) entry.n += 1
+      O.map(MutableHashMap.get(found, keyOf(view.cells[column.id] ?? "")), (entry) => {
+        entry.n += 1
+      })
     }
     const options = [...found]
       .map(([key, entry]) => ({
@@ -301,8 +302,8 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
   const id = input.id
 
   const ui = Atom.make<RegionUi>({
-    picked: undefined,
-    kind: undefined,
+    picked: O.none(),
+    kind: O.none(),
     activityOpen: false,
     whyOpen: false,
     confirmOpen: false,
@@ -323,7 +324,7 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
     viewRows({
       rows: get(input.rows),
       state: get(input.decisions),
-      recheck: O.getOrUndefined(get(input.recheck)),
+      recheck: get(input.recheck),
       fixable: get(fixable),
       rejects: get(rejects)
     })
@@ -343,7 +344,12 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
       decisions: get(left)
     })
   })
-  const filter = Atom.readable((get): FilterId => get(picked) ?? O.getOrUndefined(get(opened))?.filter ?? "needs")
+  const filter = Atom.readable((get): FilterId =>
+    O.match(get(picked), {
+      onNone: () => O.match(get(opened), { onNone: () => "needs", onSome: (opened) => opened.filter }),
+      onSome: (picked) => picked
+    })
+  )
   // The work list: every kind that has had rows since the review opened stays on it, ticked once done.
   const seenKinds: Atom.Atom<HashSet.HashSet<string>> = Atom.readable((get) => {
     const now = get(counts)
@@ -356,13 +362,19 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
   )
   // On a desk and a tablet "Needs you" shows one kind at a time, the one picked on the work list (at first, the
   // first with rows left). A phone goes through every decision in turn.
-  const activeKind = Atom.readable((get): string | undefined => {
-    if (get(filter) !== "needs" || get(regionLayout) === "narrow") return undefined
+  const activeKind = Atom.readable((get): O.Option<string> => {
+    if (get(filter) !== "needs" || get(regionLayout) === "narrow") return O.none()
     const list = get(work)
-    const chosen = get(kind)
-    return chosen !== undefined && list.some((item) => item.kind.id === chosen)
-      ? chosen
-      : (list.find((item) => item.left > 0)?.kind.id ?? list[0]?.kind.id)
+    const chosen = O.filter(get(kind), (chosen) => A.some(list, (item) => item.kind.id === chosen))
+    return O.orElse(chosen, () =>
+      O.map(
+        O.orElse(
+          A.findFirst(list, (item) => item.left > 0),
+          () => A.head(list)
+        ),
+        (item) => item.kind.id
+      )
+    )
   })
   const list = Atom.readable((get) => visible({ views: get(views), filter: get(filter), kind: get(activeKind) }))
   const columnDefs = Atom.map(input.columns, defsOf)
@@ -410,31 +422,29 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
     const now = get(filter)
     const rows = get(list)
     return HashSet.fromIterable(
-      now === "needs" && get(activeKind) !== undefined
-        ? rows.flatMap((view) => (view.problem?.column === undefined ? [] : [view.problem.column]))
+      now === "needs" && O.isSome(get(activeKind))
+        ? A.getSomes(A.map(rows, (view) => O.flatMap(view.problem, (problem) => problem.column)))
         : now === "auto"
           ? // The fixes made for the person are what this view is about: their cells stay in the row.
             rows.flatMap((view) => Object.keys(view.marks).filter((column) => isCellMarkApplied(view.marks[column])))
           : []
     )
   })
-  const listMode = Atom.readable((get): "rail" | "chips" | undefined => {
+  const listMode = Atom.readable((get): O.Option<"rail" | "chips"> => {
     const layout: Layout = get(regionLayout)
     // The phone's drawers (vaul) are their own chunk, fetched here, where the review turns out to be narrow, so the
     // first press opens them at once; never on a desk. Asked for again, the browser hands back the one it has.
     if (layout === "narrow") void import("./internal/PhoneDrawer.tsx")
     return layout === "narrow" || get(filter) !== "needs" || get(work).length === 0
-      ? undefined
-      : layout === "wide"
-        ? "rail"
-        : "chips"
+      ? O.none()
+      : O.some(layout === "wide" ? "rail" : "chips")
   })
   const gridRoom = Atom.readable((get) => {
     const room = get(contentWidth)
-    return room - (room < 640 ? 32 : 48) - 2 - (get(listMode) === "rail" ? railWidth : 0)
+    return room - (room < 640 ? 32 : 48) - 2 - (O.contains(get(listMode), "rail") ? railWidth : 0)
   })
 
-  const nav = Atom.make<Nav>({ wanted: O.none(), stepped: undefined })
+  const nav = Atom.make<Nav>({ wanted: O.none(), stepped: O.none() })
   const reveal = Atom.make<O.Option<{ readonly rowId: string; readonly n: number }>>(O.none())
   const present = Atom.make(false)
   const toasts = Atom.make<ReadonlyArray<string | number>>([])
@@ -521,9 +531,9 @@ export type RowActions = {
   /** Takes a fix that is in force on one cell out again ("Undo this fix"). */
   undoFix: (rowId: string, column: string) => void
   /** Turns a proposal down: the file's value stands and the row waits. Absent where a turned-down fix is offered again. */
-  reject?: (rowId: string, column: string) => void
+  reject: O.Option<(rowId: string, column: string) => void>
   /** The row as it stands now, for comparing two rows that cannot both be imported. */
-  peek: (rowId: string) => RowView | undefined
+  peek: (rowId: string) => O.Option<RowView>
 }
 
 /** What a group heading can ask for. Each is one undo step. */
@@ -563,7 +573,7 @@ export interface RegionTable {
   readonly moves: Atom.Atom<number>
   /** For `moves`: settles the wanted move once the change is on screen. */
   readonly settleSoon: () => void
-  readonly run: (action: Action, from?: string) => void
+  readonly run: (action: Action, from: O.Option<string>) => void
   readonly step: (back: boolean) => void
   readonly actions: RowActions
   /** Where the rules' fixes are proposals there is nothing in force to turn down: the rows offer no "Reject". */
@@ -644,7 +654,7 @@ const makeRegionTable = (
           groups: get(region.groups),
           problemKinds: A.filter(
             get(region.input.problemKinds),
-            (entry) => active === undefined || entry.id === active
+            (entry) => O.isNone(active) || O.contains(active, entry.id)
           ),
           collapsed: (entry) => HashSet.has(closed, entry.id)
         })
@@ -696,11 +706,12 @@ const makeRegionTable = (
     if (button !== null && button.checkVisibility()) button.focus()
     else root?.querySelector<HTMLElement>('[data-slot="sticky-table-frame"]')?.focus()
   }
-  const focusRow = (rowId: string | undefined, toGroup = false) => {
-    if (rowId === undefined || !A.some(registry.get(ordered), (view) => view.row.id === rowId)) {
+  const focusRow = (askedRow: O.Option<string>, toGroup: boolean) => {
+    if (O.isNone(askedRow) || !A.some(registry.get(ordered), (view) => view.row.id === askedRow.value)) {
       focusLast()
       return
     }
+    const rowId = askedRow.value
     registry.update(region.reveal, (before) =>
       O.some({ rowId, n: O.match(before, { onNone: () => 1, onSome: (asked) => asked.n + 1 }) })
     )
@@ -724,61 +735,68 @@ const makeRegionTable = (
   /** The rows a stop stands for: its own, or every row of the kind it folds. */
   const rowsAt = Stop.$match({ Row: ({ rowId }) => [rowId], Folded: ({ among }) => among })
 
-  const run = (action: Action, from?: string) => {
+  const run = (action: Action, from: O.Option<string>) => {
     if (!onPage()) return
     const outcome = act({
       rows: registry.get(region.input.rows),
       state: registry.get(region.input.decisions),
       action,
-      recheck: O.getOrUndefined(registry.get(region.input.recheck)),
+      recheck: registry.get(region.input.recheck),
       fixable: registry.get(region.fixable),
       rejects: registry.get(region.rejects)
     })
     if (outcome.label === "") return
     const narrow = registry.get(regionLayout) === "narrow"
     const history = isActionUndo(action) || isActionRedo(action)
-    let unfold: string | undefined
+    let unfold: O.Option<string> = O.none()
     // On a phone the queue moves focus to the card that takes the decided one's place.
     let move: O.Option<Wanted> = O.none()
     if (narrow) move = O.none()
-    else if (history) move = O.some(Wanted.Row({ rowId: O.getOrUndefined(outcome.focus), toGroup: false, waited: 0 }))
+    else if (history) move = O.some(Wanted.Row({ rowId: outcome.focus, toGroup: false, waited: 0 }))
     else {
       // The next place on screen that still needs a decision after this one, in the order the table shows them
       // (a folded kind is opened to reach its rows); failing that, the row itself when it still needs one.
       const changed = MutableHashSet.fromIterable(outcome.changed)
       const left = (rowId: string): boolean => !MutableHashSet.has(changed, rowId)
-      const origin = from ?? outcome.changed[0]
+      const origin = O.orElse(from, () => A.head(outcome.changed))
       const places = registry.get(stops)
-      const at = O.getOrElse(
-        A.findFirstIndex(places, (stop) => origin !== undefined && A.contains(rowsAt(stop), origin)),
-        () => -1
-      )
-      const ahead = [...A.drop(places, at + 1), ...A.take(places, Math.max(0, at))]
-      const next = O.getOrUndefined(A.findFirst(ahead, (stop) => A.some(rowsAt(stop), left)))
-      const stays = from !== undefined && left(from) ? from : undefined
-      // The kind on screen now, read before the decision is written: once its last row is settled the table moves
-      // on by itself, and the work list is gone down from the kind the person was on, not from the one after it.
+      const at = A.findFirstIndex(places, (stop) => O.exists(origin, (origin) => A.contains(rowsAt(stop), origin)))
+      const ahead = O.match(at, {
+        onNone: () => places,
+        onSome: (at) => [...A.drop(places, at + 1), ...A.take(places, Math.max(0, at))]
+      })
+      const next = A.findFirst(ahead, (stop) => A.some(rowsAt(stop), left))
+      const stays = O.filter(from, left)
+      // Read before the decision is written: advancing follows the kind the person was on.
       const onScreen = registry.get(region.activeKind)
       move = O.some(
-        next === undefined
-          ? stays === undefined && onScreen !== undefined
-            ? Wanted.Advance({ from: onScreen })
-            : Wanted.Row({ rowId: stays, toGroup: true, waited: 0 })
-          : Stop.$match(next, {
-              Row: ({ rowId }): Wanted => Wanted.Row({ rowId, toGroup: true, waited: 0 }),
+        O.match(next, {
+          onNone: () =>
+            O.match(stays, {
+              onNone: () =>
+                O.match(onScreen, {
+                  onNone: () => Wanted.Row({ rowId: O.none(), toGroup: true, waited: 0 }),
+                  onSome: (from) => Wanted.Advance({ from: O.some(from) })
+                }),
+              onSome: (rowId) => Wanted.Row({ rowId: O.some(rowId), toGroup: true, waited: 0 })
+            }),
+          onSome: (next) =>
+            Stop.$match(next, {
+              Row: ({ rowId }): Wanted => Wanted.Row({ rowId: O.some(rowId), toGroup: true, waited: 0 }),
               Folded: ({ among, kindId }): Wanted => {
                 const ids = A.filter(among, left)
-                unfold = kindId
-                return Wanted.Among({ rowId: ids[0], ids, last: false })
+                unfold = O.some(kindId)
+                return Wanted.Among({ rowId: A.head(ids), ids, last: false })
               }
             })
+        })
       )
     }
     Atom.batch(() => {
       want(move)
       region.change((before) => ({
         said: outcome.label,
-        ...(unfold === undefined ? {} : { folded: flip(before.folded, unfold) })
+        folded: O.match(unfold, { onNone: () => before.folded, onSome: (unfold) => flip(before.folded, unfold) })
       }))
       // The caller's atom: whoever keeps the decisions (a server draft, the browser) follows it.
       registry.set(region.input.decisions, outcome.state)
@@ -793,7 +811,7 @@ const makeRegionTable = (
           label: "Undo",
           onClick: () => {
             const undo = registry.get(region.input.decisions).undo
-            if (undo[undo.length - 1] === step) run({ type: "undo" as const })
+            if (undo[undo.length - 1] === step) run({ type: "undo" as const }, O.none())
           }
         }
       })
@@ -804,38 +822,39 @@ const makeRegionTable = (
   const step = (back: boolean) => {
     if (!onPage()) return
     const active = document.activeElement
-    const focused =
+    const focused = O.fromNullishOr(
       active instanceof HTMLElement ? active.closest<HTMLElement>("[data-row-id]")?.dataset.rowId : undefined
-    // In the order on screen, from the row that has focus or, after a click on "Next problem" (which took the
-    // focus), from the row the last step went to. Stepping by row number skipped every section drawn above.
+    )
     const places = registry.get(stops)
-    const here = focused ?? registry.get(region.nav).stepped
-    const at =
-      here === undefined
-        ? -1
-        : O.getOrElse(
-            A.findFirstIndex(places, (entry) => entry.rowId === here),
-            () => -1
-          )
-    const next = back ? (at === -1 ? places[places.length - 1] : (places[at - 1] ?? places[at])) : places[at + 1]
-    if (next === undefined) {
-      // Past the last row of the kind on screen: down the work list to the next kind with rows left.
+    const here = O.orElse(focused, () => registry.get(region.nav).stepped)
+    const at = A.findFirstIndex(places, (entry) => O.contains(here, entry.rowId))
+    const next = O.match(at, {
+      onNone: () => (back ? A.last(places) : A.head(places)),
+      onSome: (at) => (back ? O.orElse(A.get(places, at - 1), () => A.get(places, at)) : A.get(places, at + 1))
+    })
+    if (O.isNone(next)) {
       const onScreen = registry.get(region.activeKind)
-      if (!back && onScreen !== undefined) want(O.some(Wanted.Advance({ from: onScreen })))
-      else if (places[at] !== undefined) focusRow(places[at].rowId)
+      if (!back && O.isSome(onScreen)) want(O.some(Wanted.Advance({ from: onScreen })))
+      else
+        O.match(
+          O.flatMap(at, (at) => A.get(places, at)),
+          {
+            onNone: () => undefined,
+            onSome: (place) => focusRow(O.some(place.rowId), false)
+          }
+        )
       return
     }
-    Stop.$match(next, {
+    Stop.$match(next.value, {
       Row: ({ rowId }) => {
-        registry.update(region.nav, (before) => ({ ...before, stepped: rowId }))
-        focusRow(rowId)
+        registry.update(region.nav, (before) => ({ ...before, stepped: O.some(rowId) }))
+        focusRow(O.some(rowId), false)
       },
-      // The row is under a folded heading: open it, and take the focus there once it is drawn.
       Folded: ({ among, kindId, rowId }) =>
         Atom.batch(() => {
           registry.set(region.nav, {
-            stepped: rowId,
-            wanted: O.some(Wanted.Among({ rowId, ids: among, last: back }))
+            stepped: O.some(rowId),
+            wanted: O.some(Wanted.Among({ rowId: O.some(rowId), ids: among, last: back }))
           })
           region.change((before) => ({ folded: flip(before.folded, kindId) }))
         })
@@ -852,9 +871,12 @@ const makeRegionTable = (
       // first row once it is drawn.
       Advance: ({ from }) => {
         const next = nextKind({ list: registry.get(region.work), from })
-        if (next === undefined || next === from) {
+        if (O.isNone(next) || O.exists(next, (next) => O.contains(from, next))) {
           want(O.none())
-          focusRow(places[0]?.rowId)
+          focusRow(
+            O.map(A.head(places), (place) => place.rowId),
+            false
+          )
           return
         }
         Atom.batch(() => {
@@ -863,7 +885,7 @@ const makeRegionTable = (
         })
       },
       First: () => {
-        const first = places[0]?.rowId
+        const first = O.map(A.head(places), (place) => place.rowId)
         registry.set(region.nav, { wanted: O.none(), stepped: first })
         focusRow(first, true)
       },
@@ -871,7 +893,7 @@ const makeRegionTable = (
         // A caller whose rows follow the decisions a little later: after an undo the row may not be in the list yet.
         // Wait for two frames before falling back.
         const { rowId, waited } = move
-        if (rowId !== undefined && waited < 2 && !A.some(registry.get(ordered), (view) => view.row.id === rowId)) {
+        if (O.isSome(rowId) && waited < 2 && !A.some(registry.get(ordered), (view) => view.row.id === rowId.value)) {
           want(O.some(Wanted.Row({ ...move, waited: waited + 1 })))
           return
         }
@@ -881,9 +903,12 @@ const makeRegionTable = (
       // A kind was just unfolded to step into it: its first row as drawn (its last, stepping backwards).
       Among: (move) => {
         const drawn = A.filter(places, (stop) => isStopRow(stop) && A.contains(move.ids, stop.rowId))
-        const target = (move.last ? drawn[drawn.length - 1] : drawn[0])?.rowId ?? move.rowId
+        const target = O.orElse(
+          O.map(move.last ? A.last(drawn) : A.head(drawn), (place) => place.rowId),
+          () => move.rowId
+        )
         registry.set(region.nav, { wanted: O.none(), stepped: target })
-        focusRow(target)
+        focusRow(target, false)
       }
     })
   }
@@ -894,21 +919,23 @@ const makeRegionTable = (
 
   const excluded = () => [...registry.get(region.ui).excluded]
   const actions: RowActions = {
-    accept: (rowId) => run({ type: "accept" as const, rowIds: [rowId] }, rowId),
-    keep: (rowId) => run({ type: "keep" as const, rowId }, rowId),
-    leaveOut: (rowId) => run({ type: "leaveOut" as const, rowIds: [rowId] }, rowId),
-    putBack: (rowId) => run({ type: "putBack" as const, rowId }, rowId),
-    edit: (rowId, column, value) => run({ type: "edit" as const, rowId, column, value }, rowId),
-    undoFix: (rowId, column) => run({ type: "revert" as const, rowId, column, how: "undo" }, rowId),
-    reject: (rowId, column) => run({ type: "revert" as const, rowId, column, how: "reject" }, rowId),
-    peek: (rowId) => O.getOrUndefined(A.findFirst(registry.get(region.views), (view) => view.row.id === rowId))
+    accept: (rowId) => run({ type: "accept" as const, rowIds: [rowId] }, O.some(rowId)),
+    keep: (rowId) => run({ type: "keep" as const, rowId }, O.some(rowId)),
+    leaveOut: (rowId) => run({ type: "leaveOut" as const, rowIds: [rowId] }, O.some(rowId)),
+    putBack: (rowId) => run({ type: "putBack" as const, rowId }, O.some(rowId)),
+    edit: (rowId, column, value) => run({ type: "edit" as const, rowId, column, value }, O.some(rowId)),
+    undoFix: (rowId, column) => run({ type: "revert" as const, rowId, column, how: "undo" }, O.some(rowId)),
+    reject: O.some((rowId: string, column: string) =>
+      run({ type: "revert" as const, rowId, column, how: "reject" }, O.some(rowId))
+    ),
+    peek: (rowId) => A.findFirst(registry.get(region.views), (view) => view.row.id === rowId)
   }
   const groupActions: GroupActions = {
-    accept: (groupId) => run({ type: "acceptGroup" as const, groupId, except: excluded() }),
-    choose: (groupId, value) => run({ type: "chooseGroup" as const, groupId, value, except: excluded() }),
-    leaveOut: (rowIds) => run({ type: "leaveOut" as const, rowIds }),
-    revert: (groupId) => run({ type: "revertGroup" as const, groupId }),
-    acceptRows: (rowIds) => run({ type: "accept" as const, rowIds }),
+    accept: (groupId) => run({ type: "acceptGroup" as const, groupId, except: excluded() }, O.none()),
+    choose: (groupId, value) => run({ type: "chooseGroup" as const, groupId, value, except: excluded() }, O.none()),
+    leaveOut: (rowIds) => run({ type: "leaveOut" as const, rowIds }, O.none()),
+    revert: (groupId) => run({ type: "revertGroup" as const, groupId }, O.none()),
+    acceptRows: (rowIds) => run({ type: "accept" as const, rowIds }, O.none()),
     toggle: (rowId) => {
       if (onPage()) region.change((before) => ({ excluded: flip(before.excluded, rowId) }))
     },
@@ -916,7 +943,7 @@ const makeRegionTable = (
       if (onPage()) region.change((before) => ({ folded: flip(before.folded, kindId) }))
     }
   }
-  const { reject: _reject, ...plainActions } = actions
+  const plainActions: RowActions = { ...actions, reject: O.none() }
 
   // Let go the moment nothing mounts it: a region that has gone must not hear a key meant for the one after it.
   const keys = Atom.setIdleTTL(
@@ -927,12 +954,12 @@ const makeRegionTable = (
         const key = event.key.toLowerCase()
         if ((event.ctrlKey || event.metaKey) && !event.altKey && key === "z") {
           event.preventDefault()
-          run(event.shiftKey ? { type: "redo" as const } : { type: "undo" as const })
+          run(event.shiftKey ? { type: "redo" as const } : { type: "undo" as const }, O.none())
           return
         }
         if (event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && key === "y") {
           event.preventDefault()
-          run({ type: "redo" as const })
+          run({ type: "redo" as const }, O.none())
           return
         }
         if (event.ctrlKey || event.metaKey || event.altKey || registry.get(regionLayout) === "narrow") return

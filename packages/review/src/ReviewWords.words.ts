@@ -5,22 +5,7 @@
 import { ReviewWords } from "@inventory/review/ReviewTypes"
 
 /** The words when the caller gives none. */
-export const defaultReviewWords: ReviewWords = ReviewWords.make({
-  needs: "Needs a decision",
-  cannot: "Cannot import",
-  ready: "Ready",
-  out: "Left out",
-  all: "All",
-  stored: "Already there",
-  auto: "Auto-fixed",
-  accepted: "Accepted",
-  kept: "Kept",
-  edited: "Edited",
-  chosen: "Chosen",
-  nothingNew: "Nothing new: this file is already in",
-  nothingToImport: "Nothing here can be imported"
-})
+export const defaultReviewWords: ReviewWords = ReviewWords.make({})
 
 /** The caller's words over the defaults. */
-export const reviewWords = (given: Partial<typeof ReviewWords.Encoded> | undefined): ReviewWords =>
-  given === undefined ? defaultReviewWords : { ...defaultReviewWords, ...given }
+export const reviewWords = (given: Partial<ReviewWords>): ReviewWords => ReviewWords.make(given)

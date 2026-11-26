@@ -1,3 +1,4 @@
+import { fixableBy } from "@inventory/review/ReviewDraft"
 // A draft saved before the review region became a package, and before its decision became a tagged union, still
 // restores. The fixture is the exact localStorage text that build wrote, kept as .txt so no formatter touches it. The
 // rule that would hurt if wrong: a person's unfinished review is never thrown away by a new build.
@@ -49,7 +50,14 @@ describe("a draft saved by the build before the move", () => {
           cells: {}
         })
       )
-      const after = act({ rows, state, action: { type: "redo" } }).state
+      const after = act({
+        recheck: O.none(),
+        fixable: fixableBy([]),
+        rejects: false,
+        rows,
+        state,
+        action: { type: "redo" }
+      }).state
       expect(O.map(R.get(R.fromEntries(after.decisions), "row-191"), (d) => d.place.kind)).toEqual(O.some("leftOut"))
     })
   )

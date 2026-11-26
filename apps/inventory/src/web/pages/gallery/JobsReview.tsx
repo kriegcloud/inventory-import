@@ -59,8 +59,8 @@ const leaveJobAction = Atom.readable((get) =>
   O.some((row: ReviewRow) => {
     const code = row.cells.job
     return code === undefined
-      ? undefined
-      : {
+      ? O.none()
+      : O.some({
           label: `Leave job ${code} out`,
           onSelect: () =>
             get.registry.update(jobsLeftOut, (before) =>
@@ -69,7 +69,7 @@ const leaveJobAction = Atom.readable((get) =>
                 code
               )
             )
-        }
+        })
   })
 )
 const jobLineKinds = Atom.make(lineKinds)

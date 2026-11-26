@@ -97,6 +97,26 @@ the value moves.
 | `drivers/better-auth/src/BetterAuth.schema.ts` | library options with absent, undefined or NULL `basePath` | `/api/auth` | 0 (sign-in routing, not an import row) | the default sign-in endpoint `/api/auth/sign-in/email` |
 | `access/web/src/SignIn.screen.tsx` `OrganizationSlugStem` | the slug of a new organization whose name has no letter or digit | `organization` (plus the random suffix) | 0 (sign-up, not an import row) | a name of `!!!` gets the slug `organization-1a2b3c` |
 
+Review source row 9 (2026-11-26) retains the following pre-existing defaults on entry schemas. These are presentation
+or empty-state policies, not new import rules; no stored item value changes. They remain listed for Benjamin's
+ruling where the repository gives no separate decision for the value. Counts below come from a local read, stage,
+review and adapter run of the messy sample in propose mode; this was not an on-screen import. Stored row values
+and encoded progress bytes do not change.
+
+| File | Field | Value | Rows of the messy sample | Example |
+| --- | --- | --- | --- | --- |
+| `review/src/ReviewRegion.types.ts` | column `size` | `fit` | 200 rows, 14 of 16 columns | SKU without a size is fit to its measured content |
+| `review/src/ReviewRegion.types.ts` | column core/hidden/facet/search/context/under/code flags | `false` | 200 rows; omitted flag counts across 16 columns: 12 core, 14 hidden/facet/context, 15 search/under/code | an omitted hidden flag shows the column at first |
+| `review/src/ReviewRegion.types.ts` | kind `fixable` | `true` | 45 rows with a problem; the caller can explicitly mark a kind false as before | a kind without fixable stays in Needs a decision |
+| `review/src/ReviewRegion.types.ts` | row `stored`, choice `suggested` | `false` | 200 rows for stored; 2 rows with 10 choices for suggested | an unmarked choice has no suggested suffix |
+| `review/src/ReviewRegion.types.ts` | row applied fixes; why alternatives/labels/targets; draft redo | empty arrays | 183 rows without applied fixes; 26/27/32 rows with a fix lacking alternatives/labels/targets; no sample saved draft lacks redo | a row with no applied fixes starts with none |
+| `review/src/ReviewRegion.types.ts` | review words | existing words in `ReviewWords`, unchanged | 200 rows; 11 words use defaults, while the app overrides stored and all | no caller override still says Ready and Needs a decision |
+| `review/src/ReviewDecision.schema.ts` | absent stored flags/lists/edits | false/empty arrays/empty record | 17 initial decision records; out/kept/accepted/edits are absent on 17, reverted on 0 | `{}` still means an open row with nothing accepted, undone or typed, and encodes as `{}` |
+
+The legacy progress fixture still round-trips byte for byte. `SubmittedText` in `review/src/internal/parts.tsx`
+models the form's pre-existing trim-on-submit and refusal of a blank box; it does not normalize a file cell. Raw
+input stays in the box and the trimmed nonempty submission is decoded at the actual input event.
+
 Foundation modeling row 8 (2026-11-26) moves no new undecided product fallback to a schema. CSV/XLSX API callers
 now explicitly select the already-existing options-schema defaults; fixture builders use named starting values.
 Short CSV/header cells, malformed workbook metadata and parser compatibility fallbacks remain unchanged and are

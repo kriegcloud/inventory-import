@@ -107,5 +107,5 @@ export function planColumns(input: { columns: ReadonlyArray<SizedColumn>; fixed:
 }
 
 /** A column's priority as the rule reads it: its own number, else 1 for a `core` column and 0 for the rest. */
-export const priorityOf = (column: { priority?: number; core?: boolean }): number =>
-  column.priority ?? (column.core === true ? 1 : 0)
+export const priorityOf = (column: { priority: O.Option<number>; core: boolean }): number =>
+  O.match(column.priority, { onNone: () => (column.core ? 1 : 0), onSome: (priority) => priority })

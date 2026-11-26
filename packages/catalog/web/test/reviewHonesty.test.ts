@@ -1,3 +1,4 @@
+import { identity } from "effect/Function"
 // What the review says must be true and must be enough to act on. Each test is a sentence that was wrong on a screen
 // built from this starter: a rule's suggestion called "a guess by the model", a row with no fix that said nothing
 // about why, rows nothing here can fix counted as decisions, an enabled import button that could do nothing, a table
@@ -32,7 +33,7 @@ import {
   visible
 } from "@inventory/review/ReviewDraft"
 import { planColumns, type SizedColumn } from "../../../review/src/internal/sizing.ts"
-import { ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
+import { Problem, ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 import { defaultReviewWords, reviewWords } from "@inventory/review/ReviewWords"
 import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
 import type { ItemFields } from "@inventory/catalog-contract/Item"
@@ -76,16 +77,16 @@ describe("who is behind a suggestion", () => {
   it.effect("calls the sample's low-confidence date reading a rule's, never a model's", () =>
     Effect.map(sampleRows(), ({ rows }) => {
       const fixes = A.flatMap(rows, (row) => [
-        ...(row.applied ?? []),
-        ...(row.problem?.fix === undefined ? [] : [row.problem.fix])
+        ...row.applied,
+        ...O.toArray(O.flatMap(row.problem, (problem) => problem.fix))
       ])
       const questions = A.filter(fixes, (fix) => O.contains(fix.confidence, "low"))
       expect(questions.length).toBeGreaterThan(0)
-      for (const fix of fixes) expect(fix.by).toBe("rule")
+      for (const fix of fixes) expect(fix.by).toEqual(O.some("rule"))
       for (const fix of questions)
-        expect(Str.toLowerCase(sourceLead({ by: fix.by, confidence: O.getOrUndefined(fix.confidence) }))).not.toContain(
-          "model"
-        )
+        expect(
+          Str.toLowerCase(sourceLead({ ...R.getSomes({ by: fix.by }), ...R.getSomes({ confidence: fix.confidence }) }))
+        ).not.toContain("model")
     })
   )
 })
@@ -124,7 +125,15 @@ describe("a second load after a confirm that took accepted proposals", () => {
         expect(A.flatMap([55, 85, 135, 172, 186, 191], statusOf)).toEqual(A.replicate("already", 6))
         // A SKU that does not read yet as written keeps its row waiting, stored or not.
         expect(A.flatMap([148, 195], statusOf)).toEqual(["needs", "needs"])
-        const counts = count(viewRows({ rows: toRegionRows(current, {}), state: emptyState }))
+        const counts = count(
+          viewRows({
+            recheck: O.none(),
+            fixable: fixableBy([]),
+            rejects: false,
+            rows: toRegionRows(current, {}),
+            state: emptyState
+          })
+        )
         expect([counts.stored, counts.needs, counts.cannot, counts.ready, counts.out, counts.total]).toEqual([
           161, 18, 21, 0, 0, 200
         ])
@@ -153,17 +162,25 @@ describe("an open import's card on the Upload step", () => {
 describe("every row says why", () => {
   it.effect("gives each row of the sample that is not ready a sentence, the row with no fix included", () =>
     Effect.map(sampleRows(), ({ current, decisions, rows }) => {
-      const views = viewRows({ rows, state: restored(toRegionDecisions(decisions)) })
+      const views = viewRows({
+        recheck: O.none(),
+        fixable: fixableBy([]),
+        rejects: false,
+        rows,
+        state: restored(toRegionDecisions(decisions))
+      })
       const kinds = kindsOf(regionKinds)
       const open = A.filter(views, (view) => view.status === "needs")
       expect(open.length).toBe(current.counts.needs)
       // A row with an empty SKU has no fix, only a refusal: it still says why, in the domain's own sentence.
-      const noFix = A.filter(open, (view) => view.problem?.fix === undefined)
+      const noFix = A.filter(open, (view) => O.isNone(O.flatMap(view.problem, (problem) => problem.fix)))
       expect(noFix.length).toBeGreaterThan(0)
       for (const view of open) {
         const domain = O.getOrThrow(A.findFirst(current.rows, (row) => row.id === view.row.id))
         // The first problem's sentence, and how many more the row has behind it.
-        expect(reasonOf({ view, kinds })).toBe(reasonShown(O.getOrThrow(domain.reason), domain.reasons.length))
+        expect(reasonOf({ words: defaultReviewWords, view, kinds })).toBe(
+          reasonShown(O.getOrThrow(domain.reason), domain.reasons.length)
+        )
       }
     })
   )
@@ -174,8 +191,8 @@ const kinds: ReadonlyArray<ProblemKind> = [
   ProblemKind.make({ id: "unit", label: "Unit", tone: "decision" }),
   ProblemKind.make({ id: "unknown", label: "Not in system", tone: "blocker", fixable: false })
 ]
-const columns: ReadonlyArray<ReviewColumn> = [ReviewColumn.make({ id: "name", label: "Name" })]
-const row = (line: number, extra: Partial<typeof ReviewRow.Encoded> = {}): ReviewRow =>
+const columns: ReadonlyArray<ReviewColumn> = [ReviewColumn.make({ display: identity, id: "name", label: "Name" })]
+const row = (line: number, extra: Partial<Parameters<typeof ReviewRow.make>[0]> = {}): ReviewRow =>
   ReviewRow.make({
     id: `row-${line}`,
     line,
@@ -183,34 +200,48 @@ const row = (line: number, extra: Partial<typeof ReviewRow.Encoded> = {}): Revie
     ...extra
   })
 const unknownItem = (line: number) =>
-  row(line, { problem: { kind: "unknown", reason: `Item ${line} is not in the system yet.` } })
+  row(line, {
+    problem: O.some(Problem.make({ kind: "unknown", reason: O.some(`Item ${line} is not in the system yet.`) }))
+  })
 
 describe("rows that cannot be fixed here", () => {
-  const rows = [row(2), unknownItem(3), unknownItem(4), row(5, { problem: { kind: "unit", column: "name" } })]
+  const rows = [
+    row(2),
+    unknownItem(3),
+    unknownItem(4),
+    row(5, { problem: O.some(Problem.make({ kind: "unit", column: O.some("name") })) })
+  ]
   const fixable = fixableBy(kinds)
-  const views = viewRows({ rows, state: emptyState, fixable })
+  const views = viewRows({ recheck: O.none(), rejects: false, rows, state: emptyState, fixable })
 
   it("are counted apart from the decisions, with their reason, and never offer an answer", () => {
     const counts = count(views)
     expect([counts.ready, counts.needs, counts.cannot, counts.out]).toEqual([1, 1, 2, 0])
     expect(counts.needs + counts.cannot + counts.ready + counts.out + counts.stored).toBe(counts.total)
-    expect(decisionsLeft(views)).toBe(1)
-    expect(A.map(visible({ views, filter: "cannot" }), (view) => view.row.line)).toEqual([3, 4])
-    expect(A.map(visible({ views, filter: "needs" }), (view) => view.row.line)).toEqual([5])
+    expect(decisionsLeft(views, [])).toBe(1)
+    expect(A.map(visible({ kind: O.none(), views, filter: "cannot" }), (view) => view.row.line)).toEqual([3, 4])
+    expect(A.map(visible({ kind: O.none(), views, filter: "needs" }), (view) => view.row.line)).toEqual([5])
     const cannot = O.getOrUndefined(A.findFirst(views, (view) => view.row.line === 3))
-    expect(cannot === undefined ? "" : reasonOf({ view: cannot, kinds: kindsOf(kinds) })).toBe(
-      "Item 3 is not in the system yet."
-    )
     expect(
-      act({ rows, state: emptyState, action: { type: "leaveOut" as const, rowIds: ["row-3"] }, fixable }).label
+      cannot === undefined ? "" : reasonOf({ words: defaultReviewWords, view: cannot, kinds: kindsOf(kinds) })
+    ).toBe("Item 3 is not in the system yet.")
+    expect(
+      act({
+        recheck: O.none(),
+        rejects: false,
+        rows,
+        state: emptyState,
+        action: { type: "leaveOut" as const, rowIds: ["row-3"] },
+        fixable
+      }).label
     ).toBe("")
-    expect(heldLine(counts)).toBe("3 won't be imported: Needs a decision 1, Cannot import 2")
+    expect(heldLine(counts, defaultReviewWords)).toBe("3 won't be imported: Needs a decision 1, Cannot import 2")
   })
 
   it("do not hold the import back", () => {
-    expect(primary({ columns, counts: count(views), noun: ["item", "items"] })).toEqual(
-      Primary.Import({ label: "Import 1 item" })
-    )
+    expect(
+      primary({ closing: O.none(), words: defaultReviewWords, columns, counts: count(views), noun: ["item", "items"] })
+    ).toEqual(Primary.Import({ label: "Import 1 item" }))
   })
 })
 
@@ -218,13 +249,33 @@ describe("a button that could do nothing is never offered", () => {
   const noun = ["item", "items"] as const
 
   it("is idle while decisions are open and nothing is ready", () => {
-    const counts = count(viewRows({ rows: [row(2, { problem: { kind: "unit", column: "name" } })], state: emptyState }))
-    expect(primary({ columns, counts, noun })).toEqual(Primary.Idle({ label: "No items ready yet" }))
+    const counts = count(
+      viewRows({
+        recheck: O.none(),
+        fixable: fixableBy([]),
+        rejects: false,
+        rows: [row(2, { problem: O.some(Problem.make({ kind: "unit", column: O.some("name") })) })],
+        state: emptyState
+      })
+    )
+    expect(primary({ closing: O.none(), words: defaultReviewWords, columns, counts, noun })).toEqual(
+      Primary.Idle({ label: "No items ready yet" })
+    )
   })
 
   it("gives way to words when only rows nothing here can fix are left", () => {
-    const counts = count(viewRows({ rows: [unknownItem(2)], state: emptyState, fixable: fixableBy(kinds) }))
-    expect(primary({ columns, counts, noun })).toEqual(Primary.Done({ label: defaultReviewWords.nothingToImport }))
+    const counts = count(
+      viewRows({
+        recheck: O.none(),
+        rejects: false,
+        rows: [unknownItem(2)],
+        state: emptyState,
+        fixable: fixableBy(kinds)
+      })
+    )
+    expect(primary({ closing: O.none(), words: defaultReviewWords, columns, counts, noun })).toEqual(
+      Primary.Done({ label: defaultReviewWords.nothingToImport })
+    )
   })
 
   it.effect("ends a second load of the same file on 'Nothing new' once every row is already there", () =>
@@ -234,9 +285,11 @@ describe("a button that could do nothing is never offered", () => {
       const items = A.flatMap(first.current.rows, (each) => A.fromOption(each.item))
       expect(items.length).toBe(25)
       const { rows } = yield* sampleRows("items_clean.csv", items)
-      const counts = count(viewRows({ rows, state: emptyState }))
+      const counts = count(
+        viewRows({ recheck: O.none(), fixable: fixableBy([]), rejects: false, rows, state: emptyState })
+      )
       expect(counts.stored).toBe(25)
-      expect(primary({ columns, counts, noun })).toEqual(
+      expect(primary({ closing: O.none(), words: defaultReviewWords, columns, counts, noun })).toEqual(
         Primary.Done({ label: "Nothing new: this file is already in" })
       )
     })
@@ -246,9 +299,20 @@ describe("a button that could do nothing is never offered", () => {
 describe("status words", () => {
   it("are set once by the caller and said everywhere they show", () => {
     const words = reviewWords({ out: "Skipped", stored: "In stock already", needs: "Waiting on you" })
-    const rows = [row(2, { problem: { kind: "unit", column: "name" } }), row(3), row(4, { stored: true })]
-    const left = act({ rows, state: emptyState, action: { type: "leaveOut" as const, rowIds: ["row-3"] } }).state
-    const views = viewRows({ rows, state: left })
+    const rows = [
+      row(2, { problem: O.some(Problem.make({ kind: "unit", column: O.some("name") })) }),
+      row(3),
+      row(4, { stored: true })
+    ]
+    const left = act({
+      recheck: O.none(),
+      fixable: fixableBy([]),
+      rejects: false,
+      rows,
+      state: emptyState,
+      action: { type: "leaveOut" as const, rowIds: ["row-3"] }
+    }).state
+    const views = viewRows({ recheck: O.none(), fixable: fixableBy([]), rejects: false, rows, state: left })
     const csv = heldCsv({ views, columns, problemKinds: kinds, words })
     expect(csv).toContain("3,Skipped,Item 3")
     expect(csv).toContain("4,In stock already,Item 4")
@@ -259,7 +323,7 @@ describe("status words", () => {
   it("keep the current words as defaults, each said once", () => {
     const values = R.values(defaultReviewWords)
     expect(A.dedupe(values)).toHaveLength(values.length)
-    expect(reviewWords(undefined)).toEqual(defaultReviewWords)
+    expect(reviewWords({})).toEqual(defaultReviewWords)
   })
 })
 
@@ -351,7 +415,7 @@ describe("a cost, the dimensions and the vendors in the review", () => {
             (column) => column.id === "unitCost"
           )
         )
-        expect(cost?.unit).toBeUndefined()
+        expect(cost?.unit).toEqual(O.none())
         expect(cost?.display?.("31.4")).toBe("$31.40")
       }
     )

@@ -300,7 +300,7 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
   const signedIn = useAtomValue(member)
   const actor = O.getOrUndefined(signedIn)
   const progress = useSavedProgress(
-    actor === undefined ? undefined : { organizationId: actor.organizationId, memberId: actor.id, screen: "upload" },
+    O.map(signedIn, (actor) => ({ organizationId: actor.organizationId, memberId: actor.id, screen: "upload" })),
     catalogRuntime()
   )
   const [problem, setProblem] = useAtom(uploadProblem)
@@ -346,21 +346,29 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
   // A file whose upload stopped with the page. Not offered once an import of it exists: a reload while the server
   // was preparing it still finished it, and it is in the list above.
   const saved = progress.saved
-  const stopped = saved?.step === "upload" ? O.getOrNull(saved.file) : null
-  const landed =
-    stopped !== null &&
-    saved !== undefined &&
-    views.some(
-      (view) => view.fileName === stopped.name && DateTime.isGreaterThanOrEqualTo(view.createdAt, saved.savedAt)
+  const stopped = O.flatMap(
+    O.filter(saved, (saved) => saved.step === "upload"),
+    (saved) => saved.file
+  )
+  const landed = O.exists(stopped, (stopped) =>
+    O.exists(saved, (saved) =>
+      views.some(
+        (view) => view.fileName === stopped.name && DateTime.isGreaterThanOrEqualTo(view.createdAt, saved.savedAt)
+      )
     )
+  )
   // One filled button on the screen: Continue when a file stopped, else the first open import, else Choose file.
-  const offered = stopped !== null && !landed && !busy && props.canImport
+  const offered = O.isSome(stopped) && !landed && !busy && props.canImport
   const resume = () => {
-    if (stopped === null) return
+    if (O.isNone(stopped)) return
     void progress.file().then((file) => {
-      if (file !== undefined) return send(file)
-      clear()
-      setProblem(`${stopped.name} is no longer kept in this browser. Choose it again.`)
+      O.match(file, {
+        onSome: send,
+        onNone: () => {
+          clear()
+          setProblem(`${stopped.value.name} is no longer kept in this browser. Choose it again.`)
+        }
+      })
     })
   }
 
@@ -403,25 +411,31 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
               </AlertDescription>
             </Alert>
           ) : null}
-          {!offered || stopped === null ? null : (
-            <Item variant="outline" className="flex-wrap">
-              <ItemContent className="min-w-56">
-                <ItemTitle className="max-w-full">
-                  <span className="truncate">{stopped.name}</span>
-                </ItemTitle>
-                <ItemDescription>
-                  Stopped before it was saved. Continue reads it again from this browser.
-                </ItemDescription>
-              </ItemContent>
-              <ItemActions>
-                <Button variant="ghost" onClick={clear}>
-                  Start again
-                </Button>
-                <Button onClick={resume}>
-                  Continue<span className="sr-only"> {stopped.name}</span>
-                </Button>
-              </ItemActions>
-            </Item>
+          {O.match(
+            O.filter(stopped, () => offered),
+            {
+              onNone: () => null,
+              onSome: (stopped) => (
+                <Item variant="outline" className="flex-wrap">
+                  <ItemContent className="min-w-56">
+                    <ItemTitle className="max-w-full">
+                      <span className="truncate">{stopped.name}</span>
+                    </ItemTitle>
+                    <ItemDescription>
+                      Stopped before it was saved. Continue reads it again from this browser.
+                    </ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <Button variant="ghost" onClick={clear}>
+                      Start again
+                    </Button>
+                    <Button onClick={resume}>
+                      Continue<span className="sr-only"> {stopped.name}</span>
+                    </Button>
+                  </ItemActions>
+                </Item>
+              )
+            }
           )}
           {views.length === 0 ? null : (
             <ul aria-label="Files not imported yet" className="flex flex-col gap-2">

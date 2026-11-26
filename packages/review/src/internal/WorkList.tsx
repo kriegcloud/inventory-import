@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import { useAtomValue } from "@effect/atom-react"
 import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
@@ -17,7 +18,7 @@ const whole = new Intl.NumberFormat("en-US")
 export function WorkList(props: {
   items: ReadonlyArray<WorkItem>
   /** The kind the table is showing; undefined while it shows another view (Ready, All). */
-  active: string | undefined
+  active: O.Option<string>
   onPick: (kindId: string) => void
   mode: "rail" | "chips"
 }) {
@@ -50,7 +51,7 @@ export function WorkList(props: {
               orientation="vertical"
               size="sm"
               spacing={1}
-              value={props.active ?? ""}
+              value={O.match(props.active, { onNone: () => "", onSome: (active) => active })}
               onValueChange={onValueChange}
               className="w-full flex-col items-stretch"
             >
@@ -68,7 +69,7 @@ export function WorkList(props: {
         variant="outline"
         size="sm"
         spacing={1}
-        value={props.active ?? ""}
+        value={O.match(props.active, { onNone: () => "", onSome: (active) => active })}
         onValueChange={onValueChange}
       >
         {items}

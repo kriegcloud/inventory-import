@@ -101,7 +101,7 @@ describe("stored forms round-trip", () => {
     ([decision]) =>
       Effect.gen(function* () {
         const flags = yield* S.encodeEffect(ReviewDecisionFromFlags)(decision)
-        expect(S.is(DecisionFlags)(flags)).toBe(true)
+        expect(S.is(S.toEncoded(DecisionFlags))(flags)).toBe(true)
         const back = yield* S.decodeEffect(ReviewDecisionFromFlags)(flags)
         const again = yield* S.encodeEffect(ReviewDecisionFromFlags)(back)
         expect(again).toEqual(flags)

@@ -1,3 +1,4 @@
+import { rowName } from "@inventory/review/ReviewDraft"
 import { useAtom, useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as A from "effect/Array"
 import * as Cause from "effect/Cause"
@@ -62,18 +63,18 @@ const whole = new Intl.NumberFormat("en-US")
 /** The two cells that hold JSON are fixed in a form of their own, not as raw text in one box. */
 const cellEditor = (input: { row: ReviewRow; column: string; value: string }) =>
   input.column === "dimensions"
-    ? {
+    ? O.some({
         label: "Fix dimensions",
-        title: `Dimensions, row ${input.row.label ?? input.row.line}`,
+        title: `Dimensions, row ${rowName(input.row)}`,
         render: (save: (value: string) => void) => <DimensionsForm value={input.value} onSave={save} />
-      }
+      })
     : input.column === "vendors"
-      ? {
+      ? O.some({
           label: "Fix vendors",
-          title: `Vendors, row ${input.row.label ?? input.row.line}`,
+          title: `Vendors, row ${rowName(input.row)}`,
           render: (save: (value: string) => void) => <VendorsForm value={input.value} onSave={save} />
-        }
-      : undefined
+        })
+      : O.none()
 
 /** The review of every row with the decisions shown: the same pure review the server runs at the confirm. */
 const currentReview = perKey((id: ImportId) =>
@@ -113,14 +114,13 @@ const recheckOf = perKey((id: ImportId) =>
   Atom.readable((get) =>
     O.map(get(reviewInput(id)), (input) => {
       const check = recheckRow(input)
-      return (asked: { row: ReviewRow; cells: Readonly<Record<string, string>> }): Problem | undefined => {
+      return (asked: { row: ReviewRow; cells: Readonly<Record<string, string>> }): O.Option<Problem> => {
         const problem = check({ id: asked.row.id, values: asked.cells })
         // The check knows the typed values and not the keep-or-replace answer: once that is given, what is still open
         // is what the review of every decision says (the row's own problem).
         const answered = asked.cells[storedChoice] === "keep" || asked.cells[storedChoice] === "replace"
         if (O.exists(problem, (open) => open.kind === "changed") && answered) return asked.row.problem
-        // The region takes no problem as undefined: the screen's last step.
-        return O.match(problem, { onNone: () => undefined, onSome: toRegionProblem })
+        return O.map(problem, toRegionProblem)
       }
     })
   )

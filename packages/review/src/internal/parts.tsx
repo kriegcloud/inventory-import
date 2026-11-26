@@ -1,5 +1,9 @@
+import { identity } from "effect/Function"
 import { CellMark } from "@inventory/review/ReviewTypes"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
+import * as S from "effect/Schema"
+import { $ReviewId } from "./identity.ts"
 import {
   ArrowRightIcon,
   CheckIcon,
@@ -277,19 +281,22 @@ export function FixMark(props: { by: MarkSource }) {
 
 /** The reason a row needs the person: an icon and three words at most. Never colour alone. */
 export function ReasonTag(props: {
-  kind: ProblemKind | undefined
+  kind: O.Option<ProblemKind>
   /** The problem's own tone, over its kind's (`Problem.tone`). */
-  tone?: ProblemKind["tone"] | undefined
+  tone: O.Option<ProblemKind["tone"]>
   fallback: string
 }) {
-  const blocker = (props.tone ?? props.kind?.tone) === "blocker"
+  const blocker = O.contains(
+    O.orElse(props.tone, () => O.map(props.kind, (kind) => kind.tone)),
+    "blocker"
+  )
   return (
     <StatusPill
       tone={blocker ? "danger" : "warning"}
       icon={blocker ? <CircleAlertIcon aria-hidden /> : <TriangleAlertIcon aria-hidden />}
       className="flex-none"
     >
-      {props.kind?.label ?? props.fallback}
+      {O.match(props.kind, { onNone: () => props.fallback, onSome: (kind) => kind.label })}
     </StatusPill>
   )
 }
@@ -314,18 +321,20 @@ export function DecisionTag(props: { view: RowView; words?: ReviewWords }) {
       </StatusPill>
     )
   }
-  const decided = props.view.decided
-  if (decided === undefined) return <span className="text-muted-foreground">{words.ready}</span>
-  return decided === "auto" ? (
-    <StatusPill tone="neutral" icon={<WandSparklesIcon aria-hidden />} className="flex-none">
-      {words.auto}
-    </StatusPill>
-  ) : (
-    <StatusPill tone="outline" icon={<UserCheckIcon aria-hidden />} className="flex-none">
-      {/* A value picked from the row's choices was chosen, not edited. */}
-      {decided === "edited" && pickedChoice(props.view) !== undefined ? words.chosen : words[decided]}
-    </StatusPill>
-  )
+  return O.match(props.view.decided, {
+    onNone: () => <span className="text-muted-foreground">{words.ready}</span>,
+    onSome: (decided) =>
+      decided === "auto" ? (
+        <StatusPill tone="neutral" icon={<WandSparklesIcon aria-hidden />} className="flex-none">
+          {words.auto}
+        </StatusPill>
+      ) : (
+        <StatusPill tone="outline" icon={<UserCheckIcon aria-hidden />} className="flex-none">
+          {/* A value picked from the row's choices was chosen, not edited. */}
+          {decided === "edited" && O.isSome(pickedChoice(props.view)) ? words.chosen : words[decided]}
+        </StatusPill>
+      )
+  })
 }
 
 /**
@@ -337,7 +346,7 @@ export const longValue = 8
 /** A value with its change, or the plain value. A `low` reading is shown as a question, not as a change. */
 export function CellValue(props: {
   value: string
-  mark: CellMark | undefined
+  mark: O.Option<CellMark>
   /** How the column shows a value (`ReviewColumn.display`): money as the app shows it. */
   display?: ((value: string) => string) | undefined
   accepted?: boolean
@@ -345,96 +354,99 @@ export function CellValue(props: {
   /** The row sits under a group heading that already says what its empty cell becomes ("empty → Foot"). */
   stated?: boolean
 }) {
-  const shown = (text: string): string => (props.display === undefined || text === "" ? text : props.display(text))
-  const raw = props.mark
-  const { empty = null } = props
-  if (raw === undefined) return props.value === "" ? empty : <>{shown(props.value)}</>
-  const mark = { ...raw, from: shown(raw.from), to: shown(raw.to) }
-  if (mark.from === mark.to) return <>{mark.to}</>
-  if (isCellMarkProposed(mark) && choicesOf(mark.fix) !== undefined) {
-    // A question, marked with who asks it: a sparkle only when the caller says a model made it.
-    return (
-      <span className="inline-flex items-center gap-1.5">
-        {mark.from === "" ? "empty" : mark.from}
-        <span className="inline-flex items-center gap-1 text-muted-foreground">
-          <FixMark by={mark.by} />
-          {mark.to}?
-        </span>
-      </span>
-    )
-  }
-  // A value typed into an empty cell has nothing to strike through: the value and a check say it changed.
-  if (mark.from === "" && isCellMarkApplied(mark)) {
-    return (
-      <span className="inline-flex items-center gap-1">
-        {mark.to}
-        <CheckIcon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
-        <span className="sr-only"> (was empty)</span>
-      </span>
-    )
-  }
-  // Nothing to strike through that a person could see: an empty cell under a heading that says "empty", or a value
-  // that only loses the spaces around it. The proposed value stands alone.
-  // A short value that loses its spaces is shown in quotation marks beside the new one (“Foot ” → Foot), so the
-  // change can be seen; a long one (a name) would not fit twice and stands alone.
-  const spacesOnly = mark.from !== "" && mark.from.trim() === mark.to
-  const alone = spacesOnly && mark.to.length > longValue
-  if (isCellMarkProposed(mark) && ((mark.from === "" && props.stated === true) || alone)) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <ins className="inline-flex max-w-full min-w-0 no-underline">
-            <span className="sr-only">{alone ? "spaces removed, proposed " : "was empty, proposed "}</span>
-            <ProposedChip>
-              {mark.to}
+  const { empty = null, display = identity } = props
+  const shown = (text: string): string => (text === "" ? text : display(text))
+  return O.match(props.mark, {
+    onNone: () => (props.value === "" ? empty : <>{shown(props.value)}</>),
+    onSome: (raw) => {
+      const mark = { ...raw, from: shown(raw.from), to: shown(raw.to) }
+      if (mark.from === mark.to) return <>{mark.to}</>
+      if (isCellMarkProposed(mark) && O.isSome(choicesOf(mark.fix))) {
+        // A question, marked with who asks it: a sparkle only when the caller says a model made it.
+        return (
+          <span className="inline-flex items-center gap-1.5">
+            {mark.from === "" ? "empty" : mark.from}
+            <span className="inline-flex items-center gap-1 text-muted-foreground">
               <FixMark by={mark.by} />
-            </ProposedChip>
-          </ins>
-        </TooltipTrigger>
-        <TooltipContent>
-          {alone ? `Was ${spellingOf(mark.from)}: the spaces around it are removed` : "Was empty"}
-        </TooltipContent>
-      </Tooltip>
-    )
-  }
-  const state = isCellMarkApplied(mark)
-    ? props.accepted === true && mark.by !== "you"
-      ? "accepted"
-      : "applied"
-    : "proposed"
-  const source = mark.by === "you" ? null : <FixMark by={mark.by} />
-  // The file's value struck through and the value that would be imported beside it, as real `<del>` and `<ins>` with
-  // hidden "was" and "now". Short of room the old value is the part that is cut; its whole spelling is then one hover
-  // or tap away in a hover card, never in a native title.
-  return (
-    <span className="inline-flex max-w-full min-w-0 flex-nowrap items-center gap-x-1.5">
-      <del className="min-w-0 text-muted-foreground decoration-muted-foreground/70">
-        <CutText text={spellingOf(mark.from)}>
-          <span className="sr-only">was </span>
-          {spellingOf(mark.from)}
-        </CutText>
-      </del>
-      {state === "applied" ? (
-        <ins className="inline-flex items-center gap-1 no-underline">
-          <span className="sr-only">now </span>
-          {mark.to}
-          <CheckIcon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
-          {source}
-        </ins>
-      ) : (
-        <>
-          <ArrowRightIcon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
-          <ins className="shrink-0 no-underline">
-            <span className="sr-only">{state === "accepted" ? "accepted " : "proposed "}</span>
-            <ProposedChip state={state}>
+              {mark.to}?
+            </span>
+          </span>
+        )
+      }
+      // A value typed into an empty cell has nothing to strike through: the value and a check say it changed.
+      if (mark.from === "" && isCellMarkApplied(mark)) {
+        return (
+          <span className="inline-flex items-center gap-1">
+            {mark.to}
+            <CheckIcon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
+            <span className="sr-only"> (was empty)</span>
+          </span>
+        )
+      }
+      // Nothing to strike through that a person could see: an empty cell under a heading that says "empty", or a value
+      // that only loses the spaces around it. The proposed value stands alone.
+      // A short value that loses its spaces is shown in quotation marks beside the new one (“Foot ” → Foot), so the
+      // change can be seen; a long one (a name) would not fit twice and stands alone.
+      const spacesOnly = mark.from !== "" && mark.from.trim() === mark.to
+      const alone = spacesOnly && mark.to.length > longValue
+      if (isCellMarkProposed(mark) && ((mark.from === "" && props.stated === true) || alone)) {
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <ins className="inline-flex max-w-full min-w-0 no-underline">
+                <span className="sr-only">{alone ? "spaces removed, proposed " : "was empty, proposed "}</span>
+                <ProposedChip>
+                  {mark.to}
+                  <FixMark by={mark.by} />
+                </ProposedChip>
+              </ins>
+            </TooltipTrigger>
+            <TooltipContent>
+              {alone ? `Was ${spellingOf(mark.from)}: the spaces around it are removed` : "Was empty"}
+            </TooltipContent>
+          </Tooltip>
+        )
+      }
+      const state = isCellMarkApplied(mark)
+        ? props.accepted === true && mark.by !== "you"
+          ? "accepted"
+          : "applied"
+        : "proposed"
+      const source = mark.by === "you" ? null : <FixMark by={mark.by} />
+      // The file's value struck through and the value that would be imported beside it, as real `<del>` and `<ins>` with
+      // hidden "was" and "now". Short of room the old value is the part that is cut; its whole spelling is then one hover
+      // or tap away in a hover card, never in a native title.
+      return (
+        <span className="inline-flex max-w-full min-w-0 flex-nowrap items-center gap-x-1.5">
+          <del className="min-w-0 text-muted-foreground decoration-muted-foreground/70">
+            <CutText text={spellingOf(mark.from)}>
+              <span className="sr-only">was </span>
+              {spellingOf(mark.from)}
+            </CutText>
+          </del>
+          {state === "applied" ? (
+            <ins className="inline-flex items-center gap-1 no-underline">
+              <span className="sr-only">now </span>
               {mark.to}
+              <CheckIcon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
               {source}
-            </ProposedChip>
-          </ins>
-        </>
-      )}
-    </span>
-  )
+            </ins>
+          ) : (
+            <>
+              <ArrowRightIcon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
+              <ins className="shrink-0 no-underline">
+                <span className="sr-only">{state === "accepted" ? "accepted " : "proposed "}</span>
+                <ProposedChip state={state}>
+                  {mark.to}
+                  {source}
+                </ProposedChip>
+              </ins>
+            </>
+          )}
+        </span>
+      )
+    }
+  })
 }
 
 /**
@@ -519,9 +531,9 @@ export function GroupChange(props: {
   /** How the column shows a value (`ReviewColumn.display`): vendors as "2 · Acme preferred", not the file's JSON. */
   display?: ((value: string) => string) | undefined
 }) {
-  const { group } = props
+  const { group, display = identity } = props
   const choices = choicesOf(group)
-  const variants = variantsText(group, props.display)
+  const variants = variantsText(group, display)
   return (
     <span
       className={cn(
@@ -535,19 +547,25 @@ export function GroupChange(props: {
       {group.mixed === true ? (
         // The rows end in different values: none is named here, each row shows its own.
         <span className="flex-none font-normal text-muted-foreground">each row its own value, shown below</span>
-      ) : choices !== undefined ? (
-        <span>{choices.map((choice) => valueWords(group, choice)).join(" or ")}?</span>
-      ) : props.applied === true ? (
-        <span className="inline-flex items-center gap-1 font-medium">
-          {group.label ?? group.to}
-          <CheckIcon aria-hidden className="size-3 text-muted-foreground" />
-        </span>
-      ) : props.oneLine === true ? (
-        <span className="flex-none">
-          <ProposedChip>{group.label ?? group.to}</ProposedChip>
-        </span>
       ) : (
-        <ProposedChip>{group.label ?? group.to}</ProposedChip>
+        O.match(choices, {
+          onNone: () =>
+            props.applied === true ? (
+              <span className="inline-flex items-center gap-1 font-medium">
+                {O.match(group.label, { onNone: () => group.to, onSome: (label) => label })}
+                <CheckIcon aria-hidden className="size-3 text-muted-foreground" />
+              </span>
+            ) : props.oneLine === true ? (
+              <span className="flex-none">
+                <ProposedChip>
+                  {O.match(group.label, { onNone: () => group.to, onSome: (label) => label })}
+                </ProposedChip>
+              </span>
+            ) : (
+              <ProposedChip>{O.match(group.label, { onNone: () => group.to, onSome: (label) => label })}</ProposedChip>
+            ),
+          onSome: (present) => <span>{present.map((choice) => valueWords(group, choice)).join(" or ")}?</span>
+        })
       )}
     </span>
   )
@@ -558,20 +576,23 @@ export function GroupChange(props: {
  * `brief` keeps it to one line: who is behind it and the reason, without the evidence.
  */
 export function Reason(props: {
-  fix: { by?: MarkSource | undefined; confidence: Fix["confidence"]; why: Fix["why"] }
+  fix: { by: Fix["by"]; confidence: Fix["confidence"]; why: Fix["why"] }
   brief?: boolean
   className?: string
 }) {
   const { why } = props.fix
-  const by = props.fix.by === undefined ? undefined : markSource(props.fix.by)
   return (
     // The whole reason on hover: in a heading of one line it is the part that is cut.
     <span className={cn("text-muted-foreground", props.className)}>
       <span className="font-medium text-foreground">
-        {sourceAndConfidence({ by, confidence: O.getOrUndefined(props.fix.confidence) })}.
+        {sourceAndConfidence({
+          ...R.getSomes({ by: props.fix.by }),
+          ...R.getSomes({ confidence: props.fix.confidence })
+        })}
+        .
       </span>{" "}
       {why.basis}
-      {why.detail === undefined || props.brief === true ? null : ` ${why.detail}`}
+      {props.brief === true ? null : O.match(why.detail, { onNone: () => null, onSome: (detail) => ` ${detail}` })}
     </span>
   )
 }
@@ -602,8 +623,8 @@ export function WhyBody(props: {
           <Button variant="outline" size={props.size} onClick={props.onUndoFix}>
             Undo this fix
           </Button>
-        ) : choices !== undefined && props.onPick !== undefined ? (
-          choices.map((value) => (
+        ) : O.isSome(choices) && props.onPick !== undefined ? (
+          choices.value.map((value) => (
             <Button
               key={value}
               variant="secondary"
@@ -638,8 +659,31 @@ export function WhyBody(props: {
   )
 }
 
-/** What one edit form holds: the value it opened with, then what was typed. A later value from outside does not move it. */
-const EditScope = ScopedAtom.make((opened: string) => Atom.make(opened))
+const $I = $ReviewId.create("parts")
+
+/** The form's submitted text: outside spaces removed, and a blank box never submitted. */
+const SubmittedText = S.Trim.check(S.isNonEmpty()).pipe(
+  $I.annoteSchema("SubmittedText", {
+    description: "The edit form's trimmed, nonempty submitted text"
+  })
+)
+
+/** The box's raw text and the checked value it can submit, read once at each input event. */
+const EditText = S.Struct({
+  text: S.String.pipe(S.annotateKey({ description: "The person's exact text in the box" })),
+  submission: SubmittedText.pipe(
+    S.toType,
+    S.Option,
+    S.annotateKey({ description: "The trimmed, nonempty value, or none for a blank box" })
+  )
+}).pipe($I.annoteSchema("EditText", { description: "The edit form's raw input and checked submission" }))
+
+type EditText = typeof EditText.Type
+
+/** What one edit form holds; a later value from outside does not move it. */
+const EditScope = ScopedAtom.make((opened: string) =>
+  Atom.make<EditText>({ text: opened, submission: S.decodeOption(SubmittedText)(opened) })
+)
 
 type EditFormProps = {
   label: string
@@ -665,21 +709,23 @@ function EditBody(props: EditFormProps) {
       className="flex flex-col gap-3"
       onSubmit={(event) => {
         event.preventDefault()
-        if (value.trim() !== "") props.onSave(value.trim())
+        O.match(value.submission, { onNone: () => undefined, onSome: props.onSave })
       }}
     >
       <Field>
         <FieldLabel htmlFor={id}>{props.label}</FieldLabel>
         <Input
           id={id}
-          value={value}
+          value={value.text}
           autoFocus
           autoComplete="off"
           className="max-md:h-11"
-          onChange={(event) => setValue(event.target.value)}
+          onChange={(event) =>
+            setValue({ text: event.target.value, submission: S.decodeOption(SubmittedText)(event.target.value) })
+          }
         />
       </Field>
-      <Button type="submit" variant="secondary" size={props.size} disabled={value.trim() === ""}>
+      <Button type="submit" variant="secondary" size={props.size} disabled={O.isNone(value.submission)}>
         Save
       </Button>
     </form>

@@ -1,3 +1,4 @@
+import { identity } from "effect/Function"
 import { LayoutGridIcon } from "lucide-react"
 import { useAtom, useAtomValue } from "@effect/atom-react"
 import * as A from "effect/Array"
@@ -87,7 +88,7 @@ const newSupplier: ProblemKind = ProblemKind.make({
   id: "supplier",
   label: "New supplier",
   tone: "blocker",
-  help: "Add the supplier to your supplier list, then load the file again.",
+  help: O.some("Add the supplier to your supplier list, then load the file again."),
   fixable: false
 })
 const elsewhereKinds: ReadonlyArray<ProblemKind> = [...problemKinds, newSupplier]
@@ -104,11 +105,13 @@ const elsewhereRows: ReadonlyArray<ReviewRow> = A.map(
       id: `elsewhere-${index + 1}`,
       line: 183 + index,
       cells: { name, sku, unit: "pcs", onHand: "10", supplier },
-      problem: {
-        kind: newSupplier.id,
-        column: "supplier",
-        reason: `Supplier ${supplier} is not in your supplier list yet.`
-      }
+      problem: O.some(
+        Problem.make({
+          kind: newSupplier.id,
+          column: O.some("supplier"),
+          reason: O.some(`Supplier ${supplier} is not in your supplier list yet.`)
+        })
+      )
     })
 )
 
@@ -118,11 +121,18 @@ const elsewhereRows: ReadonlyArray<ReviewRow> = A.map(
  * 3 · Feb out").
  */
 const monthColumns: ReadonlyArray<ReviewColumn> = [
-  ReviewColumn.make({ id: "name", label: "Item", size: "fill", width: 200, core: true }),
-  ReviewColumn.make({ id: "sku", label: "SKU", code: true, search: true, core: true, under: true }),
-  ReviewColumn.make({ id: "month", label: "Month", core: true, context: true, facet: true }),
-  ReviewColumn.make({ id: "unit", label: "Unit", core: true }),
-  ReviewColumn.make({ id: "onHand", label: "On hand", align: "right", core: true, context: true })
+  ReviewColumn.make({ display: identity, id: "name", label: "Item", size: "fill", width: O.some(200), core: true }),
+  ReviewColumn.make({ display: identity, id: "sku", label: "SKU", code: true, search: true, core: true, under: true }),
+  ReviewColumn.make({ display: identity, id: "month", label: "Month", core: true, context: true, facet: true }),
+  ReviewColumn.make({ display: identity, id: "unit", label: "Unit", core: true }),
+  ReviewColumn.make({
+    display: identity,
+    id: "onHand",
+    label: "On hand",
+    align: O.some("right"),
+    core: true,
+    context: true
+  })
 ]
 
 const monthItems = [
@@ -133,8 +143,12 @@ const monthItems = [
 
 const belowZero = (month: string, onHand: string) =>
   Str.startsWith("-")(Str.trim(onHand))
-    ? Problem.make({ kind: "below", column: "onHand", reason: `On hand "${onHand}" for ${month} is below zero.` })
-    : undefined
+    ? Problem.makeOption({
+        kind: "below",
+        column: O.some("onHand"),
+        reason: O.some(`On hand "${onHand}" for ${month} is below zero.`)
+      })
+    : O.none()
 
 const monthRows: ReadonlyArray<ReviewRow> = A.flatMap(monthItems, (item, index) =>
   A.map(item.counts, (onHand, part) => {
@@ -144,19 +158,21 @@ const monthRows: ReadonlyArray<ReviewRow> = A.flatMap(monthItems, (item, index) 
     return ReviewRow.make({
       id: `line-${line}.${part + 1}`,
       line,
-      label: `${line} · ${month}`,
+      label: O.some(`${line} · ${month}`),
       cells: { name: item.name, sku: item.sku, month, unit: item.unit, onHand },
-      ...(problem === undefined ? {} : { problem })
+      problem
     })
   })
 )
 
 /** The item's own answer on each of its months: every record of its line goes. An atom, as the region takes it. */
 const leaveItemOut = Atom.make(
-  O.some((row: ReviewRow) => ({
-    label: `Leave ${row.cells.name ?? "the item"} out, every month`,
-    onSelect: () => toast(`Would leave every month of line ${row.line} out`)
-  }))
+  O.some((row: ReviewRow) =>
+    O.some({
+      label: `Leave ${row.cells.name ?? "the item"} out, every month`,
+      onSelect: () => toast(`Would leave every month of line ${row.line} out`)
+    })
+  )
 )
 
 /** Which state the gallery shows, first from the address (`?state=`). */

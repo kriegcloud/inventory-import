@@ -1,3 +1,5 @@
+import { defaultReviewWords } from "@inventory/review/ReviewWords"
+import { fixableBy } from "@inventory/review/ReviewDraft"
 // The server applies the person's decisions with `review` (src/domain); the screen applies them with the review
 // region's own logic (src/web/components/review). These must agree, or the button would say "Import 9 items" and
 // the server would write a different number. This test drives the region's logic the way the screen does, through
@@ -55,7 +57,7 @@ const screen = (table: StagedTable, mode: "propose" | "apply", storedItems: Read
     const problem = check({ id: asked.row.id, values: asked.cells })
     const answered = asked.cells[storedChoice] === "keep" || asked.cells[storedChoice] === "replace"
     if (O.exists(problem, (open) => open.kind === "changed") && answered) return asked.row.problem
-    return O.match(problem, { onNone: () => undefined, onSome: toRegionProblem })
+    return O.map(problem, toRegionProblem)
   }
   // As the review step holds them: the server's shape, and the region's state restored from the region's shape.
   let decisions: SavedDecisions = firstDecisions({ table, choices: [], mode, itemsOf: itemsOfRow })
@@ -63,7 +65,11 @@ const screen = (table: StagedTable, mode: "propose" | "apply", storedItems: Read
   const derive = () => {
     const current = review({ ...input, decisions })
     const rows = toRegionRows(current, decisions)
-    return { current, rows, views: viewRows({ rows, state, recheck }) }
+    return {
+      current,
+      rows,
+      views: viewRows({ fixable: fixableBy([]), rejects: false, rows, state, recheck: O.some(recheck) })
+    }
   }
   return {
     derive,
@@ -73,7 +79,7 @@ const screen = (table: StagedTable, mode: "propose" | "apply", storedItems: Read
     /** One action of the person's, then what the screen does next: keep the decisions and derive the rows again. */
     press(action: Action) {
       const { rows } = derive()
-      state = act({ rows, state, action, recheck }).state
+      state = act({ fixable: fixableBy([]), rejects: false, rows, state, action, recheck: O.some(recheck) }).state
       decisions = toServerDecisions(saved(state))
     },
     /** Every row stands the same in the region and in the domain. */
@@ -101,7 +107,7 @@ describe("the screen and the server apply decisions the same way", () => {
         // none is left. Each accept can uncover the next problem of the same rows.
         for (let round = 0; round < 60; round += 1) {
           const group = A.findFirst(
-            waitingGroups({ views: s.derive().views }),
+            waitingGroups({ kind: O.none(), views: s.derive().views }),
             (candidate) => !O.contains(candidate.confidence, "low")
           )
           if (O.isNone(group)) break
@@ -111,34 +117,49 @@ describe("the screen and the server apply decisions the same way", () => {
         // What is left are the rows only a person can settle. One of each answer the screen offers, on real rows.
         const left = A.filter(s.derive().views, (view) => view.status === "needs")
         expect(left.length).toBeGreaterThan(0)
-        const typed = A.findFirst(left, (view) => view.problem?.column === "sku" && view.problem.rivals === undefined)
+        const typed = A.findFirst(left, (view) =>
+          O.exists(view.problem, (problem) => O.contains(problem.column, "sku") && O.isNone(problem.rivals))
+        )
         if (O.isSome(typed)) {
           s.press({ type: "edit" as const, rowId: typed.value.row.id, column: "sku", value: "ZZZ-9999" })
           s.agree()
         }
         const picked = A.findFirst(
           s.derive().views,
-          (view) => view.status === "needs" && view.problem?.choices !== undefined && view.problem.column !== undefined
+          (view) =>
+            view.status === "needs" &&
+            O.exists(view.problem, (problem) => O.isSome(problem.choices) && O.isSome(problem.column))
         )
         if (O.isSome(picked)) {
-          const choice = picked.value.problem?.choices?.[0]
-          const column = picked.value.problem?.column
-          if (choice !== undefined && column !== undefined) {
-            s.press({ type: "edit" as const, rowId: picked.value.row.id, column, value: choice.value })
+          const choice = O.flatMap(
+            O.flatMap(picked.value.problem, (problem) => problem.choices),
+            A.head
+          )
+          const column = O.flatMap(picked.value.problem, (problem) => problem.column)
+          if (O.isSome(choice) && O.isSome(column)) {
+            s.press({
+              type: "edit" as const,
+              rowId: picked.value.row.id,
+              column: column.value,
+              value: choice.value.value
+            })
             s.agree()
           }
         }
         const rivals = A.findFirst(
           s.derive().views,
-          (view) => view.status === "needs" && view.problem?.rivals !== undefined
+          (view) => view.status === "needs" && O.exists(view.problem, (problem) => O.isSome(problem.rivals))
         )
         if (O.isSome(rivals)) {
           s.press({ type: "keep" as const, rowId: rivals.value.row.id })
           s.agree()
           // Only the first kept row may win: keeping its rival too must not make both ready.
-          const rival = rivals.value.problem?.rivals?.[0]
-          if (rival !== undefined) {
-            s.press({ type: "keep" as const, rowId: rival })
+          const rival = O.flatMap(
+            O.flatMap(rivals.value.problem, (problem) => problem.rivals),
+            A.head
+          )
+          if (O.isSome(rival)) {
+            s.press({ type: "keep" as const, rowId: rival.value })
             s.agree()
           }
         }
@@ -159,7 +180,7 @@ describe("the screen and the server apply decisions the same way", () => {
         expect([tabs.needs, tabs.cannot, tabs.ready]).toEqual([counts.decision, counts.cannot, counts.ready])
 
         // What the screen would hand over is what the server would write: the same rows, values and provenance.
-        const handed = result({ views, problemKinds: regionKinds })
+        const handed = result({ words: defaultReviewWords, views, problemKinds: regionKinds })
         const ready = A.filter(current.rows, (row) => row.status === "ready")
         expect(A.map(handed.ready, (row) => row.line)).toEqual(A.map(ready, (row) => row.rowNumber))
         expect(A.map(handed.ready, (row) => row.cells)).toEqual(A.map(ready, (row) => row.values))
@@ -226,10 +247,11 @@ describe("a row discontinued yet active, on the screen", () => {
       for (const answer of ["Not active", "No discontinued date"]) {
         const s = screen(table, "apply")
         const view = O.getOrUndefined(A.findFirst(s.derive().views, (candidate) => candidate.row.id === "row-45"))
-        const fix = view?.problem?.fix
-        expect(fix?.why.labels).toEqual(["Not active", "No discontinued date"])
-        expect(fix?.why.alternatives).toEqual([""])
-        if (fix === undefined) return
+        const proposed = O.flatMap(O.fromNullishOr(view), (view) => O.flatMap(view.problem, (problem) => problem.fix))
+        expect(O.map(proposed, (fix) => fix.why.labels)).toEqual(O.some(["Not active", "No discontinued date"]))
+        expect(O.map(proposed, (fix) => fix.why.alternatives)).toEqual(O.some([""]))
+        if (O.isNone(proposed)) return
+        const fix = proposed.value
         const value = answer === "Not active" ? fix.to : ""
         s.press(
           value === fix.to
@@ -268,18 +290,22 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
       const decisions = firstDecisions({ table, choices: [], mode: "propose", itemsOf: itemsOfRow })
       const current = review({ ...noHistory, table, choices: [], decisions, storedItems: [] })
       const rows = toRegionRows(current, decisions)
-      const picks = A.filter(rows, (row) => row.problem?.column === "category")
+      const picks = A.filter(rows, (row) => O.exists(row.problem, (problem) => O.contains(problem.column, "category")))
       expect(picks.length).toBe(1)
       for (const row of picks) {
-        expect(row.problem?.fix).toBeUndefined()
-        expect(A.map(row.problem?.choices ?? [], (choice) => choice.value)).toEqual([
-          "raw-materials",
-          "components",
-          "finished-goods",
-          "packaging",
-          "supplies"
-        ])
-        expect(A.some(row.problem?.choices ?? [], (choice) => choice.suggested === true)).toBe(false)
+        expect(O.flatMap(row.problem, (problem) => problem.fix)).toEqual(O.none())
+        expect(
+          O.map(
+            O.flatMap(row.problem, (problem) => problem.choices),
+            (choices) => A.map(choices, (choice) => choice.value)
+          )
+        ).toEqual(O.some(["raw-materials", "components", "finished-goods", "packaging", "supplies"]))
+        expect(
+          O.exists(
+            O.flatMap(row.problem, (problem) => problem.choices),
+            (choices) => A.some(choices, (choice) => choice.suggested)
+          )
+        ).toBe(false)
       }
     })
   )
@@ -290,9 +316,12 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
         new File([`${heading}\n ABC-0001,One,packaging,EA,1.00\nABC-0002 ,Two,packaging,EA,1.00\n`], "items.csv")
       )
       const s = screen(table, "propose")
-      const groups = A.filter(waitingGroups({ views: s.derive().views }), (group) => group.kind === "spaces")
+      const groups = A.filter(
+        waitingGroups({ kind: O.none(), views: s.derive().views }),
+        (group) => group.kind === "spaces"
+      )
       expect(A.map(groups, (group) => [group.id, group.label, group.rowIds.length > 1])).toEqual([
-        ["sku:trim", "the value without its spaces", true]
+        ["sku:trim", O.some("the value without its spaces"), true]
       ])
       const group = groups[0]
       if (group === undefined) return
@@ -328,10 +357,28 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
         const opened = s.agree()
         const view = opened.views[0]
         expect(view?.status).toBe("needs")
-        expect(view?.problem?.column).toBe(storedChoice)
+        expect(
+          O.flatMap(
+            O.flatMap(O.fromNullishOr(view), (view) => view.problem),
+            (problem) => problem.column
+          )
+        ).toEqual(O.some(storedChoice))
         // The button says what the choice is, not the SKU column the problem sits on.
-        expect(view?.problem?.ask).toBe("Keep or replace")
-        expect(A.map(view?.problem?.choices ?? [], (choice) => choice.value)).toEqual(["keep", "replace"])
+        expect(
+          O.flatMap(
+            O.flatMap(O.fromNullishOr(view), (view) => view.problem),
+            (problem) => problem.ask
+          )
+        ).toEqual(O.some("Keep or replace"))
+        expect(
+          O.map(
+            O.flatMap(
+              O.flatMap(O.fromNullishOr(view), (view) => view.problem),
+              (problem) => problem.choices
+            ),
+            (choices) => A.map(choices, (choice) => choice.value)
+          )
+        ).toEqual(O.some(["keep", "replace"]))
         s.press({ type: "edit" as const, rowId: "row-2", column: storedChoice, value: answer })
         // As the server stores it: the one flag, and nothing else said about the row.
         const sent = s.decisions["row-2"]

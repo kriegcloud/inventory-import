@@ -68,7 +68,8 @@ export const appPages: ReadonlyArray<AppPage> = [
 const initials = (name: string): string =>
   pipe(
     Str.split(name, /\s+/),
-    A.map((word) => O.getOrElse(Str.at(word, 0), () => "")),
+    A.map((word) => Str.at(word, 0)),
+    A.getSomes,
     A.join(""),
     Str.takeLeft(2),
     Str.toUpperCase

@@ -2,7 +2,9 @@
 // only (`OpenApi.Transform` on the `Api`, applied last). Nothing here changes a route, a payload or an answer; the
 // one thing not to break is that every line below states what the server already does, never what it should do.
 import * as A from "effect/Array"
+import * as O from "effect/Option"
 import * as P from "effect/Predicate"
+import { identity } from "effect/Function"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
@@ -32,7 +34,8 @@ const methods = ["get", "put", "post", "delete", "patch", "head", "options"]
 /** Every operation of the document, with its method. */
 const operationsOf = (spec: Json): Array<{ readonly method: string; readonly operation: Json }> => {
   const found: Array<{ readonly method: string; readonly operation: Json }> = []
-  for (const item of R.values<string, Json>(spec["paths"] ?? {})) {
+  const paths = O.map(O.fromNullishOr(spec["paths"]), (paths) => R.values<string, Json>(paths))
+  for (const item of O.match(paths, { onNone: A.empty, onSome: identity })) {
     for (const method of methods) {
       const operation = item[method]
       if (operation !== undefined) found.push({ method, operation })
@@ -78,19 +81,28 @@ const DocumentPart = S.suspend((): S.Codec<S.Json> =>
  */
 const sameShape = S.toEquivalence(DocumentPart)
 
+/** A regular expression's first capture, present only when the complete name matches. */
+const nameGroup = (pattern: RegExp, name: string) =>
+  O.flatMap(O.fromNullOr(pattern.exec(name)), (match) => A.get(match, 1))
+
 /** One pass of naming: true when a component was renamed or folded, so another pass may find more. */
 const nameOnce = (spec: Json): boolean => {
   const schemas: Json = spec["components"]["schemas"]
   const renamed: Record<string, string> = {}
   for (const name of R.keys(schemas)) {
-    const copy = /^(.+)_\d+$/.exec(name)
-    const original = copy?.[1]
-    if (original !== undefined && R.has(schemas, original) && sameShape(schemas[name], schemas[original])) {
-      renamed[name] = original
+    const original = O.filter(
+      nameGroup(/^(.+)_\d+$/, name),
+      (original) => R.has(schemas, original) && sameShape(schemas[name], schemas[original])
+    )
+    if (O.isSome(original)) {
+      renamed[name] = original.value
       continue
     }
-    const unsuffixed = /^(.+)Encoded$/.exec(name)?.[1] ?? name
-    const plain = /^_beep_(?:[A-Za-z0-9]+_)+([A-Za-z0-9]+)$/.exec(unsuffixed)?.[1] ?? unsuffixed
+    const unsuffixed = O.match(nameGroup(/^(.+)Encoded$/, name), { onNone: () => name, onSome: identity })
+    const plain = O.match(nameGroup(/^_beep_(?:[A-Za-z0-9]+_)+([A-Za-z0-9]+)$/, unsuffixed), {
+      onNone: () => unsuffixed,
+      onSome: identity
+    })
     // Its own name when that is free, or when what holds it is the very same shape.
     if (plain !== name && (!R.has(schemas, plain) || sameShape(schemas[name], schemas[plain]))) {
       renamed[name] = plain
@@ -98,7 +110,7 @@ const nameOnce = (spec: Json): boolean => {
   }
   const next: Json = {}
   for (const [name, schema] of R.toEntries(schemas)) {
-    const to = renamed[name] ?? name
+    const to = O.match(O.fromNullishOr(renamed[name]), { onNone: () => name, onSome: identity })
     if (!R.has(next, to)) next[to] = schema
   }
   spec["components"]["schemas"] = next
@@ -122,11 +134,15 @@ const nameComponents = (spec: Json): void => {
  */
 const dropImpossibleResponses = (spec: Json): void => {
   for (const { method, operation } of operationsOf(spec)) {
-    const responses: Json = operation["responses"] ?? {}
-    const refused = responses["403"]?.["content"]?.["application/json"]?.["schema"]?.["$ref"]
-    if (method === "get" && refused === `${refPrefix}CrossSiteRequest`) delete responses["403"]
-    const parameters: ReadonlyArray<unknown> = operation["parameters"] ?? []
-    if (parameters.length === 0 && operation["requestBody"] === undefined) delete responses["400"]
+    O.map(O.fromNullishOr(operation["responses"]), (responses: Json) => {
+      const refused = responses["403"]?.["content"]?.["application/json"]?.["schema"]?.["$ref"]
+      if (method === "get" && refused === `${refPrefix}CrossSiteRequest`) delete responses["403"]
+      const noParameters = O.match(O.fromNullishOr(operation["parameters"]), {
+        onNone: () => true,
+        onSome: (parameters: ReadonlyArray<unknown>) => parameters.length === 0
+      })
+      if (noParameters && operation["requestBody"] === undefined) delete responses["400"]
+    })
   }
 }
 

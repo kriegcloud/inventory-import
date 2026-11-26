@@ -18,7 +18,7 @@ pull request is merged, not when it is opened.
 | 4, 5 | `packages/review` src and tests: 110 places to 64 | 21 | done: merged 2026-11-26 |
 | 6, 7 | Outside the review package: 48 places to 36 | 20 | done: merged 2026-11-26 |
 | 7b | What was left, 104 places in 30 files, by Benjamin's rulings of 2026-11-26 (below): the baseline names no file | 22 | done: merged 2026-11-26, seen on screen (below) |
-| 8 | Close: both goals' closing notes and `status: done`; `bun run check:full` on main; the merged worktrees and branches removed | 23 | done but for the worktrees: `bun run check:full` passes on `main` at `e71f2b5d` (closing note, below). The merged worktrees and branches are local to the workstation and come off on Benjamin's word |
+| 8 | Close: both goals' closing notes and `status: done`; `bun run check:full` on main; the merged worktrees and branches removed | 25 | done but for the worktrees: `bun run check:full` passes on `main` at `e71f2b5d` (closing note, below). The merged worktrees and branches are local to the workstation and come off on Benjamin's word |
 
 ## The failing property (step 2)
 

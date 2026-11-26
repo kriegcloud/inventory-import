@@ -49,6 +49,32 @@ const held = "packages/a/src/held.ts"
 const twoFallbacks = `export const a = (x?: number, y?: number) => (x ?? 0) + (y ?? 0)\n`
 
 describe("what the reader takes for a place", () => {
+  it("leaves strict undefined comparisons on a component's own props out, retaining other absence", () => {
+    deepStrictEqual(
+      places(`function Card(props: { title?: string }) {
+  return <b>{props.title === undefined ? "" : props.title}</b>
+}
+const Line = ({ title: caption, size = "sm" }: Props) =>
+  <b>{undefined !== caption ? caption : size}</b>
+const Other = (props: Props) => <b>{props.title ?? ""}{props.title === null}{other === undefined}</b>
+const helper = (props: Props) => props.title === undefined
+const Nested = (props: Props) => <b>{[1].map(() => props.title === undefined)}</b>
+const Shadowed = (props: Props) => <b>{[1].map((props) => props.title === undefined)}</b>
+const UppercaseHelper = (props: Props) => props.title === undefined`),
+      [
+        '6 fallback props.title ?? ""',
+        "6 absence props.title === null",
+        "6 absence other === undefined",
+        "7 absence props.title === undefined",
+        "9 absence props.title === undefined",
+        "10 absence props.title === undefined"
+      ]
+    )
+    deepStrictEqual(places(`const Card = (props: Props) => props.title === undefined`, "a.ts"), [
+      "1 absence props.title === undefined"
+    ])
+  })
+
   it("counts an Option's valueOrUndefined as the unwrap it is", () => {
     deepStrictEqual(places(`export const f = (o: O.Option<string>) => Result.getSuccess(o).valueOrUndefined`), [
       "1 unwrap Result.getSuccess(o).valueOrUndefined"

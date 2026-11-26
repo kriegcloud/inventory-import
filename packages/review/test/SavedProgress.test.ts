@@ -1,3 +1,4 @@
+import { StorageTwin } from "@inventory/ui/StorageTwin"
 import type { ReviewColumn } from "@inventory/review/ReviewTypes"
 import { assertDefined } from "@effect/vitest/utils"
 import { fixableBy } from "@inventory/review/ReviewDraft"
@@ -39,7 +40,7 @@ const browser = vi.hoisted(() => {
   Object.assign(globalThis, {
     window: {
       localStorage: {
-        getItem: (key: string) => state.items[key] ?? null,
+        getItem: (key: string) => StorageTwin.getItem(state.items, key),
         setItem: (key: string, value: string) => {
           if (state.refuse) throw new Error("QuotaExceededError")
           state.items[key] = value

@@ -1,3 +1,4 @@
+import { StorageTwin } from "@inventory/ui/StorageTwin"
 // When an assistant's answer may still change the table. The request outlives the screen that asked, and the table
 // it would be applied through writes into the address of whatever the person is on by then: so an answer is applied
 // only on the very drawing of the assistant that asked, for the same person in the same organization. The address
@@ -26,7 +27,7 @@ vi.hoisted(() => {
   const kept: Record<string, string> = {}
   Object.assign(globalThis, {
     localStorage: {
-      getItem: (key: string) => kept[key] ?? null,
+      getItem: (key: string) => StorageTwin.getItem(kept, key),
       setItem: (key: string, value: string) => {
         kept[key] = value
       },

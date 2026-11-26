@@ -2142,3 +2142,26 @@ Next: a lane builds 1 to 3 (`goals/defaults-closeout`, step 7b); 4 is on main.
 
 Reverse: 1, the law counts the checks again and the files go back into the baseline; 2 and 3, the stand-in and the
 adapters are inlined and their files leave the list; 4, the two methods take two arguments again.
+
+### 2026-11-26 — the defaults baseline's last four places, and the starting values the last lane kept
+
+Asked by dialog once the lane of step 7b (`goals/defaults-closeout`) had brought the baseline to 4 places in 4 files.
+
+1. **The three public APIs that run `Effect.runSync`** (`stringify` in `packages/ui/src/Json.codec.ts`, the one
+   Reactivity in `packages/client/src/Api.atoms.ts`, the workbook writer in
+   `packages/foundation/modeling/xlsx/src/Xlsx.codec.ts`)? I chose; the agent recommended the same. The three files
+   on the exemptions list, each as the synchronous edge a caller outside Effect needs. Rejected: making them
+   Effects, which changes `stringify`'s and the writer's signatures and their callers on screens; leaving them
+   counted.
+2. **`TotalCells.text`, which reads a column outside the region's declared columns as empty text** (1 place)? I
+   chose; the agent recommended the same. It returns an Option and the screen decides at its last step. No saved
+   progress changes. Rejected: exempting `ReviewDraft.rules.ts` for the one fallback; leaving it counted.
+3. **Four starting values nobody had ruled on**, each now on a schema: a count starts at 0 (`CountStart`), a new
+   facet group has 0 rows and no spellings (`FacetStart`), and in test support only a pending tab handle is ""
+   (`TabIdentity`) and an unrecorded writer is "somebody else" (`WriterStart`)? I chose; the agent recommended the
+   same. All four ratified as they were. Rejected: the two test values made Options in a follow-up.
+
+Next: 1 and 2 are built on the branch of step 7b; the baseline then names no file.
+
+Reverse: 1, the three files leave the list and are counted again; 2, the reader returns text with `""` for a column
+it does not hold; 3, the value moves or becomes an Option on its schema.

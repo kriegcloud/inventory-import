@@ -1,3 +1,4 @@
+import { VendoredTable } from "./internal/dataTable.adapter.ts"
 import { parameter } from "./internal/browser.ts"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
@@ -715,10 +716,7 @@ export function ItemsPage() {
     data: A.fromIterable(rows),
     columns,
     config,
-    pageCount: O.getOrElse(
-      O.map(page.data, (data) => data.pageCount),
-      () => 0
-    ),
+    pageCount: VendoredTable.pageCount(O.map(page.data, (data) => data.pageCount)),
     urlState: true,
     initialState: {
       columnVisibility: O.match(kept, { onNone: () => ({ ...fits }), onSome: (kept) => ({ ...fits, ...kept }) })

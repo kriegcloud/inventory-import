@@ -1,3 +1,4 @@
+import { StorageTwin } from "@inventory/ui/StorageTwin"
 // Who answered the assistant's last request decides whether the screen says what the rules read: told by the case
 // the answer carries, never by the name the line shows, so a model whose id is "Rules" is still read as a model.
 import { describe, expect, it } from "@effect/vitest"
@@ -45,7 +46,7 @@ describe("a conversation kept as version 1", () => {
   it("comes back with its entries, who answered as a case, and its columns", () => {
     const kept: Record<string, string> = {}
     vi.stubGlobal("localStorage", {
-      getItem: (key: string) => kept[key] ?? null,
+      getItem: (key: string) => StorageTwin.getItem(kept, key),
       setItem: (key: string, value: string) => {
         kept[key] = value
       },

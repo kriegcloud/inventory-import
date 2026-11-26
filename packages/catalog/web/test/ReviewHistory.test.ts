@@ -1,3 +1,4 @@
+import { StorageTwin } from "@inventory/ui/StorageTwin"
 import type { SaveAnswer } from "./support/catalog.ts"
 import * as MutableRef from "effect/MutableRef"
 import type { ReviewColumn } from "@inventory/review/ReviewTypes"
@@ -38,7 +39,7 @@ const browser = vi.hoisted(() => {
   Object.assign(globalThis, {
     window: {
       localStorage: {
-        getItem: (key: string) => kept[key] ?? null,
+        getItem: (key: string) => StorageTwin.getItem(kept, key),
         setItem: (key: string, value: string) => {
           kept[key] = value
         },
@@ -47,7 +48,7 @@ const browser = vi.hoisted(() => {
         }
       },
       sessionStorage: {
-        getItem: (key: string) => tab[key] ?? null,
+        getItem: (key: string) => StorageTwin.getItem(tab, key),
         setItem: (key: string, value: string) => {
           tab[key] = value
         }

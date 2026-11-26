@@ -1,3 +1,7 @@
+import { ReviewText } from "./ReviewText.rules.ts"
+import { AtomContext } from "./atomContext.adapter.ts"
+import { TanStackTable } from "./tanstackTable.adapter.ts"
+import { TanStackVirtual } from "./tanstackVirtual.adapter.ts"
 import * as S from "effect/Schema"
 import * as Effect from "effect/Effect"
 import { $ReviewId } from "./identity.ts"
@@ -134,8 +138,12 @@ const actionsLeast = 240
 const actionsQuiet = 120
 const actionsMost = 360
 
+// Decide how an absent cell is drawn only where the screen needs text.
+const cellText = (cells: TotalCells, column: string): string =>
+  O.match(TotalCells.text(cells, column), { onNone: () => "", onSome: (text) => text })
+
 const nameOf = (view: RowView, first: O.Option<ReviewColumn>): string => {
-  const name = O.match(first, { onNone: () => "", onSome: (column) => TotalCells.text(view.cells, column.id) })
+  const name = O.match(first, { onNone: () => "", onSome: (column) => cellText(view.cells, column.id) })
   return name === "" ? `row ${rowName(view.row)}` : name
 }
 
@@ -180,7 +188,7 @@ function Compare(props: {
 }) {
   const { view, other } = props
   const differing = props.columns.filter(
-    (column, index) => index === 0 || TotalCells.text(view.cells, column.id) !== TotalCells.text(other.cells, column.id)
+    (column, index) => index === 0 || cellText(view.cells, column.id) !== cellText(other.cells, column.id)
   )
   return (
     <>
@@ -191,8 +199,8 @@ function Compare(props: {
         {differing.slice(0, 6).map((column) => (
           <Fragment key={column.id}>
             <span className="text-muted-foreground">{column.label}</span>
-            <CutText text={TotalCells.text(view.cells, column.id)} className={cn("font-medium", codeFace(column))} />
-            <CutText text={TotalCells.text(other.cells, column.id)} className={cn("font-medium", codeFace(column))} />
+            <CutText text={cellText(view.cells, column.id)} className={cn("font-medium", codeFace(column))} />
+            <CutText text={cellText(other.cells, column.id)} className={cn("font-medium", codeFace(column))} />
           </Fragment>
         ))}
       </div>
@@ -321,9 +329,9 @@ const measureNeeds = (input: {
     let widest = 0
     for (const value of longest(
       views.map((view) =>
-        TotalCells.text(view.cells, column.id) === "" && O.isSome(column.byDefault)
+        cellText(view.cells, column.id) === "" && O.isSome(column.byDefault)
           ? `${shownWith(column, column.byDefault.value, view.cells)}, default`
-          : shownWith(column, TotalCells.text(view.cells, column.id), view.cells)
+          : shownWith(column, cellText(view.cells, column.id), view.cells)
       ),
       40
     ))
@@ -341,7 +349,7 @@ const measureNeeds = (input: {
       const chip = textWidth(to, { mono, medium: true }) + chipChrome + icon
       const value = guess
         ? from + 6 + icon + textWidth(`${to}?`, { mono, medium: false })
-        : isCellMarkProposed(mark) && mark.from.trim() === mark.to && to.length > longValue
+        : isCellMarkProposed(mark) && ReviewText.comparison(mark.from) === mark.to && to.length > longValue
           ? chip
           : from + arrowGap + chip
       // A proposal carries its "Why?" in the cell, except under a group heading, which says why for all its rows.
@@ -487,7 +495,7 @@ const Row = memo(function Row(props: {
   const choices = O.flatMap(fix, choicesOf)
   // One status mark per row: the tag. Only a required cell with nothing in it is also tinted, because an empty cell
   // has no ink to point at; a bad value is red text, a proposal is its own mark.
-  const subjectEmpty = O.isSome(subject) && TotalCells.text(view.cells, subject.value) === ""
+  const subjectEmpty = O.isSome(subject) && cellText(view.cells, subject.value) === ""
   const hiddenSubject =
     out ||
     O.isNone(subject) ||
@@ -629,7 +637,7 @@ const Row = memo(function Row(props: {
       )
     }
     const isSubject = O.contains(subject, column.id)
-    const text = TotalCells.text(view.cells, column.id)
+    const text = cellText(view.cells, column.id)
     return (
       <span
         className={cn(
@@ -711,7 +719,7 @@ const Row = memo(function Row(props: {
     if (O.isNone(problem)) return null
     const label = O.match(HashMap.get(props.labels, subject), { onNone: () => subject, onSome: (label) => label })
     const own = O.flatMap(props.cellEditor, (editor) =>
-      editor({ row: view.row, column: subject, value: TotalCells.text(view.cells, subject) })
+      editor({ row: view.row, column: subject, value: cellText(view.cells, subject) })
     )
     return (
       <Overlay
@@ -759,7 +767,7 @@ const Row = memo(function Row(props: {
                 <EditForm
                   label={label}
                   size="sm"
-                  value={TotalCells.text(view.cells, subject)}
+                  value={cellText(view.cells, subject)}
                   onSave={(next) => {
                     close()
                     actions.edit(view.row.id, subject, next)
@@ -941,7 +949,7 @@ const Row = memo(function Row(props: {
                   <del className="block font-normal text-muted-foreground">
                     <CutText text={name} />
                   </del>
-                ) : TotalCells.text(view.cells, first.id) === "" && O.isNone(R.get(view.marks, first.id)) ? (
+                ) : cellText(view.cells, first.id) === "" && O.isNone(R.get(view.marks, first.id)) ? (
                   // An empty name with a suggestion for it shows the suggestion (who made it, Why?, Reject) instead.
                   <span className="font-normal text-destructive">Empty</span>
                 ) : (
@@ -1171,7 +1179,7 @@ function Detail(props: { readonly view: RowView; readonly columns: ReadonlyArray
           </dt>
           <dd className={cn("min-w-0 whitespace-normal", codeFace(column))}>
             <CellValue
-              value={TotalCells.text(view.cells, column.id)}
+              value={cellText(view.cells, column.id)}
               display={(text) => shownWith(column, text, view.cells)}
               mark={view.status === "out" ? O.none() : R.get(view.marks, column.id)}
               accepted={O.contains(view.decided, "accepted")}
@@ -1643,7 +1651,10 @@ const makeGrid: {
       const sized = columns.map((column, index) => ({
         id: column.id,
         size: column.size,
-        need: measured[index] ?? O.match(column.width, { onNone: () => fillLeast, onSome: (width) => width }),
+        need: O.match(A.get(measured, index), {
+          onNone: () => O.match(column.width, { onNone: () => fillLeast, onSome: identity }),
+          onSome: identity
+        }),
         priority: priorityOf(column),
         keep: index === 0 || column.id === reasonColumn.id || HashSet.has(kept, column.id)
       }))
@@ -1758,16 +1769,18 @@ const makeGrid: {
   )
 
   const sizeOf = (index: number): number => {
-    const line = registry.get(entries)[index]
-    return line === undefined
-      ? bandHeight
-      : lineMatch(line, {
+    const line = TanStackVirtual.entry(registry.get(entries), index)
+    return O.match(line, {
+      onNone: () => bandHeight,
+      onSome: (line) =>
+        lineMatch(line, {
           Row: () => registry.get(rowSize),
           Group: () => groupHeight,
           Kind: () => bandHeight,
           Rest: () => bandHeight,
           Detail: () => bandHeight
         })
+    })
   }
 
   // -- The virtual list is TanStack's: where the frame is scrolled to and how tall each line was measured are its
@@ -1789,7 +1802,7 @@ const makeGrid: {
   }
   const list: Lines = new Virtualizer<HTMLDivElement, Element>({
     count: registry.get(entries).length,
-    getScrollElement: () => O.getOrNull(registry.get(scroller)),
+    getScrollElement: () => TanStackVirtual.scroller(registry.get(scroller)),
     estimateSize: sizeOf,
     overscan: 12,
     // A new size of the frame is told even when the range stays: the lines in view are read again all the same.
@@ -1835,7 +1848,7 @@ const makeGrid: {
       get(heard)
       get(rowSize)
       get(scroller)
-      if (!inStep(lines)) return O.getOrElse(get.self<Drawn>(), () => nothingDrawn)
+      if (!inStep(lines)) return AtomContext.previous(get, () => nothingDrawn)
       return { items: list.getVirtualItems(), total: list.getTotalSize() }
     }),
     (before, next) => before.items === next.items && before.total === next.total
@@ -1959,14 +1972,13 @@ export function ReviewGrid(props: GridProps) {
   // The region asks for a row to be in view before it puts the focus there.
   useAtomSubscribe(region.reveal, grid.bring)
 
-  const padTop = items[0]?.start ?? 0
-  const padBottom = total - (items[items.length - 1]?.end ?? 0)
+  const { top: padTop, bottom: padBottom } = TanStackVirtual.padding(items, total)
   const span = columns.length + (showStatus ? 2 : 1)
   // The flex column is drawn without a width and takes what the others leave, so rounding never opens a gap.
   const widthOf = (id: string): number | undefined =>
     O.contains(plan.flex, id) ? undefined : plan.shown.find((shown) => shown.id === id)?.width
   const widths = [
-    widthOf(columns[0]?.id ?? ""),
+    O.match(A.head(columns), { onNone: () => widthOf(""), onSome: (column) => widthOf(column.id) }),
     ...(showStatus ? [statusWidth] : []),
     ...columns.slice(1).map((column) => widthOf(column.id)),
     actionsWidth
@@ -1983,7 +1995,7 @@ export function ReviewGrid(props: GridProps) {
         <StickyTableHeader>
           <StickyTableRow aria-rowindex={1}>
             {columns.map((column, index) => {
-              const sortable = column.id === reasonColumn.id ? undefined : props.table.getColumn(column.id)
+              const sortable = column.id === reasonColumn.id ? O.none() : TanStackTable.column(props.table, column.id)
               return (
                 <Fragment key={column.id}>
                   <StickyTableColumn
@@ -1991,7 +2003,7 @@ export function ReviewGrid(props: GridProps) {
                     {...R.getSomes({ align: column.align })}
                     // A sortable heading is one control as large as its cell, so the cell keeps no padding of its own.
                     flush={
-                      sortable !== undefined &&
+                      O.isSome(sortable) &&
                       !(O.exists(column.match, isColumnMatchUnmatched) && props.onMatch !== undefined)
                     }
                   >
@@ -2003,11 +2015,11 @@ export function ReviewGrid(props: GridProps) {
                       >
                         {index === 0 && folded.length > 0 ? <span aria-hidden className="w-6 flex-none" /> : null}
                         {index === 0 ? <span className="mr-0.5 w-7 flex-none text-right text-xs">Row</span> : null}
-                        {sortable === undefined ? (
+                        {O.isNone(sortable) ? (
                           column.label
                         ) : (
                           <DataTableColumnHeader
-                            column={sortable}
+                            column={sortable.value}
                             label={column.label}
                             {...R.getSomes({ unit: column.unit })}
                             // The sort mark sits beside its own label, never at the cell's far edge, where it read
@@ -2054,9 +2066,9 @@ export function ReviewGrid(props: GridProps) {
             <>
               {padTop > 0 ? <StickyTableFill span={span} height={padTop} /> : null}
               {items.map((item) => {
-                const entry = entries[item.index]
-                if (entry === undefined) return null
-                return lineMatch<ReactNode>(entry, {
+                const entry = TanStackVirtual.entry(entries, item.index)
+                if (O.isNone(entry)) return null
+                return lineMatch<ReactNode>(entry.value, {
                   Detail: ({ view }) => (
                     <StickyTableBand
                       key={`detail:${view.row.id}`}

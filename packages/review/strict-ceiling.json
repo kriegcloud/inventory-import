@@ -3,5 +3,5 @@
   "own": ["src/", "test/fixtures/"],
   "vendored": [],
   "rules": ["preferEffectArray", "preferEffectString", "preferEffectRecord", "missingPipeableSignature"],
-  "ceiling": 219
+  "ceiling": 199
 }

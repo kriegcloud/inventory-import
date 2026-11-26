@@ -843,19 +843,20 @@ describe("gate 3, for the party slice's constructs", () => {
           `<${gist.namespace}${name}> ${at("rdf", "type")} ${at("owl", kind)} .\n`
         const relation = `${gist.namespace}isCategorizedBy`
         const attribute = `${gist.namespace}plantedAttribute`
-        // The kernel's list holds no gist property.
-        const unlisted = yield* refusedIn("owl", typed("isCategorizedBy", "ObjectProperty"), kernel)
+        // The kernel's list holds `isCategorizedBy` and `isAbout` (decision 176), not the copy's planted attribute.
+        const unlisted = yield* refusedIn("owl", typed("plantedAttribute", "DatatypeProperty"), kernel)
         const asAttribute = yield* refusedIn("owl", typed("isCategorizedBy", "DatatypeProperty"), copy)
         const asRelation = yield* refusedIn("owl", typed("plantedAttribute", "ObjectProperty"), copy)
         expect([unlisted, asAttribute, asRelation]).toStrictEqual([
-          [["namespace", relation]],
+          [["namespace", attribute]],
           [["namespace", relation]],
           [["namespace", attribute]]
         ])
-        // The near miss: each declared as the kind the copy's list gives it.
+        // The near miss: each declared as the kind the copy's list gives it, and the kernel's relation as the kernel's.
         const relationDeclared = yield* refusedIn("owl", typed("isCategorizedBy", "ObjectProperty"), copy)
         const attributeDeclared = yield* refusedIn("owl", typed("plantedAttribute", "DatatypeProperty"), copy)
-        expect([relationDeclared, attributeDeclared]).toStrictEqual([[], []])
+        const kernelDeclared = yield* refusedIn("owl", typed("isCategorizedBy", "ObjectProperty"), kernel)
+        expect([relationDeclared, attributeDeclared, kernelDeclared]).toStrictEqual([[], [], []])
       })
   )
 

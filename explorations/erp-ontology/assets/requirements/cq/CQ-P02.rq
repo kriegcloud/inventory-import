@@ -1,0 +1,18 @@
+# CQ-P02: Which of our organizations hold no trading role at all?
+# Only flags stated false count: a record that states no flag, or one flag only, is an open reading, unknown and not
+# roleless, whatever another tenant's record states (report 04 section 3.8). Both flags are read on the tenant's own
+# record. Each type step walks down the subclasses (decision 27), so a node typed by a subclass is found too.
+PREFIX inv: <https://example.org/inventory-import/ontology/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT DISTINCT ?tenant ?organization
+WHERE {
+  ?record rdf:type/rdfs:subClassOf* inv:SourceRecord ;
+          inv:inTenant ?tenant ;
+          inv:recordOf ?organization ;
+          inv:isCustomer false ;
+          inv:isVendor false .
+  ?organization rdf:type/rdfs:subClassOf* inv:Organization .
+}
+ORDER BY ?tenant ?organization

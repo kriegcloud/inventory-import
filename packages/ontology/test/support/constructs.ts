@@ -7,20 +7,21 @@
 // on it, and on copies of it with one mistake planted, while the kernel's module and the committed exception list stay
 // as they are (PLAN, step 2).
 //
-// Nothing here is a term anyone accepted. `Party` is decision 12's category with text of this test's own, and the gist
-// list is planted: no domain or range of a gist property is in the repository (PLAN, "What the design left
-// unchecked"), so `isCategorizedBy` states none, and `plantedAttribute` is no gist name at all, given a domain and a
-// range only so the tests can see that neither reaches the Turtle.
+// Nothing here is a term anyone accepted. `Party` is decision 12's category with text of this test's own, kept over the
+// kernel's accepted `Party` (decision 176) so the projection tests read the copy's own sentences, and its exception
+// entry replaces the committed one. The gist list is the kernel's with `plantedAttribute` added, which is no gist name
+// at all, given a domain and a range only so the tests can see that neither reaches the Turtle.
 import type { Vocabulary } from "@beep/vocabulary/Model"
 import type { ExceptionList } from "@beep/vocabulary/Rules"
 import { vocabulary } from "@inventory/kernel/Terms"
+import * as A from "effect/Array"
 import exceptionFile from "../../exceptions/no-gist-parent.json" with { type: "json" }
 
 /** `Party`'s reason for having no gist parent, as its exception entry repeats it. */
 const partyReason = "A category over Person and Organization, each of which keeps its own gist parent."
 
-/** The release the copy's retirements are dated from: the kernel's own version, so rule C15 passes. */
-const since = vocabulary.version
+/** The release the copy's retirements are dated from: the thread's, not after the kernel's own, so rule C15 passes. */
+const since = "0.1.0"
 
 /** The kernel's literal with every construct of step 1, coherent under gate 4. */
 export const constructsVocabulary = {
@@ -28,7 +29,7 @@ export const constructsVocabulary = {
   gist: {
     ...vocabulary.gist,
     properties: {
-      isCategorizedBy: { kind: "object" },
+      ...vocabulary.gist.properties,
       plantedAttribute: { kind: "datatype", domain: "Content", range: "xsd:dateTime" }
     }
   },
@@ -142,8 +143,8 @@ export const constructsVocabulary = {
   }
 } as const satisfies typeof Vocabulary.Encoded
 
-/** The committed exception list with `Party`'s entry beside `Role`'s, allowed by decision 12. */
+/** The committed exception list with `Party`'s entry the copy's own, allowed by decision 12, beside `Role`'s. */
 export const constructsExceptions = [
-  ...exceptionFile,
+  ...A.filter(exceptionFile, (entry) => entry.class !== "Party"),
   { class: "Party", reason: partyReason, ratification: { decision: 12 } }
-] as const satisfies typeof ExceptionList.Encoded
+] satisfies typeof ExceptionList.Encoded

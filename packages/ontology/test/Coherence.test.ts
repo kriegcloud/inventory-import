@@ -28,16 +28,20 @@ const decisions = decisionHeadings(decisionLog)
 /** A finding as the rule, the table and the key it names, so a changed sentence does not fail the gate's test. */
 const named = (findings: ReadonlyArray<Finding>) => A.map(findings, (found) => [found.rule, found.kind, found.key])
 
-/** Every decision number the vocabulary's terms name: classes, properties, schemes and concepts, 22 in the thread. */
-const termDecisions = (decoded: Vocabulary): ReadonlyArray<number> => [
-  ...A.map(R.values(decoded.classes), (term) => term.ratification.decision),
-  ...A.map(R.values(decoded.objectProperties), (term) => term.ratification.decision),
-  ...A.map(R.values(decoded.datatypeProperties), (term) => term.ratification.decision),
-  ...A.flatMap(R.values(decoded.schemes), (scheme) => [
-    scheme.ratification.decision,
-    ...A.map(R.values(scheme.concepts), (concept) => concept.ratification.decision)
+/** Every term the vocabulary holds, by its key, with the decision it names: classes, properties, schemes, concepts. */
+const termRatifications = (decoded: Vocabulary): ReadonlyArray<readonly [string, number]> => [
+  ...A.map(R.toEntries(decoded.classes), ([key, term]) => [key, term.ratification.decision] as const),
+  ...A.map(R.toEntries(decoded.objectProperties), ([key, term]) => [key, term.ratification.decision] as const),
+  ...A.map(R.toEntries(decoded.datatypeProperties), ([key, term]) => [key, term.ratification.decision] as const),
+  ...A.flatMap(R.toEntries(decoded.schemes), ([key, scheme]) => [
+    [key, scheme.ratification.decision] as const,
+    ...A.map(R.toEntries(scheme.concepts), ([notation, concept]) => [notation, concept.ratification.decision] as const)
   ])
 ]
+
+/** Every decision number the vocabulary's terms name: classes, properties, schemes and concepts. */
+const termDecisions = (decoded: Vocabulary): ReadonlyArray<number> =>
+  A.map(termRatifications(decoded), ([, decision]) => decision)
 
 /** Gate 4 on a copy of the constructs' literal, read with the copied list and the real log. */
 const findingsOfCopy = Effect.fn("findingsOfCopy")(function* (copy: unknown) {
@@ -55,15 +59,37 @@ describe("gate 4, vocabulary coherence", () => {
     })
   )
 
-  it.effect("all 22 terms name decision 111, and the one exception entry, Role, names decision 97", () =>
-    Effect.gen(function* () {
-      const decoded = yield* decodeVocabulary(vocabulary)
-      const exceptions = yield* decodeExceptions(exceptionFile)
-      const numbers = termDecisions(decoded)
-      expect(numbers).toHaveLength(22)
-      expect(A.dedupe(numbers)).toEqual([111])
-      expect(A.map(exceptions, (entry) => [entry.class, entry.ratification.decision])).toEqual([["Role", 97]])
-    })
+  // Decision 129 with 176: each new term and Party's exception entry name the accepting decision, and the thread's 22
+  // terms keep 111, Person, Organization and grantScope among them, whose new links change no text of theirs.
+  it.effect(
+    "the thread's 22 terms name decision 111, step 9's nine name 176, and so does Party's exception entry",
+    () =>
+      Effect.gen(function* () {
+        const decoded = yield* decodeVocabulary(vocabulary)
+        const exceptions = yield* decodeExceptions(exceptionFile)
+        const named176 = A.filter(termRatifications(decoded), ([, decision]) => decision === 176)
+        const named111 = A.filter(termRatifications(decoded), ([, decision]) => decision === 111)
+        expect(A.map(named176, ([key]) => key)).toStrictEqual([
+          "Party",
+          "SourceRecord",
+          "recordOf",
+          "sourceSystem",
+          "sourceType",
+          "sourceId",
+          "capturedAt",
+          "isCustomer",
+          "isVendor"
+        ])
+        expect(named111).toHaveLength(22)
+        expect(A.map(named111, ([key]) => key)).toEqual(
+          expect.arrayContaining(["Person", "Organization", "grantScope"])
+        )
+        expect(termRatifications(decoded)).toHaveLength(31)
+        expect(A.map(exceptions, (entry) => [entry.class, entry.ratification.decision])).toEqual([
+          ["Role", 97],
+          ["Party", 176]
+        ])
+      })
   )
 
   // The literal states gist's release twice, as a number and inside the IRI the OWL file names as its source. No rule
@@ -116,13 +142,14 @@ describe("gate 4, vocabulary coherence", () => {
         const decoded = yield* decodeVocabulary(constructsVocabulary)
         const exceptions = yield* decodeExceptions(constructsExceptions)
         expect(coherenceFindings({ vocabulary: decoded, exceptions, decisions })).toEqual([])
-        // The copy's new terms name decisions 12, 33 and 35, each a heading of the real log (rule C12).
-        expect(A.dedupe(termDecisions(decoded))).toEqual([111, 12, 33, 35])
+        // The copy's own terms name decisions 12, 33 and 35, each a heading of the real log (rule C12), beside the
+        // kernel's 111 and 176.
+        expect(A.dedupe(termDecisions(decoded))).toEqual([111, 12, 176, 33, 35])
       })
   )
 
   it.effect(
-    "reports exactly C4 on Party when the copy is read with the committed list, which has no entry for it",
+    "reports exactly C4 on Party when the copy is read with the committed list, whose entry gives another reason",
     () =>
       Effect.gen(function* () {
         const decoded = yield* decodeVocabulary(constructsVocabulary)
@@ -187,7 +214,10 @@ describe("gate 4, vocabulary coherence", () => {
         ...constructsVocabulary,
         gist: {
           ...constructsVocabulary.gist,
-          properties: { plantedAttribute: constructsVocabulary.gist.properties.plantedAttribute }
+          properties: {
+            isAbout: constructsVocabulary.gist.properties.isAbout,
+            plantedAttribute: constructsVocabulary.gist.properties.plantedAttribute
+          }
         }
       }
       const found = yield* findingsOfCopy(planted)

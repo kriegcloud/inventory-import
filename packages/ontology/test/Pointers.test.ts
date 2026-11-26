@@ -588,31 +588,36 @@ const withRecord = Effect.fn("withRecord")(function* (
   return { enrolment, enrolled: { ...enrolled, [key]: schema }, placements: [...placements, ...rows] }
 })
 
-/** A record of `cls` whose `knownAs` fills the property whose domain is `Party`. */
+/**
+ * A record of `cls` whose `knownAs` fills the property whose domain is `Party`. A `Person` stores no id (decision
+ * 161), so its record names its class on its own annotations and has no id field (P4); the others have one.
+ */
 const knownAsRecord = (cls: "inv:Person" | "inv:Tenant" | "inv:Member") => {
-  const marks = [
-    ["id", plantedClass(cls)],
-    ["knownAs", plantedProperty("inv:knownAs")]
-  ] as const
-  const schema = S.Struct({
-    id: S.String.pipe(S.annotateKey(marks[0][1])),
-    knownAs: S.String.pipe(S.annotateKey(marks[1][1]))
-  }).pipe(S.annotate(plantedClass(cls)))
-  return withRecord("KnownAs", schema, marks)
+  const known = ["knownAs", plantedProperty("inv:knownAs")] as const
+  const id = ["id", plantedClass(cls)] as const
+  const fields = { knownAs: S.String.pipe(S.annotateKey(known[1])) }
+  return cls === "inv:Person"
+    ? withRecord("KnownAs", S.Struct(fields).pipe(S.annotate(plantedClass(cls))), [known])
+    : withRecord(
+        "KnownAs",
+        S.Struct({ id: S.String.pipe(S.annotateKey(id[1])), ...fields }).pipe(S.annotate(plantedClass(cls))),
+        [id, known]
+      )
 }
 
-/** A record of `cls` whose role is reached through `partyGrant`, a relation from a `Party` to its grant. */
+/** A record of `cls` whose role is reached through `partyGrant`, a relation from a `Party` to its grant; as above. */
 const partyGrantRecord = (cls: "inv:Person" | "inv:Member") => {
   const path = plantedPath([{ property: "inv:partyGrant", node: "inv:Grant" }, { property: "inv:grantsRole" }])
-  const marks = [
-    ["id", plantedClass(cls)],
-    ["role", path]
-  ] as const
-  const schema = S.Struct({
-    id: S.String.pipe(S.annotateKey(marks[0][1])),
-    role: Role.pipe(S.annotateKey(path))
-  }).pipe(S.annotate(plantedClass(cls)))
-  return withRecord("PartyGrant", schema, marks)
+  const role = ["role", path] as const
+  const id = ["id", plantedClass(cls)] as const
+  const fields = { role: Role.pipe(S.annotateKey(path)) }
+  return cls === "inv:Person"
+    ? withRecord("PartyGrant", S.Struct(fields).pipe(S.annotate(plantedClass(cls))), [role])
+    : withRecord(
+        "PartyGrant",
+        S.Struct({ id: S.String.pipe(S.annotateKey(id[1])), ...fields }).pipe(S.annotate(plantedClass(cls))),
+        [id, role]
+      )
 }
 
 /** A Member record whose one other field, `reached`, a string, is marked with `path`. */

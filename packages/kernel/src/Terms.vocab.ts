@@ -1,18 +1,23 @@
 /**
- * The vocabulary of the thin thread: its seven classes, nine properties, two schemes and four concepts, and the gist
- * names they rest on, as one literal kept `as const` and checked with `satisfies` against the encoded side of
- * `Vocabulary`. Every registry type below is derived from this literal and from nothing else; a gate decodes the same
- * literal strictly and works on the decoded value.
+ * The vocabulary: the thin thread's seven classes, nine properties, two schemes and four concepts, the party slice's
+ * terms as its steps add them, and the gist names they rest on, as one literal kept `as const` and checked with
+ * `satisfies` against the encoded side of `Vocabulary`. Every registry type below is derived from this literal and
+ * from nothing else; a gate decodes the same literal strictly and works on the decoded value.
  *
- * Do not break: every label, definition, tag, parent, identity criterion, domain, range, datatype and notation is
- * report 14 section 2's text as Benjamin accepted it in decision 111, word for word; change one only with a decision.
- * It is never built with `Vocabulary.make`, whose record keys widen to `string` and would let any text pass as a
- * term's name. `base` is the one IRI literal; every other IRI of the vocabulary is derived from it.
+ * Do not break: every label, definition, tag, parent, identity criterion, basis, domain, range, datatype and notation
+ * is the text Benjamin accepted, word for word; change one only with a decision. The thread's terms are report 14
+ * section 2's text as decision 111 accepted it, and they name 111: `Person` and `Organization` keep it with their
+ * category parent `Party` (decision 12), `Person` with `storesId: false` (decision 161), and `grantScope` with its link
+ * to `gist:isCategorizedBy` (decision 17), each listed by decision 176 without changing the term's text. The party
+ * slice's terms are report 18's text as decision 176 accepted it, and they name 176. It is never built with
+ * `Vocabulary.make`, whose record keys widen to `string` and would let any text pass as a term's name. `base` is the
+ * one IRI literal; every other IRI of the vocabulary is derived from it.
  *
- * Where section 2 states something the metamodel has no field for, it is not lost: a class's named gist ancestors are
+ * Where a report states something the metamodel has no field for, it is not lost: a class's named gist ancestors are
  * read from the gist list (`Person` through `gist:Person`, `Grant` through `gist:Assignment`, `Tenant` through its
- * local parent); a property's "filled by" and a scheme's "pointed at by" are the marks on the records (step 5);
- * `Tenant`'s inherited criterion carries no text, and section 2.1's note on it is kept beside it as a comment.
+ * local parent); a property's "filled by" and a scheme's "pointed at by" are the marks on the records, or the fixture
+ * its `evidence` names; `Tenant`'s inherited criterion carries no text, and section 2.1's note on it is kept beside it
+ * as a comment.
  *
  * @packageDocumentation
  */
@@ -22,14 +27,17 @@ const base = "https://example.org/inventory-import"
 
 const ratification = { decision: 111 } as const
 
+/** The decision that accepted report 18, the party slice's terms (decision 176). */
+const partySlice = { decision: 176 } as const
+
 /**
- * The thread's vocabulary as written: the literal every name type of the thread is derived from. Decode it with
+ * The vocabulary as written: the literal every name type of the vocabulary is derived from. Decode it with
  * `Vocabulary` and `{ onExcessProperty: "error", errors: "all" }` before reading it as data.
  */
 export const vocabulary = {
   base,
   namespace: `${base}/ontology/`,
-  version: "0.1.0",
+  version: "0.2.0",
   gist: {
     version: "14.1.0",
     namespace: "https://w3id.org/semanticarts/ns/ontology/gist/",
@@ -48,7 +56,12 @@ export const vocabulary = {
       ["Organization", "Content"],
       ["Organization", "PhysicalIdentifiableItem"],
       ["PhysicalIdentifiableItem", "Content"]
-    ]
+    ],
+    // Report 18 section 8, read from the pinned file: neither declares a range, and `isCategorizedBy` no domain.
+    properties: {
+      isCategorizedBy: { kind: "object" },
+      isAbout: { kind: "object", domain: "Content" }
+    }
   },
   classes: {
     Organization: {
@@ -57,6 +70,7 @@ export const vocabulary = {
         "An organized body of people or of other organizations formed for a purpose, such as a company the tenant buys from, sells to, ships with or has goods made by, or the tenant itself.",
       tag: "kind",
       parent: { kind: "gist", name: "Organization" },
+      categoryParents: ["Party"],
       identity: {
         kind: "stated",
         criterion:
@@ -78,7 +92,9 @@ export const vocabulary = {
       prefLabel: "Person",
       definition: "A human being.",
       tag: "kind",
+      storesId: false,
       parent: { kind: "gist", name: "Person" },
+      categoryParents: ["Party"],
       identity: {
         kind: "stated",
         criterion:
@@ -139,6 +155,33 @@ export const vocabulary = {
         criterion: "the tenant and the entry's id. It rests on Activity.organizationId and Activity.id."
       },
       ratification
+    },
+    Party: {
+      prefLabel: "Party",
+      definition:
+        "An agent that is either a human being or an organized body, named so that the properties persons and organizations share have one range.",
+      tag: "category",
+      storesId: false,
+      parent: {
+        kind: "none",
+        reason:
+          "gist 14.1.0 has no party class; Party gathers Person and Organization, which keep their gist parents, and supplies no identity."
+      },
+      ratification: partySlice
+    },
+    SourceRecord: {
+      prefLabel: "Source record",
+      definition:
+        "Content an external system or the tenant holds about one thing, named by its system, its record type and its opaque id, so that a later read of the same record is the same source record; the tenant's assertions about that thing, such as its customer and vendor flags, sit on it.",
+      tag: "information",
+      parent: { kind: "gist", name: "Content" },
+      identity: {
+        kind: "stated",
+        criterion:
+          "the tenant, the source system, the record's type and its opaque id, each kept as written (case, leading zeros, punctuation); equal ids in two systems or two tenants are two records (decision 34).",
+        restsOn: ["inTenant", "sourceSystem", "sourceType", "sourceId"]
+      },
+      ratification: partySlice
     }
   },
   objectProperties: {
@@ -176,6 +219,7 @@ export const vocabulary = {
       definition: "Links a grant to the kind of scope it applies to.",
       domain: "Grant",
       range: { kind: "scheme", key: "GrantScopeKindScheme" },
+      subPropertyOf: { kind: "gist", name: "isCategorizedBy" },
       ratification
     },
     recordedActor: {
@@ -190,6 +234,15 @@ export const vocabulary = {
       definition: "The tenant whose workspace holds this record, not the owner of the body it describes.",
       range: { kind: "class", key: "Tenant" },
       ratification
+    },
+    recordOf: {
+      prefLabel: "record of",
+      definition: "Links a source record to the party it was captured about: a person, or an organization.",
+      domain: "SourceRecord",
+      range: { kind: "class", key: "Party" },
+      subPropertyOf: { kind: "gist", name: "isAbout" },
+      evidence: "fixture",
+      ratification: partySlice
     }
   },
   datatypeProperties: {
@@ -206,6 +259,59 @@ export const vocabulary = {
       domain: "AuditEntry",
       datatype: "xsd:dateTime",
       ratification
+    },
+    sourceSystem: {
+      prefLabel: "source system",
+      definition: "The external system a source record was read from, as written.",
+      domain: "SourceRecord",
+      datatype: "xsd:string",
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    sourceType: {
+      prefLabel: "source type",
+      definition: "The record type the external system gives a source record, as written.",
+      domain: "SourceRecord",
+      datatype: "xsd:string",
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    sourceId: {
+      prefLabel: "source id",
+      definition: "The opaque id the external system gives a source record, kept exactly as written.",
+      domain: "SourceRecord",
+      datatype: "xsd:string",
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    capturedAt: {
+      prefLabel: "captured at",
+      definition:
+        "The instant a source record was last read from its system: one value, which each later read of the same record replaces.",
+      domain: "SourceRecord",
+      datatype: "xsd:dateTime",
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    isCustomer: {
+      prefLabel: "is customer",
+      altLabels: ["Customer", "Client", "Buyer"],
+      definition:
+        "Whether the tenant's record of a trading account, one whose source has a trading-role field such as a Sutton company's, states that the party buys from the tenant: true or false on every such stored record, and stated on no other record.",
+      domain: "SourceRecord",
+      datatype: "xsd:boolean",
+      evidence: "fixture",
+      ratification: partySlice
+    },
+    isVendor: {
+      prefLabel: "is vendor",
+      altLabels: ["Vendor", "Supplier"],
+      definition:
+        "Whether the tenant's record of a trading account, one whose source has a trading-role field such as a Sutton company's, states that the party sells to the tenant: true or false on every such stored record, and stated on no other record.",
+      domain: "SourceRecord",
+      datatype: "xsd:boolean",
+      evidence: "fixture",
+      ratification: partySlice
     }
   },
   schemes: {
@@ -260,23 +366,23 @@ export const vocabulary = {
 
 type Terms = typeof vocabulary
 
-/** The thread's one prefix, `inv:`, over the vocabulary's namespace, naming the terms `K`. */
+/** The vocabulary's one prefix, `inv:`, over the vocabulary's namespace, naming the terms `K`. */
 type InvRegistry<K extends string> = {
   readonly inv: { readonly iri: Terms["namespace"]; readonly terms: ReadonlyArray<K> }
 }
 
 /**
- * The thread's classes as a registry of `@beep/identity/Vocab`: `Curie<InvClassVocab>` is `"inv:Organization" | ...`,
+ * The vocabulary's classes as a registry of `@beep/identity/Vocab`: `Curie<InvClassVocab>` is `"inv:Organization" | ...`,
  * so a helper typed with it refuses a property's or a scheme's name.
  */
 export type InvClassVocab = InvRegistry<keyof Terms["classes"] & string>
 
-/** The thread's properties, object and datatype together, as a registry: a class's name is not one of them. */
+/** The vocabulary's properties, object and datatype together, as a registry: a class's name is not one of them. */
 export type InvPropertyVocab = InvRegistry<
   (keyof Terms["objectProperties"] | keyof Terms["datatypeProperties"]) & string
 >
 
-/** The thread's concept schemes as a registry: the names a union of literals may point at. */
+/** The vocabulary's concept schemes as a registry: the names a union of literals may point at. */
 export type InvSchemeVocab = InvRegistry<keyof Terms["schemes"] & string>
 
 type Schemes = Terms["schemes"]

@@ -120,6 +120,9 @@ export const inventory = Effect.gen(function* () {
     ...(plan.address.at === "hostname" ? { domain: { name: plan.address.hostname, zoneName: plan.address.zone } } : {}),
     env: {
       DB: database,
+      // The coarse limit in front of sign-in and the model (the app's `AddressLimit.ts`): the same two numbers as
+      // `wrangler.jsonc`. The namespace is one for the account, so the app keys each count by its own host.
+      ABUSE_LIMIT: Cloudflare.RateLimit("ABUSE_LIMIT", { namespaceId: 1001, simple: { limit: 30, period: 60 } }),
       // Each stage trusts its own address; none is kept by hand.
       BETTER_AUTH_URL: Cloudflare.Worker.URL,
       BETTER_AUTH_SECRET: signInSecret.text,

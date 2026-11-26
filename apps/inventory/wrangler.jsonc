@@ -18,6 +18,9 @@
       "migrations_dir": "migrations"
     }
   ],
+  // The coarse limit in front of sign-in and the model (src/server/AddressLimit.ts): 30 in 60 seconds for each key.
+  // Local development reads this; a deployed stage's binding is the stack's, with the same numbers.
+  "ratelimits": [{ "name": "ABUSE_LIMIT", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } }],
   // Settings that are not secret, reviewed like code. Every one is read through effect/Config (src/server/Settings.ts);
   // `.dev.vars` can override any of them locally. Valid values for each are in .dev.vars.example.
   "vars": {

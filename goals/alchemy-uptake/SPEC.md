@@ -70,7 +70,7 @@ proving the capability here before anything depends on it.
       with no key, where its secrets were kept, what of `scripts/` it would delete, and what it could not do.
 - [ ] `Inventory.stack.ts` declares the Worker's CPU limit and placement, with the measurement that chose them in
       PLAN; `StagePlan` holds them if they differ by stage, with a test.
-- [ ] The rate-limit binding is declared, checked before `/api/auth/sign-in/*`, `/api/auth/sign-up/*` and the
+- [x] The rate-limit binding is declared, checked before `/api/auth/sign-in/*`, `/api/auth/sign-up/*` and the
       model's endpoints, refuses with the app's own 429 sentence, and a test shows a refusal and a pass. Built only
       after "the limiter's rule" below is answered.
 - [ ] A `pr-<number>` stage's plan carries an Access policy and no other stage's does (`planFor`'s test); the

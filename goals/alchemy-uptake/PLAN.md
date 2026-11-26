@@ -20,7 +20,7 @@ closes the step with what was seen; it does not get worked around.
 | 3 | D1 export: `beep infra export --dry-run` and the procedure in `docs/operations.md` | answered 2026-11-26: his workstation, by hand | todo |
 | 4 | Stack tests: the harness in `scratchpad/` first (does it deploy this stack locally, where does its state go), then one test in `check:full` | his re-pin adding `@alchemy.run/test` | todo |
 | 5 | `alchemy dev` trial: `bun run dev:alchemy` beside `bun run dev`, compared and written up here | nothing | done: it runs; my recommendation is that the no-go stands ("The `alchemy dev` trial", below). His to decide |
-| 6 | Rate limiter: the binding in the stack and locally, the check in front of sign-in and the model | answered 2026-11-26: by address, 30 a minute, a failed binding lets the request on | todo |
+| 6 | Rate limiter: the binding in the stack and locally, the check in front of sign-in and the model | answered 2026-11-26: by address, 30 a minute, a failed binding lets the request on | done locally; not seen on a deployed stage |
 | 7 | Access on previews: the policy in `planFor` for `pr-<number>` | answered 2026-11-26: the emails in the preview environment's secret `PREVIEW_ACCESS` | todo |
 | 8 | Telemetry export: a destination per stage that names a collector | answered 2026-11-26: staging and prod read a collector from their environment; none is named yet | todo |
 
@@ -63,6 +63,24 @@ step 3.
 
 ## What was proved on this machine
 
+- **Step 6** (2026-11-26). The binding is `ABUSE_LIMIT`, 30 in 60 seconds, declared in the stack and in
+  `wrangler.jsonc`; the check is one router middleware in front of every route (`src/server/AddressLimit.ts`).
+  `AddressLimit.test.ts`, through the Worker's own `fetch`: a stand-in counter lets two requests of an address to
+  `/api/v1/assistant/view` through and the third answers 429 `TooManyRequests` with `retry-after: 60` and the
+  security headers; another address goes on; a read, and a request with no visitor address, are not counted; a
+  binding that throws lets the request on. `AddressLimit.slow.test.ts`, on the app as the Worker builds it: a
+  refused sign-in with the right password answers 429 and sets no cookie, a refused sign-up answers 429, and another
+  address signs in. **What the local emulator does**, tried: the binding in local workerd (wrangler's platform
+  proxy on `wrangler.jsonc`) let 30 requests of one key through and refused the 31st, and another key passed. Under
+  `bun run dev:alchemy` the plan read `[Website/ABUSE_LIMIT] create`, and of 33 sign-in attempts sent with one
+  visitor address the 33rd answered `{"_tag":"TooManyRequests",...}` (the 11th to the 32nd were Better Auth's own
+  429, its exact limit). **Seen on screen** there: signed out, typed Dana Whitfield's email and the test password,
+  pressed Sign in from the address that was over the limit; the form read "Too many attempts. Wait a minute, then
+  try again." and nobody was signed in (the request was given the address header by the test browser: a local
+  request carries none, so the limit never counts a developer's own).
+  **Not seen:** the binding on a deployed stage, where Cloudflare counts per location and approximately. The three
+  model endpoints say "Too many requests at once. Wait a few seconds and try again." (`sayError`, by status): not
+  seen on screen.
 - **Step 5** (2026-11-26). The trial above. `InfraStage.test.ts` holds the local stack's guard: under `alchemy dev`
   a `dev_<user>` stage gets the personal plan; a deploy, plan or destroy of it, and every deployed stage's name, is
   stopped (`NotOnThisMachine`), because its state is in memory. The move of the stack's program into `inventory` is
@@ -165,6 +183,15 @@ secret in the clear. It is worth another look when Alchemy seals a Worker's bind
 - **`orphaned` is a loss too** (step 1). A database dropped from the state is still in the account, but the next
   deploy makes a new empty one and binds the Worker to it.
 - **Never `--detailed` in a workflow** (step 1): its log is public, and the plain plan names resources only.
+- **One middleware in front of every route, not a declared error on each endpoint** (step 6). Sign-in is Better
+  Auth's routes, outside the API's contract, so a check declared on the contract would have needed a second one in
+  the sign-in route's guard. The cost: `TooManyRequests` is not in the OpenAPI document. The browser reads a 429 by
+  its status in both places, so the screens needed no change.
+- **Counted under the request's host and the address** (step 6): a rate-limit namespace is one for the account, and
+  previews, test stages and staging share one. A request with no `cf-connecting-ip` is not counted: Cloudflare sets
+  that header on every request it carries, and a visitor cannot.
+- **The model endpoints are a list of three paths** (step 6), held against the API's own document by a test: a
+  fourth endpoint that asks a model is added to `countedPaths` by hand.
 - **The trial's state is in memory** (step 5). The only store that puts the sign-in secret in no file. The other
   two were measured or forbidden (the table in "The `alchemy dev` trial").
 - **The trial reuses the deployed stack's program** (step 5), so it tries the stack and not a copy of it; the

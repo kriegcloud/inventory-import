@@ -863,12 +863,22 @@ describe("gate 8, CQ-P03: the people a tenant reaches at each account, for which
   )
 
   // Decision 159: the tenant's record of the person gives the point, which both of test_Pat's assignments name; the
-  // query reads neither the record nor its link (report 18 section 10).
+  // query reads neither the record nor its link (report 18 section 10). Decision 140: each record is one of a source
+  // that records a contact's purpose, test_Ledger, never Sutton's.
   it.effect("the point is the email field of the person's record, and the answer stands without the records", () =>
     Effect.gen(function* () {
       const c = yield* contactNames
       const r = yield* contactRows
       const graph = yield* fixtureGraph(contacts.fixture)
+      const records: ReadonlyArray<readonly [string, string]> = [
+        [c.patRecord, "C0001"],
+        [c.samRecord, "C0002"]
+      ]
+      for (const [record, id] of records) {
+        expect(objectsOf(graph, record, c.inv("sourceSystem"))).toStrictEqual(["test_Ledger"])
+        expect(objectsOf(graph, record, c.inv("sourceType"))).toStrictEqual(["Contact"])
+        expect(objectsOf(graph, record, c.inv("sourceId"))).toStrictEqual([id])
+      }
       expect(objectsOf(graph, c.patRecord, c.inv("recordOf"))).toStrictEqual([c.pat])
       expect(objectsOf(graph, c.patRecord, c.inv("hasContactPoint"))).toStrictEqual([c.patPoint])
       expect(objectsOf(graph, c.samRecord, c.inv("hasContactPoint"))).toStrictEqual([c.samPoint])
@@ -906,6 +916,135 @@ describe("gate 8, CQ-P03: the people a tenant reaches at each account, for which
       expect(bare).not.toContain(walk)
       const bareRows = yield* asked(graph, bare, contactsVariables)
       expect(bareRows).toStrictEqual([])
+    })
+  )
+})
+
+/** The records of sutton-party.ttl, built from the vocabulary. */
+const suttonNames = Effect.gen(function* () {
+  const p = yield* partyNames
+  const { vocabulary } = yield* threadContext
+  return {
+    ...p,
+    company: p.record("test_HarborCompany"),
+    contact: p.record("test_HarborContact"),
+    workspace: p.record("test_SuttonWorkspace"),
+    suttonMember: p.member("test_SuttonMember"),
+    address: `${vocabulary.base}/fixture/PostalAddress/test_HarborDock`,
+    user: `${vocabulary.base}/fixture/SignInAccount/test_SuttonUser`
+  }
+})
+
+/**
+ * What sutton-party.ttl places on each record against report 18's coverage table (sections 4 and 9), each fault a
+ * sentence: a property the table puts on a record that the record leaves off, one the table leaves off that the record
+ * states (neither flag on the contact or the workspace, decision 168; no `sourceSystem`, section 12; no person on the
+ * member, decision 133), a contact point with no kind or value, and a grant, which no Sutton field places (decision
+ * 131). None for the committed file.
+ */
+const placementFaults = (
+  graph: ReadonlyArray<Triple>,
+  s: Effect.Success<typeof suttonNames>
+): ReadonlyArray<string> => {
+  const keys = ["inTenant", "sourceType", "sourceId", "recordOf", "name"]
+  const noFlag = ["isCustomer", "isVendor", "sourceSystem"]
+  const table: ReadonlyArray<readonly [string, ReadonlyArray<string>, ReadonlyArray<string>]> = [
+    [s.company, [...keys, "isCustomer", "isVendor"], ["sourceSystem"]],
+    [s.contact, [...keys, "hasContactPoint"], noFlag],
+    [s.workspace, keys, noFlag],
+    [
+      s.suttonMember,
+      ["membershipIn", "membershipWorkspace", "memberAccount", "membershipStatus", "name", "memberContactPoint"],
+      ["membershipOf"]
+    ],
+    [s.address, ["inTenant", "name"], []],
+    [s.user, ["accountEmail"], []]
+  ]
+  const stated = (subject: string, key: string) => A.length(objectsOf(graph, subject, s.inv(key))) > 0
+  const points = [
+    ...objectsOf(graph, s.contact, s.inv("hasContactPoint")),
+    ...objectsOf(graph, s.suttonMember, s.inv("memberContactPoint"))
+  ]
+  const grants = A.dedupe([
+    ...typedAs(graph, s.inv("Grant")),
+    ...A.map(A.filter(graph, withPredicate(s.inv("grantedTo"))), (triple) => triple.subject)
+  ])
+  return [
+    ...A.flatMap(table, ([subject, placed, left]) => [
+      ...A.map(
+        A.filter(placed, (key) => !stated(subject, key)),
+        (key) => `${subject} does not state ${key}`
+      ),
+      ...A.map(
+        A.filter(left, (key) => stated(subject, key)),
+        (key) => `${subject} states ${key}, which the table leaves off`
+      )
+    ]),
+    ...A.flatMap(points, (point) =>
+      A.map(
+        A.filter(["contactPointKind", "contactValue"], (key) => !stated(point, key)),
+        (key) => `${point} does not state ${key}`
+      )
+    ),
+    ...A.map(grants, (grant) => `${grant} is a grant, which no Sutton field places`)
+  ]
+}
+
+describe("gate 8, sutton-party.ttl: each record states what the coverage table places on it", () => {
+  it.effect("near miss: the committed file has no fault", () =>
+    Effect.gen(function* () {
+      const s = yield* suttonNames
+      const graph = yield* fixtureGraph(suttonParty)
+      expect(placementFaults(graph, s)).toStrictEqual([])
+    })
+  )
+
+  it.effect("planted: each misplacement is one fault, a flag on the contact's record first (decision 168)", () =>
+    Effect.gen(function* () {
+      const s = yield* suttonNames
+      const graph = yield* fixtureGraph(suttonParty)
+      const flag = (subject: string, key: string, value: string) =>
+        literal(subject, s.inv(key), value, `${RdfVocab.xsd.iri}boolean`)
+      const words = (subject: string, key: string, value: string) =>
+        literal(subject, s.inv(key), value, `${RdfVocab.xsd.iri}string`)
+      const email = `${s.contact}/email`
+      const grant = s.grant("test_SuttonGrant")
+      const added: ReadonlyArray<readonly [Triple, string]> = [
+        [flag(s.contact, "isCustomer", "true"), `${s.contact} states isCustomer, which the table leaves off`],
+        [flag(s.workspace, "isVendor", "false"), `${s.workspace} states isVendor, which the table leaves off`],
+        [
+          words(s.company, "sourceSystem", "test_Sutton"),
+          `${s.company} states sourceSystem, which the table leaves off`
+        ],
+        [
+          link(s.suttonMember, s.inv("membershipOf"), s.individual("test_Kim")),
+          `${s.suttonMember} states membershipOf, which the table leaves off`
+        ],
+        [link(grant, s.inv("grantedTo"), s.suttonMember), `${grant} is a grant, which no Sutton field places`]
+      ]
+      const removed: ReadonlyArray<readonly [string, string]> = [
+        [s.company, "isCustomer"],
+        [s.company, "recordOf"],
+        [s.workspace, "recordOf"],
+        [s.contact, "name"],
+        [s.suttonMember, "membershipIn"],
+        [s.suttonMember, "memberAccount"],
+        [s.suttonMember, "name"],
+        [s.address, "inTenant"],
+        [s.address, "name"],
+        [s.user, "accountEmail"]
+      ]
+      for (const [triple, fault] of added) {
+        expect(placementFaults([...graph, triple], s)).toStrictEqual([fault])
+      }
+      for (const [subject, key] of removed) {
+        const less = dropped(graph, subject, s.inv(key))
+        expect(less).toHaveLength(graph.length - 1)
+        expect(placementFaults(less, s)).toStrictEqual([`${subject} does not state ${key}`])
+      }
+      const valueless = dropped(graph, email, s.inv("contactValue"))
+      expect(valueless).toHaveLength(graph.length - 1)
+      expect(placementFaults(valueless, s)).toStrictEqual([`${email} does not state contactValue`])
     })
   )
 })

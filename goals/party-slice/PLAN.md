@@ -768,6 +768,15 @@ Choices the sources left open, each the agent's:
   out by hand and its test seen to fail, then put back; `bun run --cwd packages/ontology reason` on the cached jar
   passed (What the design left unchecked). Not measured: the JSON Schema of the app's records, since no record, mark or
   contract file changed in this step.
+- **Review of step 12.** A test reads what `sutton-party.ttl` places on each record (`placementFaults` in
+  `Questions.test.ts`): the company states both flags, the contact's and the workspace's records neither (decision 168),
+  no record a `sourceSystem` (report 18 section 12), the member its tenant, workspace, account, stage and name and no
+  person or grant (decisions 131 and 133), the address its tenant and name, each point its kind and value, the user its
+  email. The committed file is the near miss; each planted misplacement (a flag added to the contact's record first) is
+  one fault. CQ-P03's test of the giving records now reads each record's three source keys, `test_Ledger`'s (decision
+  140). The release line on `membershipIn` says what changed; the fixture's header says every record's IRI starts
+  `test_`, since the people's and the address's names do not. CQ-P06's and CQ-P07's must-fail memberships stay triples
+  given in the test, as chosen above.
 
 Needs Benjamin: carried from step 10, the name `test_AcmeC` and `test_AcmeD` share (option (a) of step 10, unbuilt).
 

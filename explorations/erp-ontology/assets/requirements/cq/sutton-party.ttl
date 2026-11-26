@@ -7,7 +7,7 @@
 # records state their type and id and no source system: what that holds for Sutton is not decided (report 18 section
 # 12). The member names no person and holds no grant, which no field places (decisions 131 and 133). Only Sutton's
 # type, field and enum names appear (decision 123); nothing here is a record of a Sutton workspace, and every record's
-# name starts `test_`.
+# IRI starts `test_`.
 @base <https://example.org/inventory-import/> .
 @prefix inv: <https://example.org/inventory-import/ontology/> .
 

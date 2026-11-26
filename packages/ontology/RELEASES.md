@@ -10,8 +10,8 @@ change to a question's expected rows names the question with its old and its new
   sign-in email: the old answer was (tenant, person, member, role) for `test_RaviWorks` as admin of `test_ExampleWorks`
   and `test_RaviSecond` as viewer of `test_SecondOrg`; the new answer is the same two rows as (tenant, person, name,
   member, email, role), each with "Ravi Example" and "test_ravi@example.org". CQ-P07 is new: `test_EmptyOrg` and
-  `test_SecondOrg` keep no active admin. `membershipIn`'s definition reworded (decision 169): it links a membership to
-  the tenant it belongs to, which no longer says the person acts in that tenant's workspace, since a membership may
-  name a source's. CQ-P06 and CQ-P07 leave out a membership that names a source's workspace (decision 154); their rows
+  `test_SecondOrg` keep no active admin. `membershipIn`'s definition reworded (decision 169): it now names the tenant the
+  membership belongs to and lets its person act in that tenant's workspace or in a source's workspace it names, where
+  111's text said only the tenant's. CQ-P06 and CQ-P07 leave out a membership that names a source's workspace (decision 154); their rows
   on their fixtures are unchanged. CQ-P03 is new: `test_Pat` is billing contact at `test_Bakery` and receiving contact
   at `test_Mill`, and `test_Sam` a contact at `test_Bakery` with no purpose.

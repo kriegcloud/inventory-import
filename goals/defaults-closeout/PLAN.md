@@ -17,8 +17,8 @@ pull request is merged, not when it is opened.
 | 3 | A test of the facet filter on a table with rows | 18 | done: merged 2026-11-26 |
 | 4, 5 | `packages/review` src and tests: 110 places to 64 | 21 | done: merged 2026-11-26 |
 | 6, 7 | Outside the review package: 48 places to 36 | 20 | done: merged 2026-11-26 |
-| 7b | What was left, 104 places in 30 files, by Benjamin's rulings of 2026-11-26 (below): the baseline names no file | 22 | doing: open, `bun run check` 107 of 107, seen on screen (below) |
-| 8 | Close: both goals' closing notes and `status: done`; `bun run check:full` on main; the merged worktrees and branches removed | | todo: after 22 is merged |
+| 7b | What was left, 104 places in 30 files, by Benjamin's rulings of 2026-11-26 (below): the baseline names no file | 22 | done: merged 2026-11-26, seen on screen (below) |
+| 8 | Close: both goals' closing notes and `status: done`; `bun run check:full` on main; the merged worktrees and branches removed | 23 | done but for the worktrees: `bun run check:full` passes on `main` at `e71f2b5d` (closing note, below). The merged worktrees and branches are local to the workstation and come off on Benjamin's word |
 
 ## The failing property (step 2)
 
@@ -82,6 +82,30 @@ signed in as Dana Whitfield. No error in the browser's console.
 ## Blocker
 
 None.
+
+## Closing note
+
+2026-11-26. Everything the defaults sweep left open is on `main`, in six pull requests (17 to 22). The baseline
+names no file: `defaults-baseline.json` holds `files: {}`, and `bun run beep laws defaults` passes on `main` at
+`e71f2b5d`.
+
+What changed. The five rulings reached the screens and `DECISIONS.md`. The draft machine was wrong, not its
+property, and both seeds are replayed. The facet filter has a test on a table with rows. Of the last 162 places,
+58 moved onto schemas in pull requests 20 and 21. The other 104 went by the rulings (above): the law stopped
+counting a component's check of its own optional prop; each library that hands back nothing sits behind one small
+adapter file of ours; the tests' storage stand-in is one shared file; `TotalCells.text` is an Option; and the four
+starting values the last lane kept are schemas (`CountStart`, `FacetStart`, `TabIdentity`, `WriterStart`). The files left on
+`exemptions` are each there by Benjamin's word, with its reason in `Defaults.rules.ts`.
+
+What was learned. The law reading a component's own prop had to learn where a prop's name stops being the prop: a
+static computed key is a prop, a renderer factory is not a component, and a `catch` or loop that binds the same
+name ends it (CodeRabbit found the three on pull request 22; the tests are in `Defaults.test.ts`). And a lane told
+not to lower a strict ceiling puts good moves back: seven were, until the ruling let a lane lower one.
+
+Checked: `bun run check:full` on `main` at `e71f2b5d` (114 of 114 tasks, 93 replayed by turbo from runs on the same inputs); SF-3's, SF-4's and SF-5's `rg` lines over every swept
+package find only schema definitions and files on `exemptions`; the messy sample on screen on the branch of each
+pull request that changed what the browser sends (above). Not checked: "Use items_messy.csv" reading "Stopped before
+it was saved" on a dev server just started (below) was not pressed on a production build.
 
 ## Choices made along the way
 

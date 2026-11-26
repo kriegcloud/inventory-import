@@ -276,33 +276,37 @@ export const decisionsItemsChanged: Decided = DecisionsItemsChanged.make({})
  * `authors` holds names, for the screen and the confirm's words; `deciders` holds the members' ids, which tell people
  * apart: a row that waited is judged by whose decision is stored, and a name is not unique.
  */
-export type StoredDecisions = {
-  readonly decisions: SavedDecisions
-  readonly authors: Readonly<Record<string, string>>
-  readonly deciders: Readonly<Record<string, string>>
-  readonly savedAt: Readonly<Record<string, number>>
-  /**
-   * Who last saved each row (a member id), whether or not that save changed it: a person who sends exactly what is
-   * stored decided the row too, though who decided it and its revision stay. A row with no entry cannot say (stored
-   * before this was kept): never the sender's.
-   */
-  readonly lastSavedBy: Readonly<Record<string, string>>
-  /** The draft's revision each row's last save was made on, before that save moved it: a screen at a later one is from after it. */
-  readonly lastSavedOn: Readonly<Record<string, number>>
-  /** How many saves have named a row of the draft, changed or not, read before the rows: what a save that waited expects. */
-  readonly saves: number
-}
+export const StoredDecisions = S.Struct({
+  decisions: SavedDecisions,
+  authors: S.Record(S.String, S.String),
+  deciders: S.Record(S.String, S.String),
+  savedAt: S.Record(S.String, S.Finite),
+  lastSavedBy: S.Record(S.String, S.String).annotateKey({
+    description:
+      "Who last saved each row (member id), even when that save changed nothing. A row stored before this was kept has no entry; never the sender by default."
+  }),
+  lastSavedOn: S.Record(S.String, S.Finite).annotateKey({
+    description:
+      "The draft revision each row's last save was made on, before that save moved it: a later screen is from after it."
+  }),
+  saves: S.Int.pipe(
+    S.annotateKey({ description: "How many saves have named a row; none for an import that is not stored." }),
+    S.withDecodingDefaultKey(Effect.succeed(0)),
+    S.withConstructorDefault(Effect.succeed(0))
+  )
+}).annotate({ description: "The saved draft, its authors and save revisions." })
+/** The decoded saved decisions of a draft. */
+export type StoredDecisions = typeof StoredDecisions.Type
 
 /** Nothing stored: a draft with no decision, read by nobody. */
-export const noStoredDecisions: StoredDecisions = {
+export const noStoredDecisions: StoredDecisions = StoredDecisions.make({
   decisions: {},
   authors: {},
   deciders: {},
   savedAt: {},
   lastSavedBy: {},
-  lastSavedOn: {},
-  saves: 0
-}
+  lastSavedOn: {}
+})
 
 /**
  * What a save whose rows waited was compared at: the draft's revision and how many saves had named a row of it. Its

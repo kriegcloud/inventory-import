@@ -121,12 +121,16 @@ holds in the code.
 | | `keys`, `items`, `created`, `suggestions` | Empty (`[]`) | `noItemsRead` is the empty read; the store's parameter default moves onto the schema |
 | `Rematch.rules.ts` `ColumnsAsked` | `reads` | Absent per entry (`OptionFromNullOr`) | |
 | `Spreadsheet.rules.ts` `Cell` | `shown`, `formula` | Absent, kept as a key left out and read with `shownOf`, `formulaOf` | a CSV cell has neither. The table crosses the reader's worker as plain structured-clone values (`web/src/internal/protocol.ts`), where an Option loses its prototype, so the Option is taken where the cell is read |
-| `Spreadsheet.rules.ts` `Row` | `extra` | Empty (`[]`) | cells past the last column; most rows have none |
-| | `hidden` | Empty (`false`) | a row is shown unless Excel hides it |
+| `Spreadsheet.rules.ts` `Row` | `extra` | Empty (`[]`), `emptyWhenLeftOut` | cells past the last column; most rows have none; empty stays omitted when encoded |
+| | `hidden` | Empty (`false`), `emptyWhenLeftOut` | a row is shown unless Excel hides it; false stays omitted when encoded |
 | `CellReading.rules.ts` `DimensionsCell` | `length`, `width`, `height`, `unit` | Absent | "all three measurements together" is a reason for the person, read from the Options |
 | `CellReading.rules.ts` `VendorCell` | `vendor_name`, `unit_cost` | Absent | a vendor with no name or cost is a reason for the person |
-| | `vendor_sku`, `lead_time_days` | Absent (`null` or left out), read with `O.fromNullishOr` | the schema keeps `null` apart from a key left out: `withPreferred` gives the cell back as written but for the flag it changes |
-| | `is_preferred` | Empty (`false`) | a vendor is not preferred unless the cell says so |
+| | `vendor_sku`, `lead_time_days` | Absent (`OptionFromOptionalKey(NullOr(...))`) | the outer Option keeps a key left out apart from an explicit null; the cell reader collapses those two absent readings, while `withPreferred` encodes the original spelling |
+| | `is_preferred` | Absent (`OptionFromOptionalKey(Boolean)`) on the cell; Derived preference predicate | a missing flag and false both mean not preferred; the Option retains the original omitted key when encoding, and `withPreferred` writes the selected flag explicitly |
+| `Spreadsheet.rules.ts` `ReadingPlace.text` | — | Empty (`"the file"`), decoding and constructor default | the reader names the sheet when present, otherwise the file; a rendering value, never file data |
+| `ImportStore.store.ts` `StoredDecisions` | `saves` | Empty (`0`), decoding and constructor default | a missing draft has no saved decisions; twin and D1 use the same schema |
+| | the rest | Required | the store states every decision, author and revision map |
+| `Catalog.memory.ts` `UpdateOrder.millis` | — | Empty (`0`), decoding and constructor default | preserves the twin's epoch-zero sort key for an item with no recorded update, without inventing an item timestamp |
 | `ImportStore.store.ts` `Draft` | `importedBy`, `importedAt` | Absent, *as is* | |
 | `ImportStore.store.ts` `decide(…, read, expected)` | `read` | Required; `noItemsRead` is the empty read | as `ItemsAsRead`; the port, the twin and the adapter no longer default it |
 | | `expected` | Absent, required (`O.none()` asks no comparison) | |
@@ -165,3 +169,8 @@ holds in the code.
 Each lane starts by writing its package's verdicts here, in the form above, before it changes code. Draft
 inventories of the boundaries of every other package were made by Codex lanes on 2026-11-23; they are machine
 heuristics, not verdicts, and are not copied here.
+
+## Ontology tests (pilot follow-up)
+
+`test/Reason.test.ts` has no field or stored encoding changes. Its fake fetch folds an optional refusal; expected
+refusal/success paths narrow with `assertTrue` from `@effect/vitest/utils`, so an unexpected branch fails the test.

@@ -310,7 +310,7 @@ describe("Workbook", () => {
     Effect.gen(function* () {
       const table = yield* messy
       expect(table.columns.length).toBe(8)
-      expect(A.some(table.rows, (row) => row.extra !== undefined)).toBe(false)
+      expect(A.every(table.rows, (row) => A.isReadonlyArrayEmpty(row.extra))).toBe(true)
     })
   )
 

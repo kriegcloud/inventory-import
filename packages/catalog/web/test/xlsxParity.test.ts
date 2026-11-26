@@ -13,6 +13,7 @@ import * as O from "effect/Option"
 import * as Config from "effect/Config"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
+import { SpreadsheetTable } from "@inventory/catalog-model/Spreadsheet"
 import { readXlsx } from "../src/internal/spreadsheet/xlsx.ts"
 import { builtCases, fixtureNames, lyingExtent, type XlsxCase } from "./xlsxCorpus.ts"
 
@@ -21,11 +22,12 @@ const bytesOf = (name: string): Uint8Array =>
 const Json = S.fromJsonString(S.Unknown)
 const expectedUrl = (name: string) => new URL(`./fixtures/xlsx-expected/${name}.json`, import.meta.url)
 
-const plain = (result: Result.Result<unknown, unknown>): unknown =>
+// Historical snapshots are the wire form: schema defaults stay omitted there.
+const plain = (result: Result.Result<SpreadsheetTable, unknown>) =>
   result.pipe(
     Result.match({
-      onSuccess: (table) => ({ table }),
-      onFailure: (problem) => ({ problem: { ...(problem as object) } })
+      onSuccess: (table) => Effect.map(S.encodeEffect(SpreadsheetTable)(table), (table) => ({ table })),
+      onFailure: (problem) => Effect.succeed({ problem: { ...(problem as object) } })
     })
   )
 
@@ -60,12 +62,12 @@ describe("@beep/xlsx reads every workbook as the SheetJS reader did", () => {
         const record = yield* Config.Boolean("XLSX_RECORD").pipe(Config.withDefault(false))
         if (record) {
           const old = yield* readXlsx({ fileName, bytes, sheet: item.sheet, notes: [] }).pipe(Effect.result)
-          const text = yield* old.pipe(plain, S.encodeEffect(Json))
+          const text = yield* old.pipe(plain, Effect.flatMap(S.encodeEffect(Json)))
           writeFileSync(expectedUrl(item.name), `${text}\n`)
         }
         const expected = yield* S.decodeEffect(Json)(readFileSync(expectedUrl(item.name), "utf8"))
         const next = yield* readXlsx({ fileName, bytes, sheet: item.sheet, notes: [] }).pipe(Effect.result)
-        const nextText = yield* next.pipe(plain, S.encodeEffect(Json))
+        const nextText = yield* next.pipe(plain, Effect.flatMap(S.encodeEffect(Json)))
         const nextJson = yield* S.decodeEffect(Json)(nextText)
         expect(nextJson).toEqual(expected)
       })

@@ -256,7 +256,10 @@ export const guard = (input: {
       }
       const column = A.findFirst(source.review.unusedColumns, (candidate) => candidate.label === entry.heading)
       if (O.isNone(column)) return no(what, "That heading is not in the file, or a field already reads it.")
-      const shown = A.findFirst(asked.unusedHeadings, (heading) => heading.heading === Str.slice(0, 80)(entry.heading))
+      const examples = O.match(
+        A.findFirst(asked.unusedHeadings, (heading) => heading.heading === Str.slice(0, 80)(entry.heading)),
+        { onNone: A.empty<string>, onSome: (heading) => heading.examples }
+      )
       const total = source.review.counts.fileRows
       return yes({
         kind: "column",
@@ -265,13 +268,7 @@ export const guard = (input: {
         heading: column.value.label,
         by,
         confidence: column.value.filled * 2 > total ? "medium" : "low",
-        basis: `No heading matched ${fieldLabels[field.value]}; "${column.value.label}" has a value on ${column.value.filled} of ${plural(total, "row", "rows")}${O.match(
-          shown,
-          {
-            onNone: () => "",
-            onSome: (heading) => (heading.examples.length === 0 ? "" : `, such as ${A.join(heading.examples, ", ")}`)
-          }
-        )}.`
+        basis: `No heading matched ${fieldLabels[field.value]}; "${column.value.label}" has a value on ${column.value.filled} of ${plural(total, "row", "rows")}${examples.length === 0 ? "" : `, such as ${A.join(examples, ", ")}`}.`
       })
     }
   )

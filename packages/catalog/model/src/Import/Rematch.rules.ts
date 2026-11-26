@@ -227,7 +227,7 @@ const judgeRow = (input: {
     ...A.map(A.filter(decision.accepted, stale), (field) => ({ rowId, field, kind: "accept" as const })),
     ...A.map(A.filter(decision.reverted, stale), (field) => ({ rowId, field, kind: "undo" as const })),
     ...O.match(storedBy, {
-      onNone: () => [],
+      onNone: A.empty,
       onSome: (field) => [{ rowId, field, kind: "stored" as const }]
     }),
     ...(twin ? [{ rowId, field: "sku", kind: "twin" as const }] : [])
@@ -659,7 +659,7 @@ export const heldToTries = (input: {
   }
   const earlier = O.match(
     O.filter(input.earlier, (held) => sameColumns(held.columns, columns)),
-    { onNone: (): ReadonlyArray<Answered> => [], onSome: (held) => held.answered }
+    { onNone: A.empty<Answered>, onSome: (held) => held.answered }
   )
   const kept = answeredAcrossTries({ earlier, questions: input.questions, changed: input.changed })
   return { changed: kept.changed, held: { columns, answered: kept.answered } }
@@ -833,7 +833,7 @@ export const planMatch = Effect.fnUntraced(function* (input: {
     ? at
     : O.match(
         A.findFirst(input.choices, (old) => old.field === field),
-        { onNone: () => 0, onSome: (old) => old.at }
+        { onNone: () => stagedRevision, onSome: (old) => old.at }
       )
   const choices = leaving(stamp)
   const moves = [...input.moves, ...added]
@@ -855,10 +855,11 @@ export const planMatch = Effect.fnUntraced(function* (input: {
   )
   const compared: O.Option<Compared> =
     questions.length === 0 ? O.none() : yield* Effect.asSome(input.compare({ choices, moves, questions }))
-  const changed = O.match(compared, { onNone: () => [], onSome: (answer) => answer.changed })
+  const changed = O.match(compared, { onNone: A.empty, onSome: (answer) => answer.changed })
   const { applied, notApplied } = withoutStaleDecisions({ choices, moves, madeOn, set: input.decisions, changed })
-  const rewrites = R.filter(applied, (decision, rowId) =>
-    O.match(R.get(input.decisions, rowId), { onNone: () => true, onSome: (old) => !sameDecision(old, decision) })
+  const rewrites = R.filter(
+    applied,
+    (decision, rowId) => !O.exists(R.get(input.decisions, rowId), (old) => sameDecision(old, decision))
   )
   const columnNow = columnsOf({ head: input.head, choices })
   const reads = (moved: Field): boolean => O.isSome(columnNow(moved))

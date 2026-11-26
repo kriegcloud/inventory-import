@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 // Asking the model, as the catalog's features do: one call through the one retry policy, its answer decoded through a
 // schema, and who answered said in the contract's words. `AnswererOpenRouter` is the catalog's `Answerer` on it.
 import { AnsweredBy } from "@inventory/catalog-contract/Answer"
@@ -6,7 +7,7 @@ import { ModelUnavailable } from "@beep/openrouter/OpenRouterError"
 import { AiUnavailable, aiUnavailable } from "@inventory/catalog-contract/AiUnavailable"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as O from "effect/Option"
+import * as R from "effect/Record"
 import type * as S from "effect/Schema"
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
 import { ModelAvailability, Answerer, type ModelQuestion } from "@inventory/catalog-model/Answerer"
@@ -69,11 +70,8 @@ export const AnswererOpenRouter = Layer.effect(
           name: question.name,
           prompt: question.prompt,
           schema,
-          ...O.match(question.system, { onNone: () => ({}), onSome: (system) => ({ system }) }),
-          ...O.match(question.maxOutputTokens, {
-            onNone: () => ({}),
-            onSome: (maxOutputTokens) => ({ maxOutputTokens })
-          })
+          ...R.getSomes({ system: question.system }),
+          ...R.getSomes({ maxOutputTokens: question.maxOutputTokens })
         })
       })
     })

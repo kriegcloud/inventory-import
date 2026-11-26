@@ -7,6 +7,7 @@
 // schema for the API's document and for what it generates. The values a list may offer are read from the item's own
 // lists, not from the facets' pattern.
 import { describe, expect, it } from "@effect/vitest"
+import { assertTrue } from "@effect/vitest/utils"
 import { categories, maxCount, uoms } from "@inventory/catalog-contract/Item"
 import { ItemFacets } from "@inventory/catalog-contract/ItemQuery"
 import * as A from "effect/Array"
@@ -86,7 +87,8 @@ describe("what the Items filters offer", () => {
         const listed = facets[name]
         // A value the list may offer and does not: listed with no items, the counts still add up.
         const absent = A.findFirst(valuesOf[name], (value) => !A.some(listed, (entry) => entry.value === value))
-        if (O.isSome(absent)) {
+        if (listed.length < valuesOf[name].length) {
+          assertTrue(O.isSome(absent), "expected the tested value to be present")
           expect(accepted({ ...facets, [name]: [...listed, { value: absent.value, count: 0 }] })).toBe(false)
         }
       }
@@ -100,13 +102,19 @@ describe("what the Items filters offer", () => {
     ([facets, fraction]) => {
       for (const name of rangeNames) {
         const { min, max } = facets[name]
-        if (O.isSome(min) && O.isSome(max)) {
+        if (facets.total > 0) {
+          assertTrue(O.isSome(min), "expected the tested value to be present")
+          assertTrue(O.isSome(max), "expected the tested value to be present")
           expect(accepted({ ...facets, [name]: { min: O.some(-1 - min.value), max } })).toBe(false)
         }
       }
       const { min, max } = facets.quantityOnHand
-      if (O.isSome(min) && O.isSome(max) && min.value < max.value) {
-        expect(accepted({ ...facets, quantityOnHand: { min: O.some(min.value + fraction), max } })).toBe(false)
+      if (facets.total > 0) {
+        assertTrue(O.isSome(min), "expected the tested value to be present")
+        assertTrue(O.isSome(max), "expected the tested value to be present")
+        if (min.value < max.value) {
+          expect(accepted({ ...facets, quantityOnHand: { min: O.some(min.value + fraction), max } })).toBe(false)
+        }
       }
     },
     runs
@@ -121,7 +129,10 @@ describe("what the Items filters offer", () => {
       const past: Readonly<Record<RangeName, number>> = { quantityOnHand: maxCount + 1, unitCost: 1e12 + fraction }
       for (const name of rangeNames) {
         const { min } = facets[name]
-        if (O.isSome(min)) expect(accepted({ ...facets, [name]: { min, max: O.some(past[name]) } })).toBe(false)
+        if (facets.total > 0) {
+          assertTrue(O.isSome(min), "expected the tested value to be present")
+          expect(accepted({ ...facets, [name]: { min, max: O.some(past[name]) } })).toBe(false)
+        }
       }
     },
     runs
@@ -211,7 +222,10 @@ describe("what the Items filters offer", () => {
     ([facets]) => {
       for (const name of listNames) {
         const twice = doubled(facets[name])
-        if (O.isSome(twice)) expect(accepted({ ...facets, [name]: twice.value })).toBe(false)
+        if (facets.total >= 2) {
+          assertTrue(O.isSome(twice), "expected the tested value to be present")
+          expect(accepted({ ...facets, [name]: twice.value })).toBe(false)
+        }
       }
     },
     runs
@@ -223,8 +237,12 @@ describe("what the Items filters offer", () => {
     ([facets]) => {
       for (const name of rangeNames) {
         const { min, max } = facets[name]
-        if (O.isSome(min)) expect(accepted({ ...facets, [name]: { min, max: O.none() } })).toBe(false)
-        if (O.isSome(max)) expect(accepted({ ...facets, [name]: { min: O.none(), max } })).toBe(false)
+        if (facets.total > 0) {
+          assertTrue(O.isSome(min), "expected the tested value to be present")
+          assertTrue(O.isSome(max), "expected the tested value to be present")
+          expect(accepted({ ...facets, [name]: { min, max: O.none() } })).toBe(false)
+          expect(accepted({ ...facets, [name]: { min: O.none(), max } })).toBe(false)
+        }
       }
     },
     runs
@@ -236,8 +254,12 @@ describe("what the Items filters offer", () => {
     ([facets]) => {
       for (const name of rangeNames) {
         const { min, max } = facets[name]
-        if (O.isSome(min) && O.isSome(max) && min.value < max.value) {
-          expect(accepted({ ...facets, [name]: { min: max, max: min } })).toBe(false)
+        if (facets.total > 0) {
+          assertTrue(O.isSome(min), "expected the tested value to be present")
+          assertTrue(O.isSome(max), "expected the tested value to be present")
+          if (min.value < max.value) {
+            expect(accepted({ ...facets, [name]: { min: max, max: min } })).toBe(false)
+          }
         }
       }
     },

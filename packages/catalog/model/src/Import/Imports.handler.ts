@@ -102,9 +102,9 @@ const fieldsSaid = (named: ReadonlyArray<string>): string => {
     A.filter(fields, (field) => A.contains(named, field)),
     (field) => fieldLabels[field]
   )
-  return O.match(A.last(labels), {
-    onNone: () => "A column",
-    onSome: (last) => (labels.length === 1 ? last : `${A.join(A.dropRight(labels, 1), ", ")} and ${last}`)
+  return A.matchRight(labels, {
+    onEmpty: () => "A column",
+    onNonEmpty: (init, last) => (init.length === 0 ? last : `${A.join(init, ", ")} and ${last}`)
   })
 }
 
@@ -167,8 +167,9 @@ const withUnsaved = (
   stored: StoredDecisions,
   unsaved: { readonly delta: DecisionDelta; readonly author: string; readonly authorId: string }
 ): StoredDecisions => {
-  const changed = R.filter(unsaved.delta.set, (decision, id) =>
-    O.match(R.get(stored.decisions, id), { onNone: () => true, onSome: (old) => !sameDecision(old, decision) })
+  const changed = R.filter(
+    unsaved.delta.set,
+    (decision, id) => !O.exists(R.get(stored.decisions, id), (old) => sameDecision(old, decision))
   )
   const cleared = (_: unknown, id: string): boolean => !A.contains(unsaved.delta.clear, id)
   return {

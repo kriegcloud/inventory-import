@@ -93,6 +93,18 @@ the value moves.
 | `model/src/Review/Review.rules.ts` `recheckRow` | a field the screen's row sends no value for, as the person types | `""`, an empty cell (`emptyText`) | not an import path: the screen sends every field of a row | none in the sample |
 | `model/src/Review/CellReading.rules.ts` `readDimensions` | the unit of a dimensions cell that names none | `cm` | 0: every dimensions cell of the sample names its unit (108 cm, 19 in) | `{"length":31.2,"width":41.4,"height":2}` reads as cm |
 
+The new-kind pilot follow-up also retained these values on schemas (2026-11-25):
+
+| File | Field | Value | Rows of the messy sample | Example |
+| --- | --- | --- | --- | --- |
+| `model/src/Import/ImportStore.store.ts` | `StoredDecisions.saves` when no draft is found | `0` | 0 on a fresh import; the draft exists | a lookup of an import that no longer exists has no saves |
+| `model/src/Catalog.memory.ts` | `UpdateOrder.millis` when an item has no recorded update | `0` | none (test twin sort key) | an item without `updatedAt` compares at epoch zero; no timestamp is stored |
+| `model/src/Reading/Spreadsheet.rules.ts` | `ReadingPlace.text` without a sheet name | `"the file"` | 0 row fields; reader notes only, no cell or outcome changes | a reader note names "the file" instead of a sheet |
+
+The two plain optional keys `Cell.shown` and `Cell.formula` remain exemption candidates, not approved exemptions:
+`{ type: "number", text: "123", shown: "00123" }` crosses the reader's worker by `postMessage`, and an Option there
+would lose its prototype. No exemption or baseline was changed in this follow-up.
+
 ## What the law should count, beyond today
 
 Read from beep-effect's lints (below) and from the pilot. Each is a change to `internal/defaultsCode.ts` and

@@ -1,3 +1,4 @@
+import { assertTrue } from "@effect/vitest/utils"
 // The catalog's endpoints over its in-memory twins: what the screens rely on, with no SQL and no HTTP. The same
 // scenarios run on D1 through HTTP in the app's Imports, TakeBack, Suggestions and Assistant slow tests.
 import { describe, expect, layer } from "@effect/vitest"
@@ -335,19 +336,16 @@ describe("the table assistant, over the twins", () => {
         Effect.gen(function* () {
           const assistant = yield* assistantEndpoints
           const first = yield* assistant.view(request("sort by name descending")).pipe(as(priya))
-          expect(
-            Result.isSuccess(first) && AnsweredBy.guards.Model(first.success.answeredBy)
-              ? first.success.answeredBy.model
-              : first
-          ).toBe("twin/model")
+          assertTrue(Result.isSuccess(first), "expected the tested value to be present")
+          assertTrue(AnsweredBy.guards.Model(first.success.answeredBy))
+          expect(first.success.answeredBy.model).toBe("twin/model")
           const second = yield* assistant.view(request("sort by name descending")).pipe(as(priya))
-          expect(Result.isSuccess(second) ? second.success.answeredBy : second).toEqual(
+          assertTrue(Result.isSuccess(second), "expected the tested value to be present")
+          expect(second.success.answeredBy).toEqual(
             AnsweredBy.cases.Rules.make({ reason: usedUpSentence(memoryUsedUpWords) })
           )
           // The rules still do the work: the same sort, read from the words.
-          expect(Result.isSuccess(second) ? A.map(second.success.changes, (change) => change.kind) : second).toEqual([
-            "sort"
-          ])
+          expect(A.map(second.success.changes, (change) => change.kind)).toEqual(["sort"])
           const got10 = yield* Ref.get(asked)
           expect(got10).toBe(1)
           const got11 = yield* lines

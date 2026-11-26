@@ -25,13 +25,14 @@ import { OrganizationId, MemberId } from "@inventory/kernel/Ids"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 
 // A suggestion as its table's columns hold it; `suggestionFromStored` reads it and `suggestionToStored` writes it.
+const noRowId = "" as const
 const Stored = S.Struct({
   id: SuggestionId,
   kind: SuggestionKind,
   rowId: S.Union([RowId, S.Literal("")]).pipe(
     S.decodeTo(RowId.pipe(S.toType, S.Option), {
       decode: SchemaGetter.transform((id) => (id === "" ? O.none() : O.some(id))),
-      encode: SchemaGetter.transform(O.match({ onNone: () => "" as const, onSome: identity }))
+      encode: SchemaGetter.transform(O.match({ onNone: () => noRowId, onSome: identity }))
     })
   ),
   rowNumber: S.OptionFromNullOr(S.Int),

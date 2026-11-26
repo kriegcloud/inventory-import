@@ -1,3 +1,4 @@
+import { StoredDecisions } from "@inventory/catalog-model/ImportStore"
 // Storage for imports: the staged file, what each confirm did with each row, the items it created, and taking a
 // confirm back. SQL lives here only; every statement filters on the organization, and goes through a Schema both ways
 // (`SqlSchema` for a read, `D1.statement` from @beep/d1 for a write). The rules not to break: a confirm is the only
@@ -509,7 +510,7 @@ export const ImportStoreD1 = Layer.effect(
           Effect.map(S.decodeEffect(DecisionJson)(row.decisionJson), (decision) => [row.rowId, decision] as const),
         { concurrency: 1 }
       )
-      return {
+      return StoredDecisions.make({
         decisions: R.fromEntries(decoded),
         authors: R.fromEntries(A.map(rows, (row) => [row.rowId, row.decidedByName] as const)),
         deciders: R.fromEntries(A.map(rows, (row) => [row.rowId, row.decidedById] as const)),
@@ -519,8 +520,8 @@ export const ImportStoreD1 = Layer.effect(
           A.flatMap(rows, (row) => A.map(A.fromOption(row.lastSavedById), (id) => [row.rowId, id] as const))
         ),
         lastSavedOn: R.fromEntries(A.map(rows, (row) => [row.rowId, row.lastSavedRevision] as const)),
-        saves: O.match(A.head(saves), { onNone: () => 0, onSome: (row) => row.saves })
-      }
+        ...R.getSomes({ saves: O.map(A.head(saves), (row) => row.saves) })
+      })
     }, Effect.orDie)
 
     // -- The lists a write carries --------------------------------------------------------------------------------
@@ -1661,8 +1662,14 @@ export const ImportStoreD1 = Layer.effect(
         )
       return {
         confirms: A.map(confirms, (row) => row.id),
-        removable: O.match(A.head(removable), { onNone: () => 0, onSome: (row) => row.n }),
-        restorable: O.match(A.head(restorable), { onNone: () => 0, onSome: (row) => row.n }),
+        removable: yield* O.match(A.head(removable), {
+          onNone: () => Effect.die("removable count returned no row"),
+          onSome: (row) => Effect.succeed(row.n)
+        }),
+        restorable: yield* O.match(A.head(restorable), {
+          onNone: () => Effect.die("restorable count returned no row"),
+          onSome: (row) => Effect.succeed(row.n)
+        }),
         changed: named(changed),
         changedCount: changed.length,
         kept: named(kept),

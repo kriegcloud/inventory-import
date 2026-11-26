@@ -156,7 +156,7 @@ export const ItemStoreD1 = Layer.effect(
       sql.and([
         sql`organizationId = ${org}`,
         ...O.toArray(narrowed.search),
-        ...O.match(narrowed.filters, { onNone: () => [], onSome: (group) => [sql`(${group})`] })
+        ...O.match(narrowed.filters, { onNone: A.empty, onSome: (group) => [sql`(${group})`] })
       ])
     const pageRows = (narrowed: Narrowed, order: Statement.Fragment) =>
       D1.statement({
@@ -354,8 +354,8 @@ export const ItemStoreD1 = Layer.effect(
         const ends = O.flatMap(O.all([A.get(value, 0), A.get(value, 1)]), ([low, high]) => O.all([end(low), end(high)]))
         return O.flatMap(ends, ([from, to]) => {
           const clauses = [
-            ...O.match(from, { onNone: () => [], onSome: (cents) => [sql`${column} >= ${cents}`] }),
-            ...O.match(to, { onNone: () => [], onSome: (cents) => [sql`${column} <= ${cents}`] })
+            ...O.match(from, { onNone: A.empty, onSome: (cents) => [sql`${column} >= ${cents}`] }),
+            ...O.match(to, { onNone: A.empty, onSome: (cents) => [sql`${column} <= ${cents}`] })
           ]
           return A.isReadonlyArrayNonEmpty(clauses) ? O.some(sql`(${sql.and(clauses)})`) : O.none()
         })
@@ -452,7 +452,10 @@ export const ItemStoreD1 = Layer.effect(
         pageRows(narrowed, order)({ org: organizationId, perPage: query.perPage, offset }),
         pageCount(narrowed)(organizationId)
       ])
-      const total = O.match(A.head(count), { onNone: () => 0, onSome: (row) => row.n })
+      const total = yield* O.match(A.head(count), {
+        onNone: () => Effect.die("item count returned no row"),
+        onSome: (row) => Effect.succeed(row.n)
+      })
       return { data: A.map(data, storedItem), total, pageCount: Math.ceil(total / query.perPage) }
     }, Effect.orDie)
 

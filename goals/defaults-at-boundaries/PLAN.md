@@ -120,3 +120,55 @@ change to a schema that the browser sends.
   beep-effect paths at length) in the session's `.scratch/defaults/port-study.md`.
 - `typescript/no-unnecessary-condition`, type-aware, run on the catalog's contract, model and host: one finding,
   `model/src/Suggestion/Suggest.rules.ts:147`.
+
+## New-kind pilot follow-up, 2026-11-25
+
+The catalog pilot had 69 newly counted places: 34 literal `onNone` fallbacks, 28 test guards and seven unwrapped
+optional keys. Ontology added five test guards. The follow-up removes 72 of those 74 places. Two remain:
+`Cell.shown` and `Cell.formula` in `Reading/Spreadsheet.rules.ts`, plain optional keys crossing `postMessage`.
+They are exemption candidates for Benjamin; the exemptions and baseline are unchanged. The other packages' lanes
+remain open; this does not complete the goal or shrink the saved baseline.
+
+- Empty arrays use `A.empty`; existing Option-of-array folds return the held array itself. Empty optional model
+  arguments to the external driver use `Record.getSomes` at that edge.
+- Nullable vendor cell keys retain an outer Option around their nullable wire value, so changing preference keeps
+  null distinct from a missing key. Row extra/hidden defaults use `emptyWhenLeftOut`; `Row.make` constructs the
+  reader's output and the affected staged-note fixture.
+- `StoredDecisions.saves`, the twin's missing-update sort key and the reader's unnamed location carry their old values
+  on schemas. Aggregate SQL count queries with no row die as an invariant defect. `MappingChoice.at` still uses the
+  existing `stagedRevision` value; no Verify rule text changed.
+- Expected test branches narrow with `assertTrue` from `@effect/vitest/utils`. Properties that include inapplicable
+  input states name the domain precondition (for example a nonempty stock count or a list with an unused value), then
+  assert presence. Helper state transitions fold their success/failure explicitly.
+
+Evidence on this follow-up:
+
+- The scoped defaults law reads filenames (passing directories reads no files). It holds the pilot files to zero
+  fallback/test-guard findings and the two optional-key candidates above.
+- Parent's independent existing `ImportsTwin.test.ts` passed: the messy sample reviews as 24 Needs a decision,
+  21 Cannot import and 155 Ready and stores 155. The existing `Imports.slow.test.ts` passed on fresh D1, covering
+  review, confirm, stored rows, reload, replace and take-back. Logs: `/tmp/defaults-pilot-twin-final.log` and
+  `/tmp/defaults-pilot-d1-final.log`; these are local proof, not a hosted deployment or a new screen observation.
+- Parent's separate Verify project passed again on the final source: one test in 175.72 s,
+  `/tmp/defaults-pilot-verify-final.log`.
+- `BoundaryDefaults.test.ts` checks omitted-key Row encoding/defaults and structured clone, full Row round-trip,
+  vendor missing/null preservation through `withPreferred`, reader location text and StoredDecisions generation.
+- The changed decoded Row shape forced three web test adaptations: `csvDifferential.test.ts` and
+  `xlsxParity.test.ts` now encode the table before comparing the historical wire snapshots; `readSpreadsheet.test.ts`
+  asserts an empty decoded `extra` array instead of an omitted key. All snapshot files remain unchanged. Their
+  targeted runs pass (24 workbook parity cases, 12 CSV parity cases, 37 reader cases), as do the two
+  `ChunkCrossing.test.ts` cases. `/tmp/pilot-parity.log` and `/tmp/pilot-web-forced.log` hold these checks.
+- The four `BoundaryDefaults.test.ts` checks passed, `/tmp/pilot-boundary.log`.
+- Final `bun run check --env-mode=loose` passed: 105/105 tasks, 3m1.004s, with no cached tasks. It includes
+  catalog contract 100 tests, model 275 tests and five proof tests, ontology 132 tests, and catalog web 401 tests.
+  No web test needed a second try. Log: `/tmp/pilot-check-final.log`.
+  Temporary Bun install/cache and Wrangler registry paths were used because managed writable roots reject the
+  workstation's default caches. The first completed check found the three forced web test adaptations above; after
+  those were corrected, the final full check passed. No historical CSV/XLSX snapshot was re-recorded.
+- `bun run docs:check` and `git diff --check` passed. The baseline SHA-256 remains
+  `5bec5d1953f057216a8932febe38ea08157a27c290f16920372fb97c075741db`; the Verify lock remains
+  `4b118da8a3dd67a567a1d25d3dbfe9fcfa8fdcebfe3796adadc3fea1bd8bcd66`.
+  No new browser observation or hosted deployment was performed.
+
+Needs the person: decide whether to approve the two Cell optional-key exemption candidates; the existing undecided
+fallback list retains its prior behavior.

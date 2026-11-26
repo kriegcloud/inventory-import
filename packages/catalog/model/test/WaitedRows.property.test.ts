@@ -140,7 +140,7 @@ const played = Effect.fnUntraced(function* (steps: ReadonlyArray<Step>) {
     O.match(
       A.findFirst(state.drafts, (entry) => entry.draft.id === view.id),
       {
-        onNone: () => ({}),
+        onNone: R.empty,
         onSome: (entry) =>
           R.fromEntries(
             A.map(
@@ -160,7 +160,7 @@ const played = Effect.fnUntraced(function* (steps: ReadonlyArray<Step>) {
         .commit({ params: { id: staged.id }, payload: { revision: staged.revision, madeOn: {}, set: {}, clear: [] } })
         .pipe(as(marcus))
     )
-    if (Exit.isSuccess(done)) yield* Ref.update(stocks, A.append(staged.id))
+    yield* Exit.match(done, { onFailure: () => Effect.void, onSuccess: () => Ref.update(stocks, A.append(staged.id)) })
   })
   const unstock = Effect.gen(function* () {
     const kept = yield* Ref.get(stocks)
@@ -199,7 +199,7 @@ const played = Effect.fnUntraced(function* (steps: ReadonlyArray<Step>) {
         })
         .pipe(as(who))
     )
-    if (Exit.isSuccess(done)) yield* press(who, step.row)
+    yield* Exit.match(done, { onFailure: () => Effect.void, onSuccess: () => press(who, step.row) })
     const screen = yield* readScreen(who)
     yield* Ref.update(screens, (all) => ({ ...all, [step.who]: screen }))
   })
@@ -235,7 +235,7 @@ const played = Effect.fnUntraced(function* (steps: ReadonlyArray<Step>) {
       onFailure: () => O.none<ReadonlyArray<string>>(),
       onSuccess: (answer) => O.some(A.map(answer.decidedSince, (row) => row.rowId))
     })
-    const left = O.match(decided, { onNone: () => true, onSome: (named) => A.contains(named, step.row) })
+    const left = !O.exists(decided, (named) => !A.contains(named, step.row))
     if (left) {
       // Named, or nothing written: left exactly as it was.
       expect(O.map(now, (one) => [one.decision, one.savedAt])).toEqual(O.map(was, (one) => [one.decision, one.savedAt]))
@@ -248,10 +248,7 @@ const played = Effect.fnUntraced(function* (steps: ReadonlyArray<Step>) {
         O.map(now, (one) => one.decision)
       )
       // Nobody else pressed the row after her screen read it, unless what is stored is what she named or writes.
-      const pressedOk =
-        asNamed ||
-        asWritten ||
-        O.match(last, { onNone: () => true, onSome: (one) => one.who === who.id || one.at < screen.readAt })
+      const pressedOk = asNamed || asWritten || !O.exists(last, (one) => one.who !== who.id && one.at >= screen.readAt)
       const storedOk =
         asNamed ||
         asWritten ||

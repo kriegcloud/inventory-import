@@ -1,3 +1,4 @@
+import { StoredDecisions } from "./Import/ImportStore.store.ts"
 // The catalog's ports in memory: the twins a test runs the handlers on. One state holds what the tables hold, and
 // each write is one pure step from a state to the next, as each write on D1 is one atomic batch. The one thing not
 // to break: a twin answers what the D1 adapter answers. Where the adapter guards a write ("the import is still
@@ -818,10 +819,7 @@ const passes = (item: StoredItem, filter: ItemFilter): O.Option<boolean> => {
         const low = O.flatMap(A.get(values, 0), asNumber)
         const high = O.flatMap(A.get(values, 1), asNumber)
         if (O.isNone(low) && O.isNone(high)) return O.none()
-        return O.some(
-          O.match(low, { onNone: () => true, onSome: (min) => n >= min }) &&
-            O.match(high, { onNone: () => true, onSome: (max) => n <= max })
-        )
+        return O.some(!O.exists(low, (min) => n < min) && !O.exists(high, (max) => n > max))
       }
       return O.map(O.flatMap(typed, asNumber), (wanted) =>
         FilterOperator.matchOrElse(
@@ -1333,7 +1331,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
           notImported: row.notImported
         }),
         ...O.match(row.takeBack, {
-          onNone: (): ReadonlyArray<ImportEvent> => [],
+          onNone: A.empty<ImportEvent>,
           onSome: (taken): ReadonlyArray<ImportEvent> =>
             O.exists(A.head(sameTakeBack(row)), (first) => first.id === row.id)
               ? [
@@ -1385,12 +1383,12 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
           )
         )
         const all = A.dedupeWith([...created, ...replaced], (a, b) => a.item.id === b.item.id)
-        const when = (entry: MemItem): number =>
-          O.match(entry.updatedAt, { onNone: () => 0, onSome: DateTime.toEpochMillis })
+        // An item with no recorded update sorts after every one that has one.
+        const when = (entry: MemItem): O.Option<number> => O.map(entry.updatedAt, DateTime.toEpochMillis)
         return A.sort(
           all,
           Order.combine(
-            Order.flip(Order.mapInput(Order.Number, when)),
+            Order.flip(Order.mapInput(O.makeOrder(Order.Number), when)),
             Order.mapInput(Order.String, (entry: MemItem) => entry.item.sku)
           )
         )
@@ -1431,7 +1429,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       uploadChunks: Effect.fnUntraced(function* (actor: Member, upload: Upload) {
         const state = yield* Ref.get(ref)
         return O.match(uploadOf(state, actor, upload.id), {
-          onNone: () => [],
+          onNone: A.empty,
           onSome: (found) =>
             A.sort(
               found.chunks,
@@ -1511,18 +1509,18 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         const state = yield* Ref.get(ref)
         const found = A.findFirst(state.drafts, sameDraft(organizationId, importId))
         const stored = O.match(found, {
-          onNone: (): ReadonlyArray<MemDecision> => [],
+          onNone: A.empty<MemDecision>,
           onSome: (entry) => entry.decisions
         })
-        return {
+        return StoredDecisions.make({
           decisions: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.decision] as const)),
           authors: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.author] as const)),
           deciders: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.authorId] as const)),
           savedAt: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.savedAt] as const)),
           lastSavedBy: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.lastSavedBy] as const)),
           lastSavedOn: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.lastSavedOn] as const)),
-          saves: O.match(found, { onNone: () => 0, onSome: (entry) => entry.saves })
-        }
+          ...R.getSomes({ saves: O.map(found, (entry) => entry.saves) })
+        })
       }),
       decide,
       choices: Effect.fnUntraced(function* (draft: Draft) {
@@ -1591,7 +1589,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         const table: StagedTable = {
           ...head,
           rows: O.match(A.findFirst(state.drafts, sameDraft(organizationId, draft.id)), {
-            onNone: () => [],
+            onNone: A.empty,
             onSome: (entry) => entry.rows
           })
         }

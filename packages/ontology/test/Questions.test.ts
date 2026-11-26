@@ -19,6 +19,7 @@ import { Role } from "@inventory/kernel/Role"
 import { aboutClass, aboutPath, noTerm } from "@inventory/kernel/TermsPointer"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import mutantThroughPerson from "../fixtures/cq/CQ-P06.M5.rq?raw"
@@ -298,6 +299,34 @@ const movedDown = (graph: ReadonlyArray<Triple>): ReadonlyArray<Triple> => {
   ]
 }
 
+/**
+ * Whether a question's rows tie on what its ORDER BY sorts by. The engine fixes no order among rows equal there, so a
+ * question whose rows tie is compared as a set, and every other question in the order it gives its rows.
+ */
+const ties = (query: string, variables: ReadonlyArray<string>, rows: ReadonlyArray<ReadonlyArray<string>>): boolean => {
+  const keys = A.flatMap(A.fromOption(O.flatMap(Str.match(/ORDER BY((?:\s+\?\w+)+)/)(query), A.get(1))), (found) =>
+    A.map(A.filter(Str.split(/\s+/)(found), Str.startsWith("?")), Str.slice(1))
+  )
+  const keyOf = (row: ReadonlyArray<string>) =>
+    A.join(
+      A.getSomes(
+        A.map(keys, (key) =>
+          O.flatMap(
+            A.findFirstIndex(variables, (variable) => variable === key),
+            (place) => A.get(row, place)
+          )
+        )
+      ),
+      "\t"
+    )
+  const keyed = A.map(rows, keyOf)
+  return A.dedupe(keyed).length < keyed.length
+}
+
+/** A question's rows as they are compared: in code point order when they tie, in the order given when they do not. */
+const inOrder = (tied: boolean, rows: ReadonlyArray<ReadonlyArray<string>>): ReadonlyArray<string> =>
+  tied ? A.sort(A.map(rows, A.join("\t")), byCodePoint) : A.map(rows, A.join("\t"))
+
 describe("gate 8, every question walks the subclasses (decision 27)", () => {
   it.effect("planted: the query written `a inv:Organization` misses the node typed only a Tenant", () =>
     Effect.gen(function* () {
@@ -349,23 +378,32 @@ ASK { ?organization ${walk} inv:Organization }`
         [tenancyGraph, tenancy.query, tenancyVariables],
         [identityGraph, identity.query, identityVariables]
       ]
-      // Rows in code point order: the engine's order is not fixed for rows the query's ORDER BY ties, as M5's are.
-      const sorted = (rows: ReadonlyArray<ReadonlyArray<string>>) => A.sort(A.map(rows, A.join("\t")), byCodePoint)
       for (const [given, query, variables] of questions) {
         const moved = movedDown(given)
         expect(query).toContain(walk)
         const rows = yield* asked(given, query, variables)
         const below = yield* asked(moved, query, variables)
         expect(rows).not.toStrictEqual([])
-        expect(sorted(below)).toStrictEqual(sorted(rows))
+        // Only M5's rows tie on its ORDER BY (two roles for each tenant and member): they alone are compared as a set.
+        const tied = ties(query, variables, rows)
+        expect(tied).toBe(query === mutantThroughPerson)
+        expect(inOrder(tied, below)).toStrictEqual(inOrder(tied, rows))
         // Planted: the same question with bare type steps answers the graph as typed, and nothing one class down.
         const bare = bareStep(query)
         expect(bare).not.toContain(walk)
         const bareRows = yield* asked(given, bare, variables)
         const bareBelow = yield* asked(moved, bare, variables)
-        expect(sorted(bareRows)).toStrictEqual(sorted(rows))
+        expect(inOrder(tied, bareRows)).toStrictEqual(inOrder(tied, rows))
         expect(bareBelow).toStrictEqual([])
       }
+      // Planted: an untied question's rows in another order are refused; M5 sorted on its role too ties no more.
+      const tradingRows = yield* asked(tradingGraph, trading.query, tradingVariables)
+      expect(tradingRows.length).toBeGreaterThan(1)
+      expect(inOrder(false, A.reverse(tradingRows))).not.toStrictEqual(inOrder(false, tradingRows))
+      const mutantRows = yield* asked(graph, mutantThroughPerson, membersVariables)
+      const byRoleToo = Str.replace("ORDER BY ?tenant ?member", "ORDER BY ?tenant ?member ?role")(mutantThroughPerson)
+      expect(byRoleToo).not.toBe(mutantThroughPerson)
+      expect(ties(byRoleToo, membersVariables, mutantRows)).toBe(false)
     })
   )
 })

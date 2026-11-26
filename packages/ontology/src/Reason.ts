@@ -205,8 +205,12 @@ export class Run extends S.Opaque<Run, { readonly brand: unique symbol }>()(
 
 const thread: ReadonlyArray<string> = [ontology, graph]
 
-/** Where the party slice's fixtures live (decision 148): a run is named by its file there. */
-const packet = "cq/"
+/**
+ * Where the party slice's fixtures live (decision 148), from the repository's root: a run of one of them is named by
+ * its path, so the name leads to the file. The package's own `fixtures/cq/` holds the thread's, which is not one of
+ * them.
+ */
+export const packetFolder = "explorations/erp-ontology/assets/requirements/cq/"
 
 /**
  * The runs. First the thread's five (the goal's forbidden conclusions 1 and 2): two that must be consistent and three
@@ -247,61 +251,61 @@ export const runs: ReadonlyArray<Run> = [
     must: "inconsistent"
   }),
   Run.make({
-    name: `${packet}bare-type.fixture.ttl`,
+    name: `${packetFolder}bare-type.fixture.ttl`,
     ban: "slice 1, step 5's fixture: a node typed only a tenant",
     files: [ontology, bareTypeFixture],
     must: "consistent"
   }),
   Run.make({
-    name: `${packet}CQ-P01.fixture.ttl`,
+    name: `${packetFolder}CQ-P01.fixture.ttl`,
     ban: "decision 34, the near miss: each tenant's record of an organization is of it, and is not it",
     files: [ontology, tradingFixture],
     must: "consistent"
   }),
   Run.make({
-    name: `${packet}CQ-P02.fixture.ttl`,
+    name: `${packetFolder}CQ-P02.fixture.ttl`,
     ban: "slice 1, CQ-P02's fixture: records that state no trading role, and the open reading, which states no flag",
     files: [ontology, rolelessFixture],
     must: "consistent"
   }),
   Run.make({
-    name: `${packet}CQ-P09.fixture.ttl`,
+    name: `${packetFolder}CQ-P09.fixture.ttl`,
     ban: "slice 1, CQ-P09's fixture: a record held by one tenant, one held by none and one held by two",
     files: [ontology, tenancyFixture],
     must: "consistent"
   }),
   Run.make({
-    name: `${packet}CQ-P04.fixture.ttl`,
+    name: `${packetFolder}CQ-P04.fixture.ttl`,
     ban: "slice 1, CQ-P04's fixture: a tenant's decisions on its records, each at its date-time",
     files: [ontology, identityFixture],
     must: "consistent"
   }),
   Run.make({
-    name: `${packet}CQ-P05.fixture.ttl`,
+    name: `${packetFolder}CQ-P05.fixture.ttl`,
     ban: "slice 1, CQ-P05's fixture beside CQ-P04's: two records stated the same, the way identity is never stated",
     files: [ontology, identityFixture, samenessFixture],
     must: "consistent"
   }),
   Run.make({
-    name: `${packet}model-call.ttl`,
+    name: `${packetFolder}model-call.ttl`,
     ban: "slice 1, model-call.ttl: one model call of each purpose",
     files: [ontology, modelCallFixture],
     must: "consistent"
   }),
   Run.make({
-    name: `${packet}CQ-P07.fixture.ttl`,
+    name: `${packetFolder}CQ-P07.fixture.ttl`,
     ban: "slice 1, CQ-P07's fixture: a tenant with an active admin, one whose only admin is revoked, one with no members",
     files: [ontology, stewardshipFixture],
     must: "consistent"
   }),
   Run.make({
-    name: `${packet}CQ-P03.fixture.ttl`,
+    name: `${packetFolder}CQ-P03.fixture.ttl`,
     ban: "slice 1, CQ-P03's fixture: contacts at two accounts, each for its purpose",
     files: [ontology, contactsFixture],
     must: "consistent"
   }),
   Run.make({
-    name: `${packet}sutton-party.ttl`,
+    name: `${packetFolder}sutton-party.ttl`,
     ban: "slice 1, sutton-party.ttl: one record of each Sutton type the coverage table places",
     files: [ontology, suttonPartyFixture],
     must: "consistent"

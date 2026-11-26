@@ -814,7 +814,8 @@ answered by decision 179 (Step 10, "Needs Benjamin").
   read beside CQ-P01's fixture. CQ-P01's own run is its near miss. The report's first line names the version of the
   Java that ran. In `Reason.test.ts`: the runs' names, verdicts and files; a test that every text in
   `handWrittenFixtures` is a file of some run (the thread's CQ-P06 text by its triples in the thread's graph), with
-  its plant. In `Questions.test.ts`: the subclass-walk test sorts its rows before comparing them.
+  its plant. In `Questions.test.ts`: the subclass-walk test compares as a set only the rows of a question whose
+  ORDER BY ties them (step 13 review, below).
 - Leaves out: gist's own axioms, which decision 28 keeps out of the reasoner's closure ("the OWL file and each fixture
   only"), so report 18 section 15's question gets that answer and no run; a record typed a person (the
   `PhysicalIdentifiableItem` and `Content` pair, report 18 section 8), which SPEC's acceptance does not ask for; any
@@ -839,6 +840,37 @@ Choices the sources left open, each the agent's:
   changes one import path.
 - **`bare-type.fixture.ttl` gets a run** though it is step 5's and holds one node: every text guard 3 reads is then
   reasoned over, which the new test holds.
+
+Step 13 review (2026-11-26), each finding checked against the code and fixed:
+
+- **A run of the packet is named by its path from the repository's root** (`packetFolder` in `src/Reason.ts`,
+  `explorations/erp-ontology/assets/requirements/cq/`), since `cq/CQ-P01.fixture.ttl` read as the package's own
+  `fixtures/cq/`, which holds only the thread's. The thread's five keep their names. `Run.ban` keeps its name; its key
+  description already says it may name the fixture a run holds consistent.
+- **Decision 34's refusal and its near miss** are found with `assertSome`, and the refused run's files must be the near
+  miss's with `record-is-organization.ttl` after them; plants: CQ-P02's fixture in CQ-P01's place, another third file
+  in the refused run, and both runs gone, each refused.
+- **Each run of the packet joins, last, the fixture its name names** (`misjoined`); plants: the files of CQ-P07's and
+  `model-call.ttl`'s runs swapped, and a run named by a file the packet does not hold.
+- **Every hand-written fixture is held consistent by a run of its own**: a run that must be consistent and joins it
+  last. Plants: CQ-P01's run left out (its text is still a file of the refused run), CQ-P04's left out (its text is
+  still a file of CQ-P05's run), CQ-P01's made one that must be inconsistent, and CQ-P03's left out. With CQ-P04's run
+  taken out of `src/Reason.ts` by hand the guard fails, beside the runs table; with CQ-P07's and `model-call.ttl`'s
+  files swapped there, `misjoined` fails, which no test did before.
+- **The subclass-walk test** had sorted every question's rows, and no failing run was recorded for it: the review ran
+  it unsorted six times and it passed, and so did one run here. It now reads each question's ORDER BY and compares as a
+  set only rows that tie on it, and holds that M5 is the one question whose rows tie (two roles for each tenant and
+  member); the others keep their order checked. Plants: CQ-P01's rows reversed are refused, and M5 ordered by
+  `?role` too ties no more.
+- **Why the refusal is decision 34's**: the review ran ROBOT v1.9.11 under Java 17 outside the repository. The refused
+  document passed the profile check and the reasoner reported it inconsistent; the OWL file with the new file alone was
+  consistent; with `gist:Content`'s `owl:disjointWith gist:Organization` taken out the refused document was consistent;
+  and `robot explain --mode inconsistency` gave one justification: `inv:Organization ⊑ gist:Organization`,
+  `recordOf`'s domain `SourceRecord`, `SourceRecord ⊑ gist:Content`, `test_WorksCoPacker recordOf test_CoPacker`,
+  `test_WorksCoPacker a inv:Organization`, and the disjoint pair. Not run again here. The committed tests hold the
+  refusal through the mock ROBOT's text marker, as they hold the thread's five.
+
+Needs Benjamin: nothing open.
 
 ## Closing note
 

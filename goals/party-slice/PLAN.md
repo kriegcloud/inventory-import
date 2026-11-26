@@ -33,7 +33,7 @@ names, and only under O2's recommendation; under its option (d) it stays out.
 | 11 | Access: `Member`'s widened definition (P2), the stage scheme and `membershipStatus`, `joinedAt`, `AgentRun` and its link (O7), `ModelCallPurposeScheme` marked by the `ModelCallPurpose` literal and, under O2 (a), `ModelCall` with `callPurpose`, `calledFor` and `calledAt` on the fixture `model-call.ttl` (one `test_` call of each purpose), the sign-in account (O6), the name's property (O4); enrolment and marks of `AgentRun`, `OrganizationChoice`, `ModelCallPurpose` and `Membership`; `Person.email`, `Person.joinedAt`, `Activity.agent`; the paths of `Member.name` and `Member.organizationName`, with decision 155's lift rule for a path that ends in an attribute and decision 161's tenant path; no mark deferred to the party slice; P13's table; planted wrong pointers in `TermsPointer.types.ts`; with CQ-P07 (O8), whose fixtures state the stage, and CQ-P06 with the person's name and the sign-in email (O4 to O6); the release line marked breaking, naming `Member`, decisions P2 and 154 and each question whose rows changed; guard 1 comparing a hand-written triple's subject and property with the lift's, not its property alone (decision 171), with its test, so CQ-P06's hand-written person's name passes beside the lifted tenant names | Gates 1 to 8; `ontology-terms:check`; the type-check; the app's tests pass and each changed record's JSON Schema is the same before and after; guard 1's tests still report the planted grant, tenant link and member type | 4, 7, 9 | done |
 | 12 | Contacts and addresses: `ContactAssignment`, `ContactPurposeScheme` and the contact point, stated by CQ-P03's fixtures (the person's `SourceRecord` giving the point by `hasContactPoint`), with CQ-P03 (O12) and its must-fail cases; under O2 (a), the address terms of O10 (`defaultFor` under no gist property, decision 174; `PostalAddress`'s criterion with decision 158's clause, decision 173), O11's links and `accountStatus` on the fixture `sutton-party.ttl`: one `test_` record of each Sutton type the coverage table places, stating each property it places that no question's fixture states, its contact and workspace records stating neither flag (168) and every contact point written by hand (175); `membershipWorkspace` (decision 154), `memberContactPoint` (162) under `gist:hasAddress` (174), `profileImage` and `profileText` (163), `givenName`, `middleName`, `familyName` and `jobTitle` (130), a `UserProfile`'s names and job title stated on the `Member` (172), and `membershipIn`'s text reworded (169), naming the accepting decision and added to the breaking release line; CQ-P06 and CQ-P07 gain the clause that leaves out a membership naming a workspace, with a must-fail membership each | Gates 1 to 8; `Questions.test.ts` for CQ-P03, and for CQ-P06 and CQ-P07 with their new must-fail memberships; `Coherence.test.ts`: the thread's terms name 111 for all but `Member` and `membershipIn` | 9 | done |
 | 13 | Gate 9 on the larger module: a run for each slice-1 fixture, `model-call.ttl` and `sutton-party.ttl` among them, and the refused fixture whose `SourceRecord` is also an organization | `bun run check:full` on a run that started the reasoner; `Reason.test.ts` | 10 to 12 | done |
-| 14 | The walk of each new planted mistake through the nine gates; SPEC's coverage table read against the module | Each new refusal fails its own gate and no other; a `Coherence.test.ts` assertion that each term the coverage table names exists | 13 | not started |
+| 14 | The walk of each new planted mistake through the nine gates; SPEC's coverage table read against the module | Each new refusal fails its own gate and no other; a `Coherence.test.ts` assertion that each term the coverage table names exists | 13 | done |
 | 15 | Close: `/quality-review-fix-loop`, the documents the build made false (listed below), the closing note naming each part of report 05 left for a later slice | Reviewers' findings at zero required; `bun run beep laws boundaries`; no `package.json` added (SPEC's acceptance) | 14 | not started |
 
 Steps 1 to 5 wait on no open row and on no data the repository lacks: each builds what an answered decision already
@@ -74,8 +74,8 @@ out is under "Step 9" below. Step 10 is done (2026-11-26): what it built and lef
 built and left out is under "Step 12" below. Decisions 177 to 179 (2026-11-26) answer what steps 9 to 12 set aside:
 CQ-P06's person's name made optional (177), the lift's two edge cases stating nothing for the field (178), and the
 name `test_AcmeC` and `test_AcmeD` share stated in CQ-P04's fixture (179); each is built, as its step's "Needs
-Benjamin" says. Step 13 is done (2026-11-26): what it built and left out is under "Step 13" below. No decided
-point holds any later step back.
+Benjamin" says. Step 13 is done (2026-11-26): what it built and left out is under "Step 13" below. Step 14 is done (2026-11-26):
+the walk and the coverage read are under "Step 14" below. No decided point holds step 15 back.
 What the decisions add to each:
 
 - **Step 9**: nothing waits. It builds `Party` with `storesId: false` (170) and the two flags'
@@ -869,6 +869,146 @@ Step 13 review (2026-11-26), each finding checked against the code and fixed:
   `recordOf`'s domain `SourceRecord`, `SourceRecord ⊑ gist:Content`, `test_WorksCoPacker recordOf test_CoPacker`,
   `test_WorksCoPacker a inv:Organization`, and the disjoint pair. Not run again here. The committed tests hold the
   refusal through the mock ROBOT's text marker, as they hold the thread's five.
+
+Needs Benjamin: nothing open.
+
+## Step 14
+
+- Builds: the walk of each new planted mistake of the slice through the nine gates, on what steps 1 to 13 committed,
+  written below as the thread's walk was (erp-vocabulary PLAN, "The planted mistakes, walked through the nine
+  gates"): what each gate reads, taken from its imports and its script, then one row for each group of new refusals
+  that share a test block and a kind of plant, with a cell for each gate. And the read of the coverage table against
+  the module: `coverageFaults` in `test/support/coverage.ts`, which reads report 18 section 9 (the coverage table as
+  decisions 130 to 175 answer it, "this is the table with those answers") from the report's accepted text, as gate 4
+  reads `DECISIONS.md`, and gives one fault for each name of a "Placed as" cell that is no term of the module, each
+  field the table gives no term, leaves unplaced or leaves for a later slice that a property of the module is named
+  after, each Sutton type with no class on its record's row, and each scheme the enums paragraph names that is no
+  scheme of the module. `Coherence.test.ts` asserts no fault over the kernel's vocabulary, with a planted mistake for
+  each kind of fault and the committed text as the near miss. The report is named among the `test` inputs of
+  `packages/ontology/turbo.json`.
+- Leaves out: any change to a term, a mark, a fixture, a query, a generated byte, the projector, the lift, a gate's
+  rules or the app; SPEC's own coverage table, which it calls "the agent's proposal until O3 and O14 are answered" and
+  which report 18 section 9 holds as answered (it is not reworded here; step 15 lists the documents the build made
+  false); a check of what a placed field's term means beyond its name and its kind (that `sourceId` is the attribute
+  a Sutton `id` fills is the report's reading, not something a test can see); handing a planted mistake to a gate that
+  does not read it, which the thread's walk did not do either.
+- Checked by: each test the walk names, run by its name and passing, so each mistake is reported by its own gate;
+  the imports of each planted file, read by a throwaway `git grep` outside the repository, so no gate but its own reads it;
+  `bun run check` passing with all of them committed (gates 1 to 8 and the type-check), and gate 9 by `bun run --cwd
+  packages/ontology reason` on the cached jar, so no other gate reports any of them; for the coverage assertion,
+  each kind of fault taken out of `coverageFaults` by hand and its plant seen to fail, then put back; a one-line edit
+  of report 18 seen to move the `@inventory/ontology#test` hash of `bunx turbo run test --filter=@inventory/ontology
+  --dry=json`; `bun run ontology:write` twice, then `git diff --exit-code packages/ontology/generated`.
+
+Choices the sources left open, each the agent's:
+
+- **The coverage table read is report 18's section 9, not SPEC's.** SPEC's table is the proposal the decisions
+  answered; report 18 section 9 is the same table with the answers, accepted by decision 176, and it names a term for
+  every placement. Reading the report's text, never a copy in the test, keeps the assertion on the accepted words: a
+  change to the table or to the module fails the test.
+- **What "has none" reads**: the field's own name is no object or datatype property of the module. A field is placed
+  on a property, so a property named after a no-term field is the mistake a test can see; a term of another name made
+  for the field is not, and no test claims it. Concept notations are not read for this, so `UserProfile.email`,
+  unplaced, passes beside the concept `email` of `ContactPointKindScheme` (a near miss the committed table holds).
+  Fields left for a later slice are read too: decision 131's forward-pointer rule places them when their slice lands,
+  so none has a term now.
+- **The names a "Placed as" cell may hold that are no term**, each excused by name in the test with its reason:
+  Sutton's own words (`kind` and its values `individual` and `company`, the type `User`, the field `phoneNumber`) and
+  this app's ids (`MemberId`, `UserId`), which the unplaced rows give as what a criterion holds; a dotted name
+  (`User.id`, `readings.json`) is a Sutton field or a file. A test holds that each excused word is in the table and is
+  no term of the module, so an excuse can never hide a term.
+- **`UserProfile` has no row for its record**: report 18 makes it part of the `Member` through `OrganizationMember`'s
+  `profile` row, so its class is read from that row.
+- **The walk's rows are groups**, one for each test block and kind of plant a step added, as the thread's walk left
+  the further rules of gates 4, 5 and 7 to one paragraph: the slice's plants number well over a hundred, and every one
+  of a group is the same kind of value in the same test file, read by the same gate.
+
+### The coverage table, read against the module
+
+Run on the committed tree (2026-11-26): `coverageFaults` finds no fault in report 18 section 9 over the kernel's
+vocabulary. The table is 74 rows over SPEC's nine Sutton types; every name a "Placed as" cell gives is a class,
+property, scheme or concept of the module but the seven excused words; every type's record names a class
+(`SourceRecord`, `Person`, `Organization`, `PostalAddress`, `Member`, `SignInAccount`), `UserProfile`'s through
+`OrganizationMember`'s `profile` (`Member`); no field the table gives no term, leaves unplaced or leaves for a later
+slice has a property of its name; and the four schemes of the enums paragraph (`AccountStatusScheme`,
+`ContactTypeScheme`, `ContactPurposeScheme`, `MembershipStatusScheme`) are schemes of the module. Each of the eight
+checks of `coverageFaults` (a name that is no term, a property named after a left field, a record with no class, a
+scheme the module lacks, an excused word out of the table, an excused word that is a term, the text with no row, and
+`UserProfile`'s part row) was taken out by hand, one at a time, and its plant, or for the part row the near miss, was
+seen to fail, then put back. A blank line appended to report 18 moved the `@inventory/ontology#test` hash of `bunx
+turbo run test --filter=@inventory/ontology --dry=json` from `694036c6def12dd9` to `599843c38849983a`, and taking it
+out moved it back.
+
+### The planted mistakes of the slice, walked through the nine gates
+
+What each gate reads, taken from its imports and its script, as the thread's table has it with what the slice added:
+
+| Gate | Where it runs | What it reads |
+| --- | --- | --- |
+| 1, 2, 3 | `Generated.test.ts` | The three files under `generated/`; what the projector writes from the kernel's literal and from step 2's copy (`test/support/constructs.ts`); gates 2's and 3's refused files under `fixtures/negative/`, which no other code file imports |
+| 4 | `Coherence.test.ts`, with the rules' own tests in `@beep/vocabulary` (`Rules.test.ts`, `Vocabulary.test.ts`) | The kernel's literal, `exceptions/no-gist-parent.json`, `DECISIONS.md` as text, step 2's copy, and from step 14 report 18 as text (`test/support/coverage.ts`, which only `Coherence.test.ts` imports) |
+| 5 | `Pointers.test.ts` | The nine enrolled exports, `enrolment.json`, the vocabulary, step 2's copy and the copies its tests build |
+| 6 | the type-check (`check`) | Every `src` and `test` file of each package, the ontology package's `scripts`, and the compile-only `packages/kernel/test/TermsPointer.types.ts`, which nothing imports |
+| 7 | `ontology-terms:check` | The repository's code files, less the law and its own test (rules 1b and 3 read `src` only); a `.ttl` or `.rq` file is no code file |
+| 8 | `Questions.test.ts`, with the lift's own `Lift.test.ts` | `threadGraph()`, the thread's queries under `fixtures/cq/`, the packet's queries and fixtures through `test/support/fixtures.ts` (`bare-type.planted.rq` through it alone), and the OWL file |
+| 9 | `scripts/reason.ts` (`src/Reason.ts`), with `Reason.test.ts` on the machine port | The OWL file, the thread's graph, `fixtures/reason/*.ttl` (imported by `src/Reason.ts` and its test alone), the ten packet fixtures through `src/Reason.ts`'s imports; `robot.lock.json`, the Java and the jar |
+
+"reports" is the failure the named tests assert; "no" means the gate does not read the mistake, by the table above;
+a cell with words is one where the gate reads the file and stays silent, with why. Every plant but rows 15, 16 and 31
+is a value in its test's memory, so gates 1 to 3 see no committed byte change, gate 6 compiles it and gate 7 reads the
+test's text and finds nothing in it; those three cells say "no", "compiles" and "passes" for them.
+
+| # | Planted mistakes (step) | Their tests | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | A category parent that is no class, a category cycle, a category with a criterion, a kind with none, the wrong inheritance, a category parent untagged, named twice or as the one identity-bearing parent (1) | `Rules.test.ts`, "a category and its category parents" (C3, C7, C14) | no | no | no | reports | no: it reads the kernel's records | compiles | passes | no | no |
+| 2 | A successor of another table, two concepts replacing each other, a retirement dated after the version, a live term on a retired one (1) | `Rules.test.ts`, "a retired term" (C15) | no | no | no | reports | no | compiles | passes | no | no |
+| 3 | A gist parent off the list, the wrong kind of gist property, a domain or datatype outside the gist property's (1, 11) | `Rules.test.ts`, "a property under a gist property" and "... that declares no domain and no range" (C9) | no | no | no | reports | no | compiles | passes | no | no |
+| 4 | A tenth tag, a withdrawn term with no reason, a relation with no range, a basis on an inherited criterion (1, 7) | `Rules.test.ts`, "what the decode holds for the party slice's constructs" and "the decode: a criterion states no basis ..."; `Vocabulary.test.ts`, "refuses a relation with no range ..." | no | no | no | reports: the decode refuses it | no | compiles | passes | no | no |
+| 5 | A criterion resting on a name, an email or a key that is no property (7) | `Rules.test.ts`, "what an identity criterion rests on" (C16) | no | no | no | reports | no | compiles | passes | no | no |
+| 6 | Step 2's copy read with the committed list; `Party` with a criterion; `Person` under `Tenant`; `Workspace`'s successor no class; the gist list emptied (2) | `Coherence.test.ts`, "reports exactly C4 on Party ...", "... C7 on Party ...", "... C14 on Person ...", "... C15 on Workspace ...", "... C9 on every relation and attribute ..." | no: the copy's own projection is the near miss, unchanged | no | no | reports | no: it reads the unplanted copy | compiles | passes | no | no |
+| 7 | The kernel's `Organization` resting on `name`; `atDateTime` and `hasAddress` given another range or taken off the list (7, 10, 12) | `Coherence.test.ts`, "reports exactly C16 on Organization ...", "... C9 on eventTime ...", "... C9 on the three address links ..." | no | no | no | reports | no: it reads the kernel's literal | compiles | passes | no | no |
+| 8 | A placement on `sourceKey`; `Address`'s record naming no class; `jobTitle`, `name` and `extension` given no term, unplaced, later; `ContactKindScheme`; an excused word gone or made a term; the heading moved (14) | `Coherence.test.ts`, "gate 4, Sutton's coverage table against the module": its five plants | no | no | no | reports | no | compiles | passes: report 18 is no code file | no | no |
+| 9 | A retirement's predicates in the graph file, a gist subject typed a property the list lacks, a listed gist property's domain, range or own gist parent (2) | `Generated.test.ts`, "gate 3, for the party slice's constructs": its three plants | no: the text is made in the test | no | reports | no | no | compiles | passes: the test spells the predicates apart | no | no |
+| 10 | A boolean neither true nor false, a day given as a date-time (2) | `Generated.test.ts`, "planted: the writer refuses a boolean that is neither true nor false, ..." | no | reports: the writer refuses the literal before any text is parsed | no | no | no | compiles | passes | no | no |
+| 11 | A `Member` record filling a `Party` property or leaving along it; a pointer at a retired class, relation, attribute, scheme or concept (3) | `Pointers.test.ts`, "gate 5 on the party slice's constructs" (P5, P7, P14) | no | no | no | no: the copies are its test's own | reports | compiles | passes: the marks are made by the helpers | no: it reads the real records | no |
+| 12 | A `Run` record whose id field names a class that stores no id (7) | `Pointers.test.ts`, "gate 5, a class that stores no id" (P4) | no | no | no | no | reports | compiles | passes | no | no |
+| 13 | An export enrolled as standing for no term with no mark, the wrong mark, a deferral, a path, a malformed slice, a field mark, a literal off the scheme, a placement row (7) | `Pointers.test.ts`, "gate 5, an export enrolled as standing for no term" (P2, P8, P9, P10, P13, P15) | no | no | no | no | reports | compiles | passes: the helpers write the marks | no | no |
+| 14 | `membershipStatus` without its fixture evidence; `OrganizationChoice` left out of `Enrolled.ts` (11) | `Pointers.test.ts`, "P11: membershipStatus, named by no record, without its fixture evidence", "P1: Enrolled.ts leaves out an export enrolment.json lists" | no | no | no | no: the planted evidence is a copy's | reports | compiles | passes | no: guard 3 reads the kernel's evidence | no |
+| 15 | A misspelt class and scheme, a class for a property and a property for a class, a stage the scheme lacks (11) | The kernel's type-check of `packages/kernel/test/TermsPointer.types.ts` | no | no | no | no | no: no test imports the file | reports: each call is the error its directive expects | the law reads the file: rules 1b and 3 read `src` only, and no mark key is written by hand | no | no |
+| 16 | A schema enrolled as standing for no term with no mark (11) | `OntologyTerms.test.ts`, "takes a schema enrolled as standing for no term with noTerm in its annotations, and refuses it bare" | no | no | no | no | no: a text, not a schema | a string: compiles | reports, in the test; the law's run over the repository leaves its own test out | no | no |
+| 17 | A string fed a number, an instant past its month's end, a text where a boolean belongs, a record its schema cannot encode (4) | `Lift.test.ts`, "the lift's literals" | no: the committed graph is lifted from the real rows | no | no | no | no | compiles | passes | reports, in the lift's test | no |
+| 18 | `Person` with no tenant or a tenant that is no id, a tenant given to a `Member` (4) | `Lift.test.ts`, "the tenant given beside the rows" | no | no | no | no | no | compiles | passes | reports, in the lift's test | no |
+| 19 | A path ending in an attribute with no field filling its relation, a reverse step, two fields filling it, a fixed concept on the reused step (11, 178) | `Lift.test.ts`, "a path that ends in an attribute": its four plants | no | no | no | no | no: its marks are the real ones, or the test's own struct | compiles | passes | reports: the path states nothing and the rest lifts | no |
+| 20 | The kernel's `AgentRun` lifted; `Member`, `Grant` and the actor's `Member` made to store no id (7, 11) | `Lift.test.ts`, "a class that stores no id" | no | no | no | no: the copies are the test's | no | compiles | passes | reports, in the lift's test | no |
+| 21 | The query written `a inv:Organization`, and each question's bare twin (5, 13) | `Questions.test.ts`, "gate 8, every question walks the subclasses": its plant, the bare twins, and step 13's two (rows reversed, M5 ordered by `?role`) | no | no | no: `bare-type.planted.rq` is under no folder it reads | no | no | compiles | no code file | reports | reads the fixture, not the query: the node typed only a tenant is consistent |
+| 22 | An ASK read as a table, a SELECT and a text that does not parse given to the boolean runner (5) | `Questions.test.ts`, "refuses an ASK as a table, ...", "the boolean runner" | no | no | no | no | no | compiles | passes | reports | no |
+| 23 | A hand-written grant, tenant link, type and tenant name on lifted nodes; a property left unshown with CQ-P06's text alone or left out (5, 9 to 12) | `Questions.test.ts`, "gate 8, the guards on the fixture's two parts" (guards 1 and 3) | no | no | no | no | no: the evidence is the kernel's | compiles | passes | reports | no: the plants are triples given in the test |
+| 24 | CQ-P01's, CQ-P02's and CQ-P09's must-fail cases (9) | `Questions.test.ts`, "gate 8, CQ-P01 ...", "gate 8, CQ-P02 ...", "gate 8, CQ-P09's party half ..." | no | no | no | no | no | compiles | passes | reports | no: the edits are in memory; the committed fixtures are its near misses |
+| 25 | CQ-P04's and CQ-P05's must-fail cases, the fixture's holding faults, and the shared name read as one party (10, 179) | `Questions.test.ts`, "gate 8, CQ-P04 ..." and "gate 8, CQ-P05 ...", the statement read from CQ-P05's file | no | no | no | no | no | compiles | passes: no test names the construct | reports | no: CQ-P05's file is consistent beside CQ-P04's, its run |
+| 26 | CQ-P06 with the name required, the person untyped, a membership naming a workspace (11, 12, 177) | `Questions.test.ts`, "CQ-P06 lists a member with no account with no email, ...", "gate 8, a membership that names a source's workspace" | no: the committed graph is unchanged | no | no | no | no | compiles | passes | reports | no |
+| 27 | CQ-P07's must-fail cases and its workspace membership (11, 12) | `Questions.test.ts`, "gate 8, CQ-P07 and its must-fail cases", "CQ-P07: an active admin naming a workspace ..." | no | no | no | no | no | compiles | passes | reports | no |
+| 28 | CQ-P03's must-fail cases (12) | `Questions.test.ts`, "gate 8, CQ-P03 ..." | no | no | no | no | no | compiles | passes | reports | no |
+| 29 | A flag on the Sutton contact's record and each other misplacement (12) | `Questions.test.ts`, "gate 8, sutton-party.ttl: each record states what the coverage table places on it" | no | no | no | no: gate 4's coverage reads the report, not the fixture | no | compiles | passes | reports | no: the plants are triples given in the test |
+| 30 | The runs table with a run left out, made to be inconsistent, swapped, misnamed or joined to a third file (13) | `Reason.test.ts`, "decision 34's refusal joins ...", "each run of the packet joins, last, ...", "every hand-written fixture is held consistent by a run of its own, ..." | no | no | no | no | no | compiles | passes | no | reports, in its test on the machine port |
+| 31 | `fixtures/reason/record-is-organization.ttl`: a tenant's record of an organization typed that organization (13) | `reason`, "decision 34, refused: a tenant's record of an organization is that organization"; `Reason.test.ts`, "passes on Java 17 and the approved jar: ..." | no | no | no: it reads `generated/` and `fixtures/negative/` only | no | no | no code file | no code file | no: it is in no `handWrittenFixtures` entry | reports |
+
+The near misses pass every gate: the kernel's literal, step 2's copy and report 18 under gate 4; the real records
+under gate 5; the committed fixtures and queries under gate 8; and CQ-P01's fixture, the near miss of row 31, beside
+the other nine packet fixtures under gate 9.
+
+What was run for this walk, on the tree with every plant committed (2026-11-26): `bunx vitest run --reporter=verbose`
+in `packages/ontology` (279 tests passed, each test of rows 6 to 14 and 17 to 30 among them, and row 8's new ones),
+in `packages/foundation/modeling/vocabulary` (147 passed, rows 1 to 5) and on `packages/tooling/tool/cli`'s
+`test/OntologyTerms.test.ts` (36 passed, row 16), so each mistake is reported by its own gate's test; `bun run --cwd
+packages/ontology reason` on the cached v1.9.11 jar under Java 17.0.21.1, nothing fetched, whose refused run is row
+31's and whose ten slice runs are consistent; and `bun run check`, passing, which runs gates 1 to 8, the type-check
+of row 15 and the law of row 16, so no other gate reports any of them. Which file reads which planted file was read
+from the imports by a throwaway `git grep` over the code files: the seven files under `fixtures/negative/` are named
+by `Generated.test.ts` alone, the five under `fixtures/reason/` by `src/Reason.ts` and its test alone,
+`bare-type.planted.rq` by `test/support/fixtures.ts` alone, `test/support/coverage.ts` by `Coherence.test.ts` alone,
+`TermsPointer.types.ts` by nothing, and no test file imports another. Not done, as in the thread: no mistake was
+handed to a gate that does not read it, to see what that gate would say; and `bun run check:full` was not run in this
+step, step 13 having run it on the same runs, so gate 9 rests on the `reason` run above.
 
 Needs Benjamin: nothing open.
 

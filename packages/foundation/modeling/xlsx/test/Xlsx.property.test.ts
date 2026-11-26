@@ -2,6 +2,7 @@
 // to `XlsxWorkbook.canonical`, the form a file gives a workbook back in: writing then reading returns the canonical
 // workbook, and the canonical form does not move under a second pass.
 import { describe, expect, it } from "@effect/vitest"
+import { assertDefined, assertTrue } from "@effect/vitest/utils"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
@@ -20,7 +21,7 @@ import {
   XlsxText,
   XlsxUnreadable
 } from "@beep/xlsx/XlsxCell"
-import { XlsxWriteOptions } from "@beep/xlsx/XlsxOptions"
+import { XlsxWriteOptions, XlsxReadOptions, XlsxCodecOptions } from "@beep/xlsx/XlsxOptions"
 import { XlsxRow, XlsxSheetInfo, XlsxWorkbook, XlsxWorksheet } from "@beep/xlsx/XlsxWorkbook"
 
 const runs = { arbitrary: { runs: 150 } }
@@ -32,8 +33,8 @@ describe("a workbook written and read back", () => {
     [workbooks],
     ([workbook]) =>
       Effect.gen(function* () {
-        const bytes = yield* Xlsx.stringify(workbook)
-        const read = yield* Xlsx.parse(bytes)
+        const bytes = yield* Xlsx.stringify(workbook, XlsxWriteOptions.default)
+        const read = yield* Xlsx.parse(bytes, XlsxReadOptions.default)
         expect(S.is(XlsxWorkbook)(read.workbook)).toBe(true)
         expect(read.workbook).toEqual(XlsxWorkbook.canonical(workbook))
       }),
@@ -46,7 +47,7 @@ describe("a workbook written and read back", () => {
     ([workbook]) =>
       Effect.gen(function* () {
         const stored = yield* Xlsx.stringify(workbook, XlsxWriteOptions.make({ compression: "store" }))
-        const read = yield* Xlsx.parse(stored)
+        const read = yield* Xlsx.parse(stored, XlsxReadOptions.default)
         expect(read.workbook).toEqual(XlsxWorkbook.canonical(workbook))
       }),
     { arbitrary: { runs: 50 } }
@@ -57,8 +58,12 @@ describe("a workbook written and read back", () => {
     [workbooks],
     ([workbook]) =>
       Effect.gen(function* () {
-        const once = yield* Effect.flatMap(Xlsx.stringify(workbook), (bytes) => Xlsx.parse(bytes))
-        const twice = yield* Effect.flatMap(Xlsx.stringify(once.workbook), (bytes) => Xlsx.parse(bytes))
+        const once = yield* Effect.flatMap(Xlsx.stringify(workbook, XlsxWriteOptions.default), (bytes) =>
+          Xlsx.parse(bytes, XlsxReadOptions.default)
+        )
+        const twice = yield* Effect.flatMap(Xlsx.stringify(once.workbook, XlsxWriteOptions.default), (bytes) =>
+          Xlsx.parse(bytes, XlsxReadOptions.default)
+        )
         expect(twice.workbook).toEqual(once.workbook)
         expect(XlsxWorkbook.canonical(once.workbook)).toEqual(once.workbook)
       }),
@@ -128,17 +133,29 @@ describe("a workbook written and read back", () => {
           XlsxWorksheet.make({ info: XlsxSheetInfo.make({ name: "empty" }) })
         ]
       })
-      const bytes = yield* Xlsx.stringify(workbook)
-      const read = yield* Xlsx.parse(bytes)
+      const bytes = yield* Xlsx.stringify(workbook, XlsxWriteOptions.default)
+      const read = yield* Xlsx.parse(bytes, XlsxReadOptions.default)
       const canonical = XlsxWorkbook.canonical(workbook)
       expect(read.workbook).toEqual(canonical)
       const first = read.workbook.sheets[0]
       expect(A.map(first.rows, (row) => row.number)).toEqual([1, 2, 3, 9])
-      expect(A.map(first.rows[2]?.cells ?? [], (cell) => (cell.value.kind === "Text" ? cell.value.text : ""))).toEqual(
-        texts
-      )
+      const textRow = first.rows[2]
+      const numberRow = first.rows[0]
+      assertDefined(textRow)
+      assertDefined(numberRow)
       expect(
-        A.map(first.rows[0]?.cells ?? [], (cell) => (cell.value.kind === "Number" ? cell.value.value : Number.NaN))
+        A.map(textRow.cells, (cell) => {
+          const text = cell.value.kind === "Text"
+          assertTrue(text)
+          return cell.value.text
+        })
+      ).toEqual(texts)
+      expect(
+        A.map(numberRow.cells, (cell) => {
+          const number = cell.value.kind === "Number"
+          assertTrue(number)
+          return cell.value.value
+        })
       ).toEqual(A.reverse(numbers))
       expect(first.merges).toEqual([{ first: { column: 1, row: 2 }, last: { column: 3, row: 4 } }])
       expect(first.hiddenColumns).toEqual([2, 5])
@@ -187,7 +204,7 @@ describe("the codecs", () => {
 
   it.effect("one sheet's rows under its first row's headings, through a row schema", () =>
     Effect.gen(function* () {
-      const codec = Xlsx.bind(Xlsx.sheetFromBytes(Item, { sheet: "Items", header: "first" }))
+      const codec = Xlsx.bind(Xlsx.sheetFromBytes(Item, { sheet: "Items", header: "first" }, XlsxCodecOptions.default))
       const items = [
         {
           SKU: XlsxText.make({ text: "BRK-040" }),
@@ -205,14 +222,14 @@ describe("the codecs", () => {
       const bytes = yield* codec.encode(items)
       const back = yield* codec.decode(bytes)
       expect(back).toEqual(items)
-      const read = yield* Xlsx.parse(bytes)
+      const read = yield* Xlsx.parse(bytes, XlsxReadOptions.default)
       expect(A.map(read.workbook.sheets, (sheet) => [sheet.info.name, sheet.rows.length])).toEqual([["Items", 3]])
     })
   )
 
   it.effect("records keep a heading that would be a property of every object as an own property", () =>
     Effect.gen(function* () {
-      const codec = Xlsx.bind(Xlsx.recordsFromBytes({ sheet: "S", header: "first" }))
+      const codec = Xlsx.bind(Xlsx.recordsFromBytes({ sheet: "S", header: "first" }, XlsxCodecOptions.default))
       const record: XlsxRecord = { constructor: XlsxText.make({ text: "a" }), toString: XlsxNumber.make({ value: 1 }) }
       const bytes = yield* codec.encode([record])
       const back = yield* codec.decode(bytes)

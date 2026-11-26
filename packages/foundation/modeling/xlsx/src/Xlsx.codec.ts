@@ -279,11 +279,12 @@ const fromRecords = (records: ReadonlyArray<XlsxRecord>, name: XlsxSheetName): X
  *
  * ```ts
  * import { Xlsx } from "@beep/xlsx/Xlsx"
+ * import { XlsxReadOptions } from "@beep/xlsx/XlsxOptions"
  * import * as Effect from "effect/Effect"
  *
  * const program = Effect.gen(function* () {
  *   const bytes = new Uint8Array(0) // the bytes of an .xlsx file
- *   const read = yield* Xlsx.parse(bytes)
+ *   const read = yield* Xlsx.parse(bytes, XlsxReadOptions.default)
  *   return read.workbook.sheets.length
  * })
  * ```
@@ -299,15 +300,14 @@ export class Xlsx {
   }
 
   /** Reads a workbook: its sheets with their rows, and the oddities read past. */
-  static readonly parse = Effect.fn("Xlsx.parse")(
-    (bytes: Uint8Array, options: XlsxReadOptions | ReadOptions = XlsxReadOptions.default) =>
-      readWorkbook(bytes, options).pipe(Effect.mapBoth({ onSuccess: readOf, onFailure: parseError }))
+  static readonly parse = Effect.fn("Xlsx.parse")((bytes: Uint8Array, options: XlsxReadOptions | ReadOptions) =>
+    readWorkbook(bytes, options).pipe(Effect.mapBoth({ onSuccess: readOf, onFailure: parseError }))
   )
 
   /** `parse` as a `Result`: reading has no asynchronous step. */
   static parseResult(
     bytes: Uint8Array,
-    options: XlsxReadOptions | ReadOptions = XlsxReadOptions.default
+    options: XlsxReadOptions | ReadOptions
   ): Result.Result<XlsxRead, XlsxParseError> {
     return Effect.runSync(
       readWorkbook(bytes, options).pipe(Effect.mapBoth({ onSuccess: readOf, onFailure: parseError }), Effect.result)
@@ -320,7 +320,7 @@ export class Xlsx {
    */
   static readonly outline = Effect.fn("Xlsx.outline")(function* (
     bytes: Uint8Array,
-    options: XlsxReadOptions | ReadOptions = XlsxReadOptions.default
+    options: XlsxReadOptions | ReadOptions
   ) {
     const opened = yield* open({ bytes, caps: capsOf(options.limits) })
     const reads = yield* readSheets({ opened, wanted: opened.sheets, keep: false })
@@ -344,9 +344,8 @@ export class Xlsx {
   }, Effect.mapError(parseError))
 
   /** Every sheet counted, none kept: what a sheet chooser shows and what "the sheet with the most data" is. */
-  static readonly sheets = Effect.fn("Xlsx.sheets")(
-    (bytes: Uint8Array, options: XlsxReadOptions | ReadOptions = XlsxReadOptions.default) =>
-      Effect.map(Xlsx.outline(bytes, options), (outline) => A.map(outline.sheets, (sheet) => sheet.count))
+  static readonly sheets = Effect.fn("Xlsx.sheets")((bytes: Uint8Array, options: XlsxReadOptions | ReadOptions) =>
+    Effect.map(Xlsx.outline(bytes, options), (outline) => A.map(outline.sheets, (sheet) => sheet.count))
   )
 
   /**
@@ -356,7 +355,7 @@ export class Xlsx {
   static rows(
     bytes: Uint8Array,
     sheet: string,
-    options: XlsxReadOptions | ReadOptions = XlsxReadOptions.default
+    options: XlsxReadOptions | ReadOptions
   ): Stream.Stream<XlsxRow, XlsxParseError> {
     return Stream.unwrap(
       Effect.map(open({ bytes, caps: capsOf(options.limits) }), (opened) => {
@@ -386,7 +385,7 @@ export class Xlsx {
   static readonly sheetLayout = Effect.fn("Xlsx.sheetLayout")(function* (
     bytes: Uint8Array,
     sheet: string,
-    options: XlsxReadOptions | ReadOptions = XlsxReadOptions.default
+    options: XlsxReadOptions | ReadOptions
   ) {
     const opened = yield* open({ bytes, caps: capsOf(options.limits) })
     const entry = A.findFirst(opened.sheets, (found) => Str.toLowerCase(found.name) === Str.toLowerCase(sheet))
@@ -407,17 +406,15 @@ export class Xlsx {
    * runtime's `CompressionStream`.
    */
   static readonly stringify = Effect.fn("Xlsx.stringify")(
-    (
-      workbook: Pick<XlsxWorkbook, "dateSystem" | "sheets">,
-      options: XlsxWriteOptions | WriteOptions = XlsxWriteOptions.default
-    ) => write(workbook, options)
+    (workbook: Pick<XlsxWorkbook, "dateSystem" | "sheets">, options: XlsxWriteOptions | WriteOptions) =>
+      write(workbook, options)
   )
 
   /**
    * The whole round trip as one codec: .xlsx bytes on the encoded side, a workbook on the decoded side. Use it with
    * Effect's effectful decoders and encoders. It has nowhere to put warnings, so it drops them; `parse` keeps them.
    */
-  static fromBytes(options: CodecOptions = XlsxCodecOptions.default): S.Codec<XlsxWorkbook, Uint8Array> {
+  static fromBytes(options: CodecOptions): S.Codec<XlsxWorkbook, Uint8Array> {
     return S.Uint8Array.pipe(
       S.decodeTo(
         S.toType(XlsxWorkbook),
@@ -435,7 +432,7 @@ export class Xlsx {
   }
 
   /** `fromBytes` with the starting options. */
-  static readonly XlsxFromBytes: S.Codec<XlsxWorkbook, Uint8Array> = Xlsx.fromBytes()
+  static readonly XlsxFromBytes: S.Codec<XlsxWorkbook, Uint8Array> = Xlsx.fromBytes(XlsxCodecOptions.default)
 
   /**
    * One sheet as records under the headings of its first row, each heading an own property and each value what the
@@ -443,7 +440,7 @@ export class Xlsx {
    */
   static recordsFromBytes(
     input: { readonly sheet: XlsxSheetName; readonly header: "first" },
-    options: CodecOptions = XlsxCodecOptions.default
+    options: CodecOptions
   ): S.Codec<ReadonlyArray<XlsxRecord>, Uint8Array> {
     return S.Uint8Array.pipe(
       S.decodeTo(
@@ -470,7 +467,7 @@ export class Xlsx {
   static sheetFromBytes<A, RD = never, RE = never>(
     row: S.Codec<A, XlsxRecord, RD, RE>,
     input: { readonly sheet: XlsxSheetName; readonly header: "first" },
-    options: CodecOptions = XlsxCodecOptions.default
+    options: CodecOptions
   ): S.Codec<ReadonlyArray<A>, Uint8Array, RD, RE> {
     return Xlsx.recordsFromBytes(input, options).pipe(S.decodeTo(S.Array(row)))
   }

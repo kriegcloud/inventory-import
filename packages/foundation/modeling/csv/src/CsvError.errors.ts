@@ -3,8 +3,6 @@
  *
  * @packageDocumentation
  */
-import * as A from "effect/Array"
-import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import { CsvFatal, describeFinding } from "./CsvDiagnostic.schema.ts"
 import { $CsvId } from "./internal/identity.ts"
@@ -18,9 +16,10 @@ const $I = $CsvId.create("CsvError")
  *
  * ```ts
  * import { Csv } from "@beep/csv/Csv"
+ * import { CsvReadOptions } from "@beep/csv/CsvOptions"
  * import * as Result from "effect/Result"
  *
- * const read = Csv.parseResult('a,"b\nc')
+ * const read = Csv.parseResult('a,"b\nc', CsvReadOptions.default)
  * if (Result.isFailure(read)) read.failure.message // => 'CSV parse failed: a quote (") opened at 1:3 ...'
  * ```
  *
@@ -37,9 +36,6 @@ export class CsvParseError extends S.TaggedError<CsvParseError, { readonly brand
 ) {
   /** The first finding, in words, with a 1-based position. */
   override get message(): string {
-    return `CSV parse failed: ${O.getOrElse(
-      O.map(A.head(this.diagnostics), (d) => describeFinding(d.finding)),
-      () => "no finding"
-    )}`
+    return `CSV parse failed: ${describeFinding(this.diagnostics[0].finding)}`
   }
 }

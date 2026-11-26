@@ -96,6 +96,12 @@ the value moves.
 | `drivers/openrouter/src/internal/plan.ts` | provider response with no valid model name | the requested model, matched where the answer is built | 0 (no stored import row changes) | scripted reply without response metadata attributes the answer to `scripted/primary` |
 | `drivers/better-auth/src/BetterAuth.schema.ts` | library options with absent, undefined or NULL `basePath` | `/api/auth` | 0 (sign-in routing, not an import row) | the default sign-in endpoint `/api/auth/sign-in/email` |
 
+Foundation modeling row 8 (2026-11-26) moves no new undecided product fallback to a schema. CSV/XLSX API callers
+now explicitly select the already-existing options-schema defaults; fixture builders use named starting values.
+Short CSV/header cells, malformed workbook metadata and parser compatibility fallbacks remain unchanged and are
+listed individually in [VERDICTS](VERDICTS.md#remaining-counted-sites), rather than hidden behind new fallback-only
+decodes. Row 8 remains incomplete while those places remain; none is an approved exemption.
+
 The new-kind pilot follow-up also retained these values on schemas (2026-11-25):
 
 | File | Field | Value | Rows of the messy sample | Example |

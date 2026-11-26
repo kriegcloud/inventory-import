@@ -1,6 +1,7 @@
 // Strict mode against Effect's own `effect/encoding/Csv`, the only file that imports it: on RFC 4180 text both accept
 // the same records, on text with misplaced quotes both refuse, and each reads the other's output back unchanged.
 import { describe, expect, it } from "@effect/vitest"
+import { assertTrue } from "@effect/vitest/utils"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
@@ -9,7 +10,7 @@ import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import * as Stream from "effect/Stream"
 import { Csv } from "@beep/csv/Csv"
-import { CsvFixedDelimiter, CsvReadOptions } from "@beep/csv/CsvOptions"
+import { CsvFixedDelimiter, CsvReadOptions, CsvWriteOptions } from "@beep/csv/CsvOptions"
 import { CsvTable } from "@beep/csv/CsvTable"
 
 const runs = { arbitrary: { runs: 200 } }
@@ -43,10 +44,11 @@ describe("strict mode agrees with effect/encoding/Csv", () => {
         const text = yield* effectWrite(records)
         const theirs = yield* effectRead(text)
         const ours = Csv.parseResult(text, strict)
-        expect(Result.isSuccess(theirs)).toBe(true)
-        expect(Result.isSuccess(ours)).toBe(true)
-        if (Result.isSuccess(theirs) && Result.isSuccess(ours))
-          expect(ours.success.table.records).toEqual(theirs.success)
+        const theirsExpected = Result.isSuccess(theirs)
+        assertTrue(theirsExpected)
+        const oursExpected = Result.isSuccess(ours)
+        assertTrue(oursExpected)
+        expect(ours.success.table.records).toEqual(theirs.success)
       }),
     runs
   )
@@ -56,10 +58,11 @@ describe("strict mode agrees with effect/encoding/Csv", () => {
     [Arbitrary.schema(Records)],
     ([records]) =>
       Effect.gen(function* () {
-        const text = Csv.stringify(CsvTable.make({ records: records }))
+        const text = Csv.stringify(CsvTable.make({ records: records }), CsvWriteOptions.default)
         const theirs = yield* effectRead(text)
-        expect(Result.isSuccess(theirs)).toBe(true)
-        if (Result.isSuccess(theirs)) expect(theirs.success).toEqual(records)
+        const theirsExpected = Result.isSuccess(theirs)
+        assertTrue(theirsExpected)
+        expect(theirs.success).toEqual(records)
       }),
     runs
   )
@@ -73,8 +76,17 @@ describe("strict mode agrees with effect/encoding/Csv", () => {
         const theirs = yield* effectRead(text)
         const ours = Csv.parseResult(text, strict)
         expect(Result.isSuccess(ours)).toBe(Result.isSuccess(theirs))
-        if (Result.isSuccess(theirs) && Result.isSuccess(ours))
-          expect(ours.success.table.records).toEqual(theirs.success)
+        Result.match(theirs, {
+          onFailure: () => {
+            const oursExpected = Result.isFailure(ours)
+            assertTrue(oursExpected)
+          },
+          onSuccess: (records) => {
+            const oursExpected = Result.isSuccess(ours)
+            assertTrue(oursExpected)
+            expect(ours.success.table.records).toEqual(records)
+          }
+        })
       }),
     runs
   )

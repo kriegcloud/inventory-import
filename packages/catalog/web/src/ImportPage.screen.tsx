@@ -1,3 +1,4 @@
+import { parameter } from "./internal/browser.ts"
 import { useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
@@ -130,23 +131,25 @@ export function ImportPage() {
   const tableRead = useAtomValue(O.match(importId, { onNone: () => noImport, onSome: importTable }))
   const view = openedOf({ read: viewRead, isGone })
   const table = openedOf({ read: tableRead, isGone })
-  const wanted = params.get("step")
+  const wanted = parameter("step")(params)
   // Confirmed, or confirmed and taken back: either way the result screen is where it stands.
   const imported = O.exists(view.data, (value) => value.status !== "open")
   const step: Step =
     // An address that names something that is no import is said so on the step it asked for, not answered
     // with the upload screen as if it named none.
-    (O.isNone(importId) && !malformed) || wanted === "upload"
+    (O.isNone(importId) && !malformed) || O.contains(wanted, "upload")
       ? "upload"
       : O.isNone(view.data)
         ? // While the import is on its way the address decides, so a link to a result shows the result's skeleton,
           // not the review's.
-          wanted === "match" || wanted === "result"
-          ? wanted
+          O.contains(wanted, "match") || O.contains(wanted, "result")
+          ? O.contains(wanted, "match")
+            ? "match"
+            : "result"
           : "review"
         : imported
           ? "result"
-          : wanted === "match"
+          : O.contains(wanted, "match")
             ? "match"
             : "review"
   const reachable = (value: Step): boolean =>

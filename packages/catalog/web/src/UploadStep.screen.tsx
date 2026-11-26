@@ -1,3 +1,4 @@
+import { query, inputInPicker, data, droppedFiles } from "./internal/browser.ts"
 import * as A from "effect/Array"
 import * as ByteSize from "effect/ByteSize"
 import * as DateTime from "effect/DateTime"
@@ -109,15 +110,15 @@ const carriesFiles = (event: DragEvent): boolean => event.dataTransfer?.types.in
  * it a file only then, and only while it says it takes one (`data-takes-files`). A file dropped anywhere on the page
  * goes in through the upload's own input, so it meets the same checks as a chosen one: one way in.
  */
-const stepOnPage = (): HTMLElement | null => document.querySelector<HTMLElement>("[data-upload-step]")
+const stepOnPage = (): O.Option<HTMLElement> => query({ selector: "[data-upload-step]", root: document })
 
 const giveStep = (step: HTMLElement, files: ReadonlyArray<File>): void => {
-  const input = step.querySelector<HTMLInputElement>('input[type="file"]')
-  if (input === null || files.length === 0) return
+  const input = query<HTMLInputElement>({ selector: 'input[type="file"]', root: step })
+  if (O.isNone(input) || files.length === 0) return
   const transfer = new DataTransfer()
   for (const file of files) transfer.items.add(file)
-  input.files = transfer.files
-  input.dispatchEvent(new Event("change", { bubbles: true }))
+  input.value.files = transfer.files
+  input.value.dispatchEvent(new Event("change", { bubbles: true }))
 }
 
 /**
@@ -151,10 +152,10 @@ const fileOverPage: Atom.Atom<boolean> = Atom.readable((get) => {
   const drop = (event: DragEvent) => {
     if (!carriesFiles(event)) return
     const step = stepOnPage()
-    if (!event.defaultPrevented && step !== null) {
+    if (!event.defaultPrevented && O.isSome(step)) {
       event.preventDefault()
-      if (step.dataset.takesFiles !== undefined)
-        giveStep(step, O.match(O.fromNullishOr(event.dataTransfer?.files), { onNone: A.empty, onSome: A.fromIterable }))
+      if (O.isSome(data("takesFiles")(step.value)))
+        giveStep(step.value, O.match(droppedFiles(event), { onNone: A.empty, onSome: A.fromIterable }))
     }
     depth = 0
     get.setSelf(false)
@@ -403,10 +404,7 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
       })
   }
 
-  const fileInput = () =>
-    O.flatMap(O.fromNullOr(picker.current), (picker) =>
-      O.fromNullOr(picker.querySelector<HTMLInputElement>('input[type="file"]'))
-    )
+  const fileInput = () => inputInPicker(picker)
   const dragging = useAtomValue(fileOverPage) && props.canImport && !busy
 
   const failed = O.liftPredicate(UploadState.guards.Failed)(state)

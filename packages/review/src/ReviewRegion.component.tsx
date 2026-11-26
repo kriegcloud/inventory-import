@@ -1,3 +1,4 @@
+import { platform, byId } from "./internal/browser.ts"
 import { ColumnMatch } from "@inventory/review/ReviewTypes"
 import type { Column } from "@tanstack/react-table"
 import {
@@ -80,7 +81,7 @@ const PhoneDrawer = lazy(() => import("./internal/PhoneDrawer.tsx").then((module
 
 const whole = new Intl.NumberFormat("en-US")
 /** The keys for undo and redo as the person's keyboard says them: Command on a Mac, Ctrl elsewhere. */
-const onMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform)
+const onMac = O.exists(platform(), (platform) => /Mac|iPhone|iPad/.test(platform))
 const undoKeys = onMac ? "\u2318Z" : "Ctrl+Z"
 const redoKeys = onMac ? "\u21e7\u2318Z" : "Ctrl+Shift+Z"
 const stepTag = { read: "Read", rule: "Rule", model: "Model" } as const
@@ -370,9 +371,10 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
       Done: () => undefined,
       Blocked: ({ columnId }) => {
         // On a desk the choice is in the column's own header; on a phone it is in the columns sheet.
-        const select = document.getElementById(`review-match-${columnId}`)
-        if (select !== null) select.focus()
-        else props.onShowMatching?.()
+        O.match(byId(`review-match-${columnId}`), {
+          onSome: (select) => select.focus(),
+          onNone: () => props.onShowMatching?.()
+        })
       }
     })
   // The confirm step is opened by the import button without being its trigger, so it hands focus back itself.

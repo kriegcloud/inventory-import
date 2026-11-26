@@ -1,3 +1,4 @@
+import { query } from "./browser.ts"
 import { identity } from "effect/Function"
 import { CellMark, ColumnMatch, Entry } from "@inventory/review/ReviewTypes"
 import { OtherAnswer } from "@inventory/review/ReviewDraft"
@@ -1819,9 +1820,10 @@ const makeGrid = (input: { readonly region: Region; readonly table: RegionTable 
       ),
     indexOf,
     toTop: () =>
-      document
-        .querySelector(`[data-review-region="${region.id}"] [data-slot="sticky-table-frame"]`)
-        ?.scrollTo({ top: 0 }),
+      O.map(
+        query({ selector: `[data-review-region="${region.id}"] [data-slot="sticky-table-frame"]`, root: document }),
+        (frame) => frame.scrollTo({ top: 0 })
+      ),
     list,
     frame: (element) => {
       registry.set(scroller, O.fromNullOr(element))

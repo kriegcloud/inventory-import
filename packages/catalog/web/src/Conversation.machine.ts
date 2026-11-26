@@ -2,6 +2,7 @@
 // who answered, and the changes it made with what takes each back. It is keyed like the import's saved progress
 // (`progressKey`: per person, organization and screen) and decoded on the way back: a version 1 conversation is
 // converted, so its Undo buttons and the columns it left come back; any other shape is dropped.
+import { storageText } from "@inventory/client/Storage"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import { identity } from "effect/Function"
@@ -115,9 +116,9 @@ export const readConversation = (key: string): Conversation =>
   O.match(
     O.flatten(
       conversations.attempt((storage) => {
-        const text = storage.getItem(key)
-        if (text === null) return O.none()
-        const found = O.orElse(decode(text), () => O.map(decodeV1(text), fromV1))
+        const text = storageText(key)(storage)
+        if (O.isNone(text)) return O.none()
+        const found = O.orElse(decode(text.value), () => O.map(decodeV1(text.value), fromV1))
         if (O.isNone(found)) storage.removeItem(key)
         return found
       })

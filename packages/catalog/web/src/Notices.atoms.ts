@@ -7,6 +7,7 @@
 // read only by that tab while that member is signed in on it. A tab that never comes back never reads its record, so
 // they are bounded: whenever one is written, the member's records older than 30 days go, and all but the newest 20; one
 // record names at most the newest 20 imports.
+import { storageKey, storageText } from "@inventory/client/Storage"
 import * as A from "effect/Array"
 import { identity } from "effect/Function"
 import * as DateTime from "effect/DateTime"
@@ -82,9 +83,9 @@ const bounding = (storage: Storage, of: Member): void => {
   const prefix = progressKey({ organizationId: of.organizationId, memberId: of.id, screen: "notices:" })
   const records: Array<{ readonly key: string; readonly at: number }> = []
   for (let index = 0; index < storage.length; index += 1) {
-    const key = storage.key(index)
-    if (key === null || !Str.startsWith(prefix)(key)) continue
-    records.push({ key, at: newest(noticesFromText(storage.getItem(key))) })
+    const key = storageKey(index)(storage)
+    if (O.isNone(key) || !Str.startsWith(prefix)(key.value)) continue
+    records.push({ key: key.value, at: storageText(key.value)(storage).pipe(noticesFromText, newest) })
   }
   const newestFirst = A.sort(
     records,
@@ -113,7 +114,7 @@ const leave = (input: {
   // Storage refused (full, or turned off): the decisions are with the tab that took them up, and only this is not said.
   sharedStorage.attempt((storage) => {
     if (!here) {
-      const text = noticesText(withNotice(noticesFromText(storage.getItem(key)), notice))
+      const text = noticesText(withNotice(noticesFromText(storageText(key)(storage)), notice))
       O.map(text, (kept) => storage.setItem(key, kept))
     }
     bounding(storage, of)

@@ -1,3 +1,4 @@
+import { query } from "./internal/browser.ts"
 import * as Match from "effect/Match"
 import { EditorState, formOf, type OpenEditor } from "./ItemEditor.state.ts"
 import * as O from "effect/Option"
@@ -211,7 +212,7 @@ const editAgain = (input: {
         notice
       })
     )
-    const drawn = document.querySelector(`[data-edit-item="${CSS.escape(base.id)}"]`) !== null
+    const drawn = O.isSome(query({ selector: `[data-edit-item="${CSS.escape(base.id)}"]`, root: document }))
     if (!drawn) navigate(`${itemsAddress}?search=${encodeURIComponent(base.sku)}`, { replace: false })
   }
 }

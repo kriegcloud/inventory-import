@@ -2,6 +2,7 @@
 // store `Atom.kvs` reads and writes: the read and the write are the atom's own, and no handler touches storage.
 // The one thing a reader must not break: a browser that keeps nothing (a private window, storage turned off, a full
 // disk) is not an error on the screen. The value is then held for the visit, and nothing is said.
+import { localStore, storedJson, refusal } from "./browser.ts"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -13,14 +14,7 @@ import * as Atom from "effect/reactivity/Atom"
  * The browser's storage, or none where reading `localStorage` is itself refused (some private windows). Not
  * `@inventory/client/Storage`, which this package may not use: every call after this one is an `Effect.try` below.
  */
-const lookup = (): Storage | undefined => O.getOrUndefined(O.liftThrowable(() => window.localStorage)())
-
-const refusal = (method: string, key: string, cause: unknown) =>
-  new KeyValueStore.KeyValueStoreError({ key, method, message: `The browser would not ${method} ${key}`, cause })
-
-// A value kept before values were kept as JSON is a bare word ("comfortable"): it is read as that word.
-const bareWord = /^(?!null$|true$|false$)[a-z]+$/
-const asJson = (text: string): string => (bareWord.test(text) ? `"${text}"` : text)
+const lookup = localStore
 
 // What `Atom.kvs` writes for a value that is none. Nothing kept is no entry: the key is removed instead.
 const nothing = "null"
@@ -30,24 +24,17 @@ const browserStore = Layer.sync(KeyValueStore.KeyValueStore)(() => {
   const storage = lookup()
   // With no storage: nothing is read, and a write is refused.
   const reading = <A>(method: string, key: string, read: (kept: Storage) => A, absent: A) =>
-    storage === undefined
-      ? Effect.succeed(absent)
-      : Effect.try({ try: () => read(storage), catch: (cause) => refusal(method, key, cause) })
+    O.match(storage, {
+      onNone: () => Effect.succeed(absent),
+      onSome: (storage) => Effect.try({ try: () => read(storage), catch: (cause) => refusal({ method, key, cause }) })
+    })
   const writing = (method: string, key: string, write: (kept: Storage) => void) =>
-    storage === undefined
-      ? Effect.fail(refusal(method, key, "the browser gives no storage"))
-      : Effect.try({ try: () => write(storage), catch: (cause) => refusal(method, key, cause) })
+    O.match(storage, {
+      onNone: () => Effect.fail(refusal({ method, key, cause: "the browser gives no storage" })),
+      onSome: (storage) => Effect.try({ try: () => write(storage), catch: (cause) => refusal({ method, key, cause }) })
+    })
   return KeyValueStore.makeStringOnly({
-    get: (key) =>
-      reading(
-        "get",
-        key,
-        (kept) => {
-          const text = kept.getItem(key)
-          return text === null ? undefined : asJson(text)
-        },
-        undefined
-      ),
+    get: (key) => O.match(storage, { onNone: () => Effect.undefined, onSome: storedJson(key) }),
     set: (key, value) =>
       writing("set", key, (kept) => (value === nothing ? kept.removeItem(key) : kept.setItem(key, value))),
     remove: (key) => writing("remove", key, (kept) => kept.removeItem(key)),

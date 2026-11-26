@@ -10,6 +10,7 @@
 // outside React: `ordered` listens to it as any atom listens to something outside. The facets the person ticked are
 // not the table's: they filter the rows here, in a derived atom, before the table is given them (Benjamin, 2026-11-19:
 // "Effect atoms only"), so no state library but atoms holds anything of the region's.
+import { query, closest, data, refCallback } from "./internal/browser.ts"
 import { CellMark, Entry } from "@inventory/review/ReviewTypes"
 import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
 import { createColumnHelper, type Table } from "@tanstack/react-table"
@@ -448,8 +449,8 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
   const reveal = Atom.make<O.Option<{ readonly rowId: string; readonly n: number }>>(O.none())
   const present = Atom.make(false)
   const toasts = Atom.make<ReadonlyArray<string | number>>([])
-  const attach = (node: HTMLElement | null) => {
-    if (node === null) return undefined
+  const attach = refCallback((node: O.Option<HTMLElement>) => {
+    if (O.isNone(node)) return undefined
     registry.set(present, true)
     return () => {
       registry.set(present, false)
@@ -458,7 +459,7 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
       for (const id of registry.get(toasts)) toast.dismiss(id)
       registry.set(toasts, [])
     }
-  }
+  })
 
   return {
     id,
@@ -587,7 +588,7 @@ const isTyping = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement &&
   (target.isContentEditable ||
     ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) ||
-    target.closest("[role=dialog], [role=alertdialog], [role=menu]") !== null)
+    O.isSome(closest("[role=dialog], [role=alertdialog], [role=menu]")(target)))
 
 /**
  * Makes what a region has once its table exists, in the atom that holds it (`ctx`): the table is given the region's
@@ -695,16 +696,21 @@ const makeRegionTable = (
   })
 
   const want = (wanted: O.Option<Wanted>) => registry.update(region.nav, (before) => ({ ...before, wanted }))
-  const section = (): HTMLElement | null => document.querySelector<HTMLElement>(`[data-review-region="${region.id}"]`)
+  const section = (): O.Option<HTMLElement> =>
+    query({ selector: `[data-review-region="${region.id}"]`, root: document })
 
   // With nothing left to go to, focus goes to the one action that is left: the import button, or, where the region
   // has none (embedded, or only looking), the table itself. Never to the page's body, from where the person had to
   // press Shift+Tab ninety-nine times to get back.
   const focusLast = () => {
     const root = section()
-    const button = root?.querySelector<HTMLElement>("[data-import-button]") ?? null
-    if (button !== null && button.checkVisibility()) button.focus()
-    else root?.querySelector<HTMLElement>('[data-slot="sticky-table-frame"]')?.focus()
+    const button = O.flatMap(root, (root) => query({ selector: "[data-import-button]", root }))
+    if (O.isSome(button) && button.value.checkVisibility()) button.value.focus()
+    else
+      O.map(
+        O.flatMap(root, (root) => query({ selector: '[data-slot="sticky-table-frame"]', root })),
+        (frame) => frame.focus()
+      )
   }
   const focusRow = (askedRow: O.Option<string>, toGroup: boolean) => {
     if (O.isNone(askedRow) || !A.some(registry.get(ordered), (view) => view.row.id === askedRow.value)) {
@@ -717,16 +723,18 @@ const makeRegionTable = (
     )
     requestAnimationFrame(() => {
       const root = section()
-      const row = root?.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(rowId)}"]`)
+      const row = O.flatMap(root, (root) => query({ selector: `[data-row-id="${CSS.escape(rowId)}"]`, root }))
       // A row under a group's heading is decided by the heading: its accept takes the focus, not the row's tick.
-      const group = toGroup ? row?.dataset.group : undefined
-      const target =
-        (group === undefined
-          ? undefined
-          : root?.querySelector<HTMLElement>(`[data-group-id="${CSS.escape(group)}"] [data-group-accept]`)) ??
-        row?.querySelector<HTMLElement>("[data-first-action]")
-      if (target === null || target === undefined) focusLast()
-      else target.focus()
+      const group = toGroup ? O.flatMap(row, (row) => data("group")(row)) : O.none<string>()
+      const target = O.orElse(
+        O.flatMap(group, (group) =>
+          O.flatMap(root, (root) =>
+            query({ selector: `[data-group-id="${CSS.escape(group)}"] [data-group-accept]`, root })
+          )
+        ),
+        () => O.flatMap(row, (row) => query({ selector: "[data-first-action]", root: row }))
+      )
+      O.match(target, { onNone: focusLast, onSome: (target) => target.focus() })
     })
   }
 
@@ -822,9 +830,10 @@ const makeRegionTable = (
   const step = (back: boolean) => {
     if (!onPage()) return
     const active = document.activeElement
-    const focused = O.fromNullishOr(
-      active instanceof HTMLElement ? active.closest<HTMLElement>("[data-row-id]")?.dataset.rowId : undefined
-    )
+    const focused =
+      active instanceof HTMLElement
+        ? O.flatMap(closest("[data-row-id]")(active), (row) => data("rowId")(row))
+        : O.none<string>()
     const places = registry.get(stops)
     const here = O.orElse(focused, () => registry.get(region.nav).stepped)
     const at = A.findFirstIndex(places, (entry) => O.contains(here, entry.rowId))

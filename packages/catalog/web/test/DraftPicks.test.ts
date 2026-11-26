@@ -235,7 +235,9 @@ describe("the line that names what a match took back", () => {
 
 describe("what an older page kept", () => {
   const older = (held: object, rows: object): O.Option<Waiting> =>
-    waitingFromText(Formatter.formatJson({ madeOn: { "row-12": 4 }, leftOver: false, rows, held: { "row-12": held } }))
+    waitingFromText(
+      O.some(Formatter.formatJson({ madeOn: { "row-12": 4 }, leftOver: false, rows, held: { "row-12": held } }))
+    )
   const read = (kept: O.Option<Waiting>) =>
     O.map(kept, (waits) =>
       R.map(waits.lines, (line) => ({

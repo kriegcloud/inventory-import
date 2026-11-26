@@ -503,12 +503,14 @@ describe("what an older page kept", () => {
   /** A value as the browser keeps it, written by an older page: text of its own, not through this page's schema. */
   const older = (held: object): O.Option<Waiting> =>
     waitingFromText(
-      Formatter.formatJson({
-        madeOn: { "row-12": 4 },
-        leftOver: false,
-        rows: { "row-12": { kept: true } },
-        held: { "row-12": held }
-      })
+      O.some(
+        Formatter.formatJson({
+          madeOn: { "row-12": 4 },
+          leftOver: false,
+          rows: { "row-12": { kept: true } },
+          held: { "row-12": held }
+        })
+      )
     )
   /** What it reads as: this tab's decision waiting, and the closed tab's on the row's line. */
   const read = (kept: O.Option<Waiting>) =>

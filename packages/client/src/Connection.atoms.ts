@@ -2,6 +2,8 @@
 // and, while nothing else does, every half minute. A read that could not be made is then asked again by itself, with
 // nothing for the person to press. The one thing not to break: only a failure that may pass is asked again here, and
 // never in a loop: at once only on something else's answer, otherwise not before `askAgainEvery` has passed.
+import * as O from "effect/Option"
+import { browserWindow } from "@inventory/client/Storage"
 import * as Cause from "effect/Cause"
 import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
@@ -18,8 +20,8 @@ const answered = "inventory:server-answered"
  * own failure, and its "too many requests", are no answer.
  */
 export const serverAnswered = (status: number): void => {
-  if (typeof window === "undefined" || status === 429 || status >= 500) return
-  window.dispatchEvent(new Event(answered))
+  if (status === 429 || status >= 500) return
+  O.map(browserWindow(), (window) => window.dispatchEvent(new Event(answered)))
 }
 
 /**
@@ -50,7 +52,9 @@ export const askedAgainWhenBack = <A, E>(input: {
       : Effect.void
   )
   return Atom.readable((get) => {
-    if (typeof window === "undefined") return
+    const browser = browserWindow()
+    if (O.isNone(browser)) return
+    const window = browser.value
     const registry = get.registry
     get.mount(input.read)
     get.mount(timer)

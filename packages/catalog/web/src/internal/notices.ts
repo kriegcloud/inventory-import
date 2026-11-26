@@ -50,8 +50,8 @@ const encodeText = S.encodeOption(asText)
 export const noticesText = (stored: NoticesKept): O.Option<string> => encodeText(stored)
 
 /** The notices from that text: none where there is none or it cannot be read. */
-export const noticesFromText = (text: string | null): NoticesKept =>
-  text === null ? O.none() : O.flatten(decodeText(text))
+export const noticesFromText = (text: O.Option<string>): NoticesKept =>
+  O.flatMap(text, (text) => O.flatten(decodeText(text)))
 
 /** A removed import's complete naming, supplying older missing comparisons through the Named maker. */
 export const namedIn = ({ beside, rows, theirs }: Extract<Notice, { readonly _tag: "Removed" }>): Named =>

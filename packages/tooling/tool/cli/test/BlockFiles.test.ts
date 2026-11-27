@@ -1,5 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
+import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as R from "effect/Record"
 import { blockFiles, blockFilesSentence } from "../src/commands/Laws/BlockFiles.rules.ts"
 import { render } from "../src/Report.schema.ts"
 import { inTree, json, printed } from "./support/tree.ts"
@@ -15,7 +17,7 @@ const placed = {
   // An aggregate, a decision and a command each hold their commands, events and rejections.
   "packages/shop/model/src/Basket/Basket.aggregate.ts": `${domain}export class Open extends Domain.Command("Open", {}) {}\nexport class Opened extends Domain.Event("Opened", {}) {}\nexport class Closed extends Domain.Rejection("Closed", {}) {}\nexport class Basket extends Domain.Aggregate("Basket", {}) {}\n`,
   "packages/shop/model/src/Basket/Checkout.decision.ts": `${domain}export class Pay extends Domain.Command("Pay", {}) {}\nexport class Paid extends Domain.Event("Paid", {}) {}\nexport class Short extends Domain.Rejection("Short", {}) {}\nexport class Checkout extends Domain.Decision(Pay, {}) {}\n`,
-  "packages/shop/model/src/Basket/Add.command.ts": `${domain}export class Add extends Domain.Command("Add", {}) {}\nexport class Added extends Domain.Event("Added", {}) {}\nexport class Full extends Domain.Rejection("Full", {}) {}\n`,
+  "packages/shop/model/src/Basket/Add.command.ts": `${domain}export class Command extends Domain.Command("Add", {}) {}\nexport class Added extends Domain.Event("Added", {}) {}\nexport class Full extends Domain.Rejection("Full", {}) {}\nexport const decide = () => []\n`,
   "packages/shop/model/src/Basket/NotOpen.rejection.ts": `${domain}export class NotOpen extends Domain.Rejection("NotOpen", {}) {}\n`,
   "packages/shop/model/src/Basket/BasketStore.port.ts": `${context}export class BasketStore extends Context.Service<BasketStore, {}>()("BasketStore") {}\n`,
   "packages/shop/model/src/Basket/Watch.policy.ts": `${domain}export class Watch extends Domain.Policy("Watch", {}) {}\n`,
@@ -33,7 +35,7 @@ const placed = {
   "packages/shop/contract/package.json": json({ name: "@x/shop-contract", beep: { layer: "contract" } }),
   "packages/shop/contract/src/Basket.payload.ts": `${schema}export const Add = S.Struct({})\n`,
   // A contract's command beside its payload, its external system, and a gateway it keeps.
-  "packages/shop/contract/src/Basket/Add.command.ts": `${domain}${schema}export const AddInput = S.Struct({})\nexport class Add extends Domain.Command("Add", { input: AddInput }) {}\n`,
+  "packages/shop/contract/src/Basket/Add.command.ts": `${domain}${schema}export const AddInput = S.Struct({})\nexport class Command extends Domain.Command("Add", { input: AddInput }) {}\n`,
   "packages/shop/contract/src/Pricing.external.ts": `${domain}export class Pricing extends Domain.ExternalSystem("Pricing", {}) {}\n`,
   "packages/shop/contract/src/Allowance.port.ts": `${context}export class Allowance extends Context.Service<Allowance, {}>()("Allowance") {}\n`
 }
@@ -79,37 +81,39 @@ describe("laws block-files", () => {
       const report = yield* inTree(
         {
           ...placed,
-          "packages/shop/model/src/Basket/Add.command.ts": `${domain}${context}export class Add extends Domain.Command("Add", {}) {}\nexport class Shop extends Domain.Model("Shop", {}) {}\nexport class Prices extends Context.Service<Prices, {}>()("Prices") {}\n`
+          "packages/shop/model/src/Basket/Add.command.ts": `${domain}${context}export class Command extends Domain.Command("Add", {}) {}\nexport const decide = () => []\nexport class Shop extends Domain.Model("Shop", {}) {}\nexport class Prices extends Context.Service<Prices, {}>()("Prices") {}\n`
         },
         Effect.map(blockFiles(), render(blockFilesSentence))
       )
       expect(printed(report).slice(1)).toEqual([
-        "err:   packages/shop/model/src/Basket/Add.command.ts:4 declares Shop with Domain.Model: move it to Shop.model.ts, beside this file",
-        "err:   packages/shop/model/src/Basket/Add.command.ts:5 declares Prices with Context.Service: move it to Prices.port.ts, beside this file"
+        "err:   packages/shop/model/src/Basket/Add.command.ts:5 declares Shop with Domain.Model: move it to Shop.model.ts, beside this file",
+        "err:   packages/shop/model/src/Basket/Add.command.ts:6 declares Prices with Context.Service: move it to Prices.port.ts, beside this file"
       ])
     })
   )
 
-  it.effect("sends an event and a rejection to their command's file, and a relation to the package's model", () =>
-    Effect.gen(function* () {
-      const report = yield* inTree(
-        {
-          ...placed,
-          "packages/shop/model/src/Basket/Open.rules.ts": `${domain}export class Open extends Domain.Command("Open", {}) {}\nexport class Opened extends Domain.Event("Opened", {}) {}\nexport class Shut extends Domain.Rejection("Shut", {}) {}\n`,
-          "packages/shop/model/src/Basket/Lost.rules.ts": `${domain}export class Lost extends Domain.Event("Lost", {}) {}\nexport class Gone extends Domain.Rejection("Gone", {}) {}\n`,
-          "packages/shop/model/src/Basket/Links.aggregate.ts": `${domain}export class Links extends Domain.Aggregate("Links", {}) {}\nexport const owns = Domain.Relation({})\n`
-        },
-        Effect.map(blockFiles(), render(blockFilesSentence))
-      )
-      expect(printed(report).slice(1)).toEqual([
-        "err:   packages/shop/model/src/Basket/Links.aggregate.ts:3 declares owns with Domain.Relation: move it into the relations of the model in packages/shop/model/src/Shop.model.ts",
-        "err:   packages/shop/model/src/Basket/Lost.rules.ts:2 declares Lost with Domain.Event: move it to the .command.ts, .aggregate.ts or .decision.ts of the command that records it, or the .view.ts or .stream.ts that emits it",
-        "err:   packages/shop/model/src/Basket/Lost.rules.ts:3 declares Gone with Domain.Rejection: move it to Gone.rejection.ts, beside this file",
-        "err:   packages/shop/model/src/Basket/Open.rules.ts:2 declares Open with Domain.Command: move it to Open.command.ts, beside this file",
-        "err:   packages/shop/model/src/Basket/Open.rules.ts:3 declares Opened with Domain.Event: move it to Open.command.ts, beside this file, with the command that records it",
-        "err:   packages/shop/model/src/Basket/Open.rules.ts:4 declares Shut with Domain.Rejection: move it to Open.command.ts, beside this file, with the command that records it"
-      ])
-    })
+  it.effect(
+    "sends an event to a file of its own, a rejection to its command's file, and a relation to the package's model",
+    () =>
+      Effect.gen(function* () {
+        const report = yield* inTree(
+          {
+            ...placed,
+            "packages/shop/model/src/Basket/Open.rules.ts": `${domain}export class Open extends Domain.Command("Open", {}) {}\nexport class Opened extends Domain.Event("Opened", {}) {}\nexport class Shut extends Domain.Rejection("Shut", {}) {}\n`,
+            "packages/shop/model/src/Basket/Lost.rules.ts": `${domain}export class Lost extends Domain.Event("Lost", {}) {}\nexport class Gone extends Domain.Rejection("Gone", {}) {}\n`,
+            "packages/shop/model/src/Basket/Links.aggregate.ts": `${domain}export class Links extends Domain.Aggregate("Links", {}) {}\nexport const owns = Domain.Relation({})\n`
+          },
+          Effect.map(blockFiles(), render(blockFilesSentence))
+        )
+        expect(printed(report).slice(1)).toEqual([
+          "err:   packages/shop/model/src/Basket/Links.aggregate.ts:3 declares owns with Domain.Relation: move it into the relations of the model in packages/shop/model/src/Shop.model.ts",
+          "err:   packages/shop/model/src/Basket/Lost.rules.ts:2 declares Lost with Domain.Event: move it to Lost.event.ts, beside this file",
+          "err:   packages/shop/model/src/Basket/Lost.rules.ts:3 declares Gone with Domain.Rejection: move it to Gone.rejection.ts, beside this file",
+          "err:   packages/shop/model/src/Basket/Open.rules.ts:2 declares Open with Domain.Command: move it to Open.command.ts, beside this file",
+          "err:   packages/shop/model/src/Basket/Open.rules.ts:3 declares Opened with Domain.Event: move it to Opened.event.ts, beside this file",
+          "err:   packages/shop/model/src/Basket/Open.rules.ts:4 declares Shut with Domain.Rejection: move it to Open.command.ts, beside this file, with the command that records it"
+        ])
+      })
   )
 
   it.effect("refuses a contract's command outside .command.ts, renaming only a file that holds nothing else", () =>
@@ -363,7 +367,7 @@ describe("laws block-files", () => {
         Effect.map(blockFiles(), render(blockFilesSentence))
       )
       expect(printed(report).slice(1)).toEqual([
-        "err:   packages/shop/model/src/Basket/Paid.decision.ts:2 declares Paid with Domain.Event: move it to the .command.ts, .aggregate.ts or .decision.ts of the command that records it, or the .view.ts or .stream.ts that emits it",
+        "err:   packages/shop/model/src/Basket/Paid.decision.ts:2 declares Paid with Domain.Event: move it to Paid.event.ts, beside this file",
         "err:   packages/shop/model/src/Basket/Paid.decision.ts:3 declares Late with Domain.Rejection: move it to Late.rejection.ts, beside this file",
         "err:   packages/shop/model/src/Basket/Pay.aggregate.ts:2 declares Pay with Domain.Command: rename the file to Pay.command.ts",
         "err:   packages/shop/model/src/Owns.model.ts:2 declares owns with Domain.Relation: move it into the relations of the model in packages/shop/model/src/Shop.model.ts"
@@ -399,8 +403,7 @@ describe("laws block-files", () => {
         Effect.map(blockFiles(), render(blockFilesSentence))
       )
       expect(printed(report).slice(1)).toEqual([
-        "err:   packages/shop/model/src/Account/Card.stream.ts:2 declares CardChanged with Domain.Event: move it to the .command.ts, .aggregate.ts or .decision.ts of the command that records it, or the .view.ts or .stream.ts that emits it",
-        "err:   packages/shop/model/src/Account/Card.stream.ts ends .stream.ts, which is kept for Domain.Stream, and declares none: declare its Domain.Stream here, or give the file the ending of what it holds",
+        "err:   packages/shop/model/src/Account/Card.stream.ts:2 declares CardChanged with Domain.Event: rename the file to CardChanged.event.ts",
         "err:   packages/shop/model/src/Account/Summary.view.ts:2 declares NotOwner with Domain.Rejection: move it to NotOwner.rejection.ts, beside this file"
       ])
     })
@@ -412,7 +415,7 @@ describe("laws block-files", () => {
         {
           ...placed,
           "packages/shop/contract/src/Ext.external.ts": `${domain}${context}export class Ext extends Domain.ExternalSystem("Ext", {}) {}\nexport class Client extends Context.Service<Client, {}>()("Client") {}\n`,
-          "packages/shop/contract/src/Basket/Remove.command.ts": `${domain}import * as RpcMiddleware from "effect/rpc/RpcMiddleware"\nexport class Remove extends Domain.Command("Remove", {}) {}\nexport class Guard extends RpcMiddleware.Service<Guard>()("Guard", {}) {}\n`,
+          "packages/shop/contract/src/Basket/Remove.command.ts": `${domain}import * as RpcMiddleware from "effect/rpc/RpcMiddleware"\nexport class Command extends Domain.Command("Remove", {}) {}\nexport class Guard extends RpcMiddleware.Service<Guard>()("Guard", {}) {}\n`,
           "packages/shop/contract/src/Only.external.ts": `${context}export class Only extends Context.Service<Only, {}>()("Only") {}\n`
         },
         Effect.map(blockFiles(), render(blockFilesSentence))
@@ -430,7 +433,7 @@ describe("laws block-files", () => {
       const report = yield* inTree(
         {
           ...placed,
-          "packages/shop/contract/src/Basket/Add.command.ts": `${domain}export class Added extends Domain.Event("Added", {}) {}\nexport class Full extends Domain.Rejection("Full", {}) {}\nexport class Add extends Domain.Command("Add", { events: [Added], rejects: [Full] }) {}\n`,
+          "packages/shop/contract/src/Basket/Add.command.ts": `${domain}export class Added extends Domain.Event("Added", {}) {}\nexport class Full extends Domain.Rejection("Full", {}) {}\nexport class Command extends Domain.Command("Add", { events: [Added], rejects: [Full] }) {}\n`,
           "packages/shop/contract/src/Basket/Edit.payload.ts": `${domain}export class Edited extends Domain.Event("Edited", {}) {}\nexport class Edit extends Domain.Command("Edit", { events: [Edited] }) {}\n`
         },
         Effect.map(blockFiles(), render(blockFilesSentence))
@@ -530,6 +533,121 @@ describe("laws block-files", () => {
         "err:   packages/shop/host/src/Basket.rules.ts ends .rules.ts, a kind a host does not hold: move it to the contract or the model package of its context, or give it the ending of what it is",
         "err:   packages/shop/host/src/Basket.screen.tsx ends .screen.tsx, a kind a host does not hold: move it to the web package of its context, or give it the ending of what it is",
         "err:   packages/shop/web/src/BasketStore.adapter.ts ends .adapter.ts, a kind a web does not hold: move it to the host package of its context, or give it the ending of what it is"
+      ])
+    })
+  )
+
+  // Each case below passed before the law held decisions 2 and 8 and the kinds of decisions 7 and 9 to 11
+  // (goals/module-kinds, steps 5 and 6).
+  const event = (tag: string): string =>
+    `${domain}export class Event extends Domain.Event("${tag}", {}) {}\nexport const evolve = (state: unknown) => state\n`
+  const command = (tag: string): string =>
+    `${domain}export class Command extends Domain.Command("${tag}", {}) {}\nexport const decide = () => []\n`
+
+  it.effect("holds an event's and a command's file to its tag, its role names and a namespace import", () =>
+    Effect.gen(function* () {
+      const shaped = {
+        ...placed,
+        "packages/shop/model/src/Basket/Opened.event.ts": event("Opened"),
+        "packages/shop/model/src/Basket/Open.command.ts": `import * as Opened from "./Opened.event.ts"\n${command("Open")}export const made = Opened.Event\n`
+      }
+      const held = yield* inTree(shaped, Effect.map(blockFiles(), render(blockFilesSentence)))
+      expect(printed(held)).toEqual([
+        "out: block-files:check OK  17 files in 2 packages of a context, each ending a kind its layer holds and each block in the file its ending names"
+      ])
+      const refused = yield* inTree(
+        {
+          ...shaped,
+          "packages/shop/model/src/Basket/Closing.event.ts": event("Closed"),
+          "packages/shop/model/src/Basket/Emptied.event.ts": `${domain}export class Emptied extends Domain.Event("Emptied", {}) {}\n`,
+          "packages/shop/model/src/Basket/Empty.command.ts": `${domain}export class Command extends Domain.Command("Empty", {}) {}\n`,
+          "packages/shop/model/src/Basket/Close.rules.ts": `import { Event } from "./Opened.event.ts"\nimport type { Command as Asked } from "./Open.command.ts"\nexport const seen = (asked: Asked) => [Event, asked]\n`,
+          "packages/shop/web/package.json": json({ name: "@x/shop-web", beep: { layer: "web" } }),
+          "packages/shop/web/src/Basket.atoms.ts": `import { Command, decide } from "@x/shop-model/Basket/Open.command.ts"\nexport const open = [Command, decide]\n`
+        },
+        Effect.map(blockFiles(), render(blockFilesSentence))
+      )
+      expect(refused.failed).toBe(true)
+      expect(printed(refused).slice(1)).toEqual([
+        'err:   packages/shop/model/src/Basket/Close.rules.ts:1 imports Event by name from ./Opened.event.ts: import the file whole, `import * as Opened from "./Opened.event.ts"`, and write Opened.Event',
+        'err:   packages/shop/model/src/Basket/Close.rules.ts:2 imports Command by name from ./Open.command.ts: import the file whole, `import * as Open from "./Open.command.ts"`, and write Open.Command',
+        "err:   packages/shop/model/src/Basket/Closing.event.ts:2 declares the event \"Closed\" in a file named Closing: a file's stem is its event's tag, and it holds one: move it to Closed.event.ts",
+        "err:   packages/shop/model/src/Basket/Emptied.event.ts:2 names its event's class Emptied: export it as Event, read as Emptied.Event through `import * as Emptied`",
+        "err:   packages/shop/model/src/Basket/Emptied.event.ts:2 exports no evolve: export `evolve` beside Event, read as Emptied.evolve",
+        "err:   packages/shop/model/src/Basket/Empty.command.ts:2 exports no decide: export `decide` beside Command, read as Empty.decide",
+        'err:   packages/shop/web/src/Basket.atoms.ts:1 imports Command by name from @x/shop-model/Basket/Open.command.ts: import the file whole, `import * as Open from "@x/shop-model/Basket/Open.command.ts"`, and write Open.Command'
+      ])
+    })
+  )
+
+  it.effect("gives a kind a folder when its module has more than five files of it, and none before", () =>
+    Effect.gen(function* () {
+      const tags = ["Add", "Drop", "Empty", "Open", "Pay", "Ship"]
+      const under = (folder: string) =>
+        R.fromEntries(A.map(tags, (tag) => [`${folder}/${tag}.command.ts`, command(tag)] as const))
+      const flat = under("packages/shop/model/src/Cart")
+      const folded = under("packages/shop/model/src/Cart/commands")
+      const held = yield* inTree(
+        {
+          ...placed,
+          ...folded,
+          "packages/shop/model/src/Cart/commands/CartCommand.union.ts": "export const CartCommand = 1\n",
+          "packages/shop/model/src/Till/Opened.event.ts": event("Opened")
+        },
+        Effect.map(blockFiles(), render(blockFilesSentence))
+      )
+      expect(held.failed).toBe(false)
+      const refused = yield* inTree(
+        {
+          ...placed,
+          ...flat,
+          "packages/shop/model/src/Till/events/Opened.event.ts": event("Opened")
+        },
+        Effect.map(blockFiles(), render(blockFilesSentence))
+      )
+      expect(refused.failed).toBe(true)
+      expect(printed(refused).slice(1)).toEqual([
+        "err:   packages/shop/model/src/Cart holds 6 command files, more than 5: move them into packages/shop/model/src/Cart/commands/, with the union that joins them",
+        "err:   packages/shop/model/src/Till/events holds 1 event file, and a folder is for more than 5: move them up, beside their module's own files"
+      ])
+    })
+  )
+
+  it.effect("holds the kinds of decisions 7 and 9 to 11 in their layers, and refuses a .live.ts", () =>
+    Effect.gen(function* () {
+      const kinds = {
+        ...placed,
+        "packages/shop/model/src/Basket/Basket.state.ts": "export const State = 1\n",
+        "packages/shop/model/src/Basket/Basket.transition.ts": "export const opens = 1\n",
+        "packages/shop/model/src/Basket/BasketEvent.union.ts": "export const BasketEvent = 1\n",
+        "packages/shop/model/src/Buyer/Email.sealed.ts": "export const Email = 1\n",
+        "packages/shop/host/package.json": json({ name: "@x/shop-host", beep: { layer: "host" } }),
+        "packages/shop/host/src/Shop.host.ts": "export const live = 1\n",
+        "packages/shop/host/src/Nightly.cron.ts": "export const nightly = 1\n",
+        "packages/shop/host/src/Sweep.singleton.ts": "export const sweep = 1\n",
+        "packages/shop/host/src/Admin.cli.ts": "export const cli = 1\n",
+        "packages/shop/host/src/Helper.toolkit.ts": "export const tools = 1\n",
+        "packages/shop/host/src/Helper.mcp.ts": "export const served = 1\n",
+        "packages/shop/host/src/SignIn.route.ts": "export const route = 1\n",
+        "packages/shop/host/src/Auth.config.ts": "export const settings = 1\n",
+        "packages/shop/web/package.json": json({ name: "@x/shop-web", beep: { layer: "web" } }),
+        "packages/shop/web/src/Editor.state.ts": "export const EditorState = 1\n"
+      }
+      const held = yield* inTree(kinds, Effect.map(blockFiles(), render(blockFilesSentence)))
+      expect(held.failed).toBe(false)
+      const refused = yield* inTree(
+        {
+          ...kinds,
+          "packages/shop/model/src/Basket/Watch.live.ts": "export const WatchLive = 1\n",
+          "packages/shop/model/src/Shop.host.ts": "export const live = 1\n",
+          "packages/shop/web/src/Auth.config.ts": "export const settings = 1\n"
+        },
+        Effect.map(blockFiles(), render(blockFilesSentence))
+      )
+      expect(printed(refused).slice(1)).toEqual([
+        "err:   packages/shop/model/src/Basket/Watch.live.ts ends .live.ts, which is no kind in the registry: give it the ending of a kind a model holds, or add the kind to the registry (Kinds.schema.ts)",
+        "err:   packages/shop/model/src/Shop.host.ts ends .host.ts, a kind a model does not hold: move it to the host package of its context, or give it the ending of what it is",
+        "err:   packages/shop/web/src/Auth.config.ts ends .config.ts, a kind a web does not hold: move it to the host package of its context, or give it the ending of what it is"
       ])
     })
   )

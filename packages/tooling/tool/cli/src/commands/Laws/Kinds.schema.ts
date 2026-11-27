@@ -66,7 +66,7 @@ const blockKinds = (description: string) =>
  *
  * **Details**
  *
- * `block`, `alone`, `holds` and `beside` are read by `laws block-files` and say nothing of a kind that names no block
+ * `block`, `alone`, `folder`, `holds` and `beside` are read by `laws block-files` and say nothing of a kind that names no block
  * of a model: such a kind leaves them at their starting values.
  *
  * @category schemas
@@ -87,6 +87,11 @@ export class Kind extends S.Opaque<Kind, { readonly brand: unique symbol }>()(
       S.annotateKey({ description: "Whether a file with the ending must declare that block" }),
       S.withConstructorDefault(Effect.succeed(false)),
       S.withDecodingDefaultTypeKey(Effect.succeed(false))
+    ),
+    folder: S.String.pipe(
+      S.annotateKey({ description: "The folder a module's files of the kind take when it has more than five" }),
+      S.OptionFromOptionalKey,
+      S.withConstructorDefault(Effect.succeedNone)
     ),
     holds: blockKinds("The kinds of block a file with the ending may hold, whatever else it declares"),
     beside: blockKinds("The kinds of block it may hold only when it declares the block its ending names")
@@ -144,8 +149,27 @@ export const kinds: Readonly<Record<string, Kind>> = {
     importedBy: everyone,
     block: O.some("Domain.Command"),
     alone: true,
+    folder: O.some("commands"),
     holds: itsCommands
   }),
+  // An event and its `evolve`, one event to a file (decision 1 as replaced).
+  event: Kind.make({
+    declares: "one Domain.Event and what it makes of a state",
+    heldBy: ["model"],
+    importedBy: everyone,
+    block: O.some("Domain.Event"),
+    alone: true,
+    folder: O.some("events"),
+    holds: ["event"]
+  }),
+  state: Kind.make({
+    declares: "the tagged union of the states a subject is in, with the pure functions over it",
+    heldBy: ["model", "web"],
+    importedBy: everyone
+  }),
+  transition: Kind.make({ declares: "the rules of a step, each by its name", heldBy: ["model"], importedBy: everyone }),
+  union: Kind.make({ declares: "one tagged union, the file named for it", heldBy: ["model"], importedBy: everyone }),
+  sealed: Kind.make({ declares: "one Domain.Sealed value", heldBy: ["model"], importedBy: everyone }),
   // Deciders: pure, run by the screen and the server alike.
   rules: Kind.make({ declares: "pure functions", heldBy: words, importedBy: everyone }),
   aggregate: Kind.make({
@@ -172,7 +196,7 @@ export const kinds: Readonly<Record<string, Kind>> = {
     holds: ["context"]
   }),
   model: Kind.make({
-    declares: "the Domain.Model",
+    declares: "the Domain.Model, and the Layer that merges its blocks' Lives",
     heldBy: ["model"],
     importedBy: everyone,
     block: O.some("Domain.Model"),
@@ -213,6 +237,20 @@ export const kinds: Readonly<Record<string, Kind>> = {
   adapter: Kind.make({ declares: "a port's Layer over a driver", heldBy: ["host"], importedBy: ["host", "app"] }),
   http: Kind.make({ declares: "the context's endpoints, served", heldBy: ["host"], importedBy: ["app"] }),
   "test-layer": Kind.make({ declares: "a Layer for tests", heldBy: ["host"], importedBy: ["app"] }),
+  // A model run on a platform, and what runs beside it (decision 10a).
+  host: Kind.make({ declares: "a model run on a platform", heldBy: ["host"], importedBy: ["app"] }),
+  cron: Kind.make({ declares: "what a host runs on a schedule", heldBy: ["host"], importedBy: ["app"] }),
+  singleton: Kind.make({ declares: "what a host runs once across its nodes", heldBy: ["host"], importedBy: ["app"] }),
+  // The other surfaces of an Api, each named for its Api (decision 10b); `.http.ts` is the first.
+  cli: Kind.make({ declares: "an Api as commands of a terminal", heldBy: ["host"], importedBy: ["app"] }),
+  toolkit: Kind.make({ declares: "an Api as tools of an assistant", heldBy: ["host"], importedBy: ["app"] }),
+  mcp: Kind.make({ declares: "an Api served over MCP", heldBy: ["host"], importedBy: ["app"] }),
+  route: Kind.make({ declares: "one HTTP route outside an Api", heldBy: ["host"], importedBy: ["app"] }),
+  config: Kind.make({
+    declares: "settings read through Effect Config, named for their subject",
+    heldBy: ["host"],
+    importedBy: ["host", "app"]
+  }),
   // Screens.
   screen: Kind.make({ declares: "one React screen", heldBy: ["web"], importedBy: screens }),
   atoms: Kind.make({ declares: "atoms", heldBy: ["web"], importedBy: screens }),
@@ -236,12 +274,10 @@ export const renamed: Readonly<Record<string, string>> = { store: "port", gatewa
  * @category constants
  */
 export const waiting: Readonly<Record<string, string>> = {
-  "packages/catalog/host/src/Host.ts": "step 6: the kind of a file that runs a model on a platform (decision 10a)",
-  "packages/access/host/src/Host.ts": "step 6: the kind of a file that runs a model on a platform (decision 10a)",
-  "packages/access/host/src/Adapters.ts": "step 7: folded into Host.ts (decision 6)",
+  "packages/catalog/host/src/Host.ts": "step 7: renamed Catalog.host.ts (decision 10a)",
+  "packages/access/host/src/Host.ts": "step 7: renamed Access.host.ts (decision 10a)",
+  "packages/access/host/src/Adapters.ts": "step 7: folded into the host file (decision 6)",
   "packages/access/host/src/Config.ts": "step 7: renamed Auth.config.ts (decision 6)",
-  "packages/access/host/src/SignIn.route.ts": "step 6: .route.ts becomes a kind (decision 7)",
-  "packages/catalog/web/src/ItemEditor.state.ts": "step 6: .state.ts becomes a kind (decision 7)",
   "packages/catalog/model/src/Review/ItemsOfRow.reference.ts": "step 7: renamed ItemsOfRow.context.ts (decision 7)"
 }
 

@@ -5,7 +5,9 @@
  * that may open a preview (goals/alchemy-uptake, step 7), the rule that `main` takes a change only
  * through a pull request whose check passed, with an admin bypass (I7), and the release rules (decision "releases and
  * deploys"): only an admin creates, moves or deletes a `v*` tag, and a `release/*` branch is never rewritten. And one
- * setting of the repository itself: a pull request's branch is deleted once it merges.
+ * setting of the repository itself: a pull request's branch is deleted once it merges. And, once its three settings
+ * are given, the shared turbo cache: the Worker's address and team as variables, the read token as a repository
+ * secret, and the write token in an environment only main may use (goals/ci-speed, step 9; `TurboCache.rules.ts`).
  *
  * Deployed from a workstation only, by the repository's owner: `bunx alchemy deploy
  * packages/infra/src/GitHub.stack.ts --stage prod`. The model key, the previews' password, the previews' token and
@@ -62,6 +64,15 @@ import {
   signUpVariable,
   withoutModelKeyFlag
 } from "./StagePlan.rules.ts"
+import {
+  cacheApiVariable,
+  cacheReadTokenVariable,
+  cacheSettingsOf,
+  cacheTeam,
+  cacheTeamVariable,
+  cacheWriteEnvironment,
+  cacheWriteTokenVariable
+} from "./TurboCache.rules.ts"
 
 /** The repository the deploy workflow runs in. */
 const repository = { owner: "kriegcloud", repository: "inventory-import" } as const
@@ -75,7 +86,9 @@ const repositorySecrets: ReadonlyArray<string> = [
   previewPasswordVariable,
   previewAccessVariable,
   previewTokenVariable,
-  previewAccountVariable
+  previewAccountVariable,
+  cacheReadTokenVariable,
+  cacheWriteTokenVariable
 ]
 
 /**
@@ -293,6 +306,48 @@ export default Alchemy.Stack(
       value: previewAccount
     })
 
+    // The shared turbo cache (goals/ci-speed, step 9): all three settings or none. With none, the workflow finds no
+    // address and runs with turbo's local cache only, as before; a part stops the stack and names what is missing.
+    const cacheApi = yield* Config.String(cacheApiVariable).pipe(
+      Config.option,
+      Config.map(O.filter((value) => S.is(NonBlankSecret)(value)))
+    )
+    const cacheRead = yield* Config.Redacted(cacheReadTokenVariable).pipe(
+      Config.option,
+      Config.map(O.filter((value) => value.pipe(Redacted.value, S.is(NonBlankSecret))))
+    )
+    const cacheWriteToken = yield* Config.Redacted(cacheWriteTokenVariable).pipe(
+      Config.option,
+      Config.map(O.filter((value) => value.pipe(Redacted.value, S.is(NonBlankSecret))))
+    )
+    const cache = yield* Result.match(cacheSettingsOf({ api: cacheApi, read: cacheRead, write: cacheWriteToken }), {
+      onFailure: Effect.die,
+      onSuccess: Effect.succeed
+    })
+    if (O.isSome(cache)) {
+      yield* GitHub.Variable("TurboCacheApi", { ...repository, name: cacheApiVariable, value: cache.value.api })
+      yield* GitHub.Variable("TurboCacheTeam", { ...repository, name: cacheTeamVariable, value: cacheTeam })
+      // A repository secret: GitHub hands it to a run of this repository's own branches and never to a fork's.
+      yield* GitHub.Secret("TurboCacheReadToken", {
+        ...repository,
+        name: cacheReadTokenVariable,
+        value: cache.value.read
+      })
+      // The write token only here: a job takes this environment on a push to main alone, and the environment refuses
+      // any other ref, so a pull request's copy of the workflow cannot name it into its run.
+      const cacheWrite = yield* GitHub.Environment("TurboCacheWrite", {
+        ...repository,
+        name: cacheWriteEnvironment,
+        deploymentBranchPolicy: { customBranchPolicies: ["main"] }
+      })
+      yield* GitHub.Secret("TurboCacheWriteToken", {
+        ...repository,
+        environment: cacheWrite,
+        name: cacheWriteTokenVariable,
+        value: cache.value.write
+      })
+    }
+
     // Benjamin's ask of 2026-11-25: a pull request's branch is deleted once it merges. Only that one setting is
     // given, so every other one (visibility, description, merge methods) stays as GitHub holds it: a setting left out
     // is not sent. The repository is retained on removal, so taking this out of the stack never deletes it. A
@@ -348,7 +403,8 @@ export default Alchemy.Stack(
       environments: ["preview", "staging", "production"],
       modelKey: O.isSome(modelKey) ? "written to production" : "none, on purpose: production's rules answer",
       signUp: "written to production as a secret",
-      previewAccess: "written to the previews as a secret"
+      previewAccess: "written to the previews as a secret",
+      turboCache: O.isSome(cache) ? `team ${cacheTeam}, written` : "none: CI keeps turbo's local cache"
     }
     // The stack is the entry point the CLI runs: this is where the plan of its stage is given.
   }).pipe(InfraStage.provided)

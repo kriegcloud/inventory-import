@@ -14,17 +14,17 @@ the exploration's [DECISIONS.md](../../explorations/ideal-architecture/DECISIONS
 
 | # | Step | Returns (estimate, of the run) | Waits on | Status |
 | --- | --- | --- | --- | --- |
-| 1 | Upload `.turbo/runs/*.json` from both jobs; record ten runs as the baseline | nothing; turns every estimate into a number | nothing | built; the ten runs wait on a push |
+| 1 | Upload `.turbo/runs/*.json` from both jobs; record ten runs as the baseline | nothing; turns every estimate into a number | nothing | done ("Ten runs after" below) |
 | 2 | Start the proofs' three long tasks at once: jobs for prove, verify, and fold with mutants:sample; "Proofs and search of the model" stays as the job that waits for them | 1 to 2 min on a full miss alone; about 4 min with step 3 | nothing | built |
 | 3 | Split the check: `catalog-web:test`; `app:test:slow` with the grid test; everything else; "Check, test and build" stays as the job that waits for them | 3 to 5 min | nothing | built |
-| 4 | Recover the 8 seeds' failing orderings against the code before each fix, pin them, remove the seed loop; time `catalog-web:test` alone with 2, 3 and 4 Vitest workers and split `Draft.machine.test.ts` by group if workers then share it | 2 to 4 min of the longest task | step 3 for the timing | built; the split waits on CI's timing ("Step 4" below) |
+| 4 | Recover the 8 seeds' failing orderings against the code before each fix, pin them, remove the seed loop; time `catalog-web:test` alone with 2, 3 and 4 Vitest workers and split `Draft.machine.test.ts` by group if workers then share it | 2 to 4 min of the longest task | step 3 for the timing | done; no split: `catalog-web:test` 117 to 160 s on CI ("Ten runs after") |
 | 5 | Bring the vendored kit into the hash of prove, verify, mutants and mutants:sample; then take `@beep/repo-cli` out of the root's devDependencies, and bring the CLI's source to the tasks that run it through its own `transit`; the hash experiment both ways | the proofs replay on the 12 of 20 merges that touch only the CLI | nothing | done ("Step 5, the experiment" below) |
 | 6 | `envMode` strict: each task's `env`, the pass-through list found by running `check:full` until it passes, locally and on a branch's CI | nothing; a condition of step 9 | nothing | built; CI's run waits on a push ("Step 6" below) |
 | 7 | `.dev.vars` out of `build`'s outputs and a check that fails when a build artifact holds one; Node pinned exactly and among the global inputs | nothing; a condition of step 9 | nothing | done ("Step 7" below) |
 | 8 | Move `Pwned.slow.test.ts` to a task of its own, never cached; give `test:slow` inputs so the rest can replay | 3 to 5 min where the app's closure is unchanged (22 of the last 40 commits) | step 6 | built ("Step 8" below) |
 | 9 | The Worker: the team's settings declared in `GitHub.stack.ts`; `TURBO_API`, `TURBO_TEAM`, `TURBO_TOKEN` and `TURBO_CACHE` in both jobs (read on a pull request, write on a push to main through the main-only environment, nothing for a fork); `--force` on the check job's tasks on a push to main; the `actions/cache` steps and the key step out of the proofs job; the workstation's lines in `.env.example` | a pull request whose commit passed `bun run check` locally replays those tasks and the proofs; otherwise 2 to 5 min where `bun.lock` is untouched | steps 5 to 8; "By hand" below | todo |
-| 10 | One variable for property run counts in `vitest.shared.ts`, in each task's `env`; 500 for `WaitedRows.property` on a pull request, today's counts in the nightly | about 30 s | step 6 | built ("Step 10" below) |
-| 11 | Drop `tsc -b` from the app's build if `check` covers it; the CLI's at-scale tests to its slow project; `docs/standards/engineering.md` and CLAUDE.md say what CI now carries; ten runs after, beside the baseline | under a minute together | the rest | built but the ten runs, which wait on a push ("Step 11" below) |
+| 10 | One variable for property run counts in `vitest.shared.ts`, in each task's `env`; 500 for `WaitedRows.property` on a pull request, today's counts in the nightly | about 30 s | step 6 | done, seen on CI ("Step 10" below) |
+| 11 | Drop `tsc -b` from the app's build if `check` covers it; the CLI's at-scale tests to its slow project; `docs/standards/engineering.md` and CLAUDE.md say what CI now carries; ten runs after, beside the baseline | under a minute together | the rest | done; median 361 s over ten runs ("Ten runs after") |
 
 Steps 1 to 8 and 10 wait on nothing of Benjamin's. Every estimate is capped by the other job: steps 2 and 3 reach their
 figures together, not apart.
@@ -94,8 +94,58 @@ Every job started within a second of 00:41:40 UTC. Times from GitHub's start and
 
 The two required gates passed: "Proofs and search of the model" at 00:47:32, "Check, test and build" at 00:48:07.
 The whole run took 390 s from its start to the last gate, against a median of 673 s on pull requests before.
-The slow job now sets the run's length. One run is not the ten SPEC asks for; the ten after, and their median
-against 673 s, wait on more runs.
+The slow job now sets the run's length. One run is not the ten SPEC asks for; the ten after are the next section.
+
+## Ten runs after
+
+PR #27 at 4198294, 2026-11-27: run 45918212383, then run 45919308058 and its attempts 2 to 9 (`gh run rerun`), all
+ten green, nothing replayed in any of them (no shared cache yet; the proofs' `actions/cache` keys were new). A run's
+length is from its first job's start to its last job's end, from GitHub's job times:
+
+| | Before (13 runs) | After (10 runs) |
+| --- | --- | --- |
+| Median run, pull request | 673 s | 361 s |
+| Range | 478 to 766 s for the check job alone | 306 to 426 s for the whole run |
+
+The ten, in order: 390, 306, 344, 419, 355, 426, 346, 367, 324 and 374 s. Two of them pass 420 s; the median does not.
+
+Each job over the nine attempts, median (lowest to highest):
+
+| Job | Median |
+| --- | --- |
+| Slow tests and the data grid | 331 s (272 to 358) |
+| The model's proofs | 318 s (227 to 367) |
+| The model against the review region, and a sample of its mutants | 288 s (190 to 417) |
+| Check, test and build, all but the two longest | 276 s (195 to 292) |
+| The search of the model | 199 s (146 to 251) |
+| Check and test the catalog's screens | 173 s (138 to 177) |
+| The reasoner on the vocabulary | 58 s (49 to 63) |
+
+Turbo's own task times over the ten (`.turbo/runs/*.json`, the artifacts step 1 uploads), the ten longest:
+
+| Task | Median | Range |
+| --- | --- | --- |
+| `catalog-model#prove` | 311 s | 207 to 344 |
+| `catalog-web#fold` | 269 s | 172 to 398 |
+| `app#test:slow` | 246 s | 198 to 290 |
+| `catalog-model#verify` | 178 s | 126 to 229 |
+| `catalog-web#test` | 153 s | 117 to 160 |
+| `repo-cli#test` | 91 s | 60 to 100 |
+| `catalog-model#mutants:sample` | 49 s | 38 to 63 |
+| `app#test` | 40 s | 27 to 53 |
+| `catalog-model#test` | 36 s | 24 to 48 |
+| `repo-cli#test:slow` | 35 s | 27 to 43 |
+
+What they settle:
+
+- SPEC's median, at most 420 s over ten runs: 361 s, with nothing replayed. Step 9's cache only shortens it.
+- `catalog-web:test` under 200 s over five runs: 117 to 160 s over ten, so `Draft.machine.test.ts` is not split
+  (step 4).
+- The proofs with nothing replayed in at most 7.5 minutes: the slowest of the three proof jobs took 417 s, and the
+  proofs gate never waited longer.
+- The baseline was measured before step 1's upload existed, so its numbers are GitHub's; turbo's own times start
+  with these ten.
+- What would come next, were it wanted: the fold (172 to 398 s) and the slow job set the longest runs.
 
 ## Step 4, the seeds' orderings
 

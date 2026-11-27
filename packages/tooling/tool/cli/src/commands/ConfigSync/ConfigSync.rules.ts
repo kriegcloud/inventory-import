@@ -607,7 +607,12 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
       )
     )
     const drifts = A.flatMap(
-      A.filter(runners, (runner) => Str.startsWith("turbo run ")(runner.found.value)),
+      A.filter(
+        runners,
+        (runner) =>
+          Str.startsWith("turbo run ")(runner.found.value) ||
+          Str.startsWith("bun packages/tooling/tool/cli/src/bin.ts check run -- turbo run ")(runner.found.value)
+      ),
       ({ script, found }) => {
         const words = A.filter(Str.split(" ")(found.value), (word) => word !== "")
         const named = A.flatMap(words, (word) => (Str.startsWith("//#")(word) ? [Str.slice(3)(word)] : []))

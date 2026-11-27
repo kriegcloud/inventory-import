@@ -17,7 +17,7 @@ pull request is merged, or, for a step with none, when its record below is writt
 | 3 | The person's session: prepared, run by Benjamin, written down | one for the record | todo |
 | 4 | `CLAUDE.md` as an index: which goal owns it, to what length, then the move | one | todo |
 | 5 | Measure `bun run check`: how long, and what a failure prints | the record below | done: 2026-11-26 |
-| 6 | One summary at the end of a failing check | one | todo |
+| 6 | One summary at the end of a failing check | one | doing |
 | 7 | `bun run check:changed` | one | todo |
 | 8 | A merge that finishes on its own | none, or one for the rule in `CLAUDE.md` | todo |
 | 9 | The worktrees and the main checkout | one for `CLAUDE.md` | doing |
@@ -126,6 +126,47 @@ type-error case's diff was not saved, so only its log shows the change.
 
 Whether turbo can run a task after a failed one, or `check` needs a small runner script, is found out in the
 scratchpad first.
+
+
+**Built, 2026-11-26. The design changed.** No law writes a findings file. The summary reads what turbo already
+records: its run summary (`--summarize`, `.turbo/runs/<id>.json`) names every failed task, and the run's own log
+(`--log-file`, kept beside it as `<id>.log`) holds what each task printed. So no law changed, and the type-check,
+oxlint, the formatter and the tests are summarised the same way as the laws.
+
+- `check`, `check:full` and `check:ci` are now `bun packages/tooling/tool/cli/src/bin.ts check run -- turbo run
+  <the same tasks>`. The runner streams turbo's output unchanged, adds `--continue` and `--summarize` when they are
+  not already there (CI passes both), and returns turbo's exit code. On a failure it prints the summary last. On
+  success it prints nothing more. Whatever a caller appends still reaches turbo (`bun run check -- --filter=...`,
+  `--force`). It keeps the ten newest run records.
+- `bun run beep check summary` prints the summary of the newest run by hand.
+- For each failed task the summary gives up to ten lines that say what to fix, whole, with the file and line where
+  the log names them, then the log that holds the rest. A log with no such line gives its last eight lines.
+- A task turbo never caches (every root law, the format check) keeps a log file from an earlier run, or none, so the
+  summary reads this run's own output first and a task's log file only when that holds nothing.
+- `config-sync` writes and checks the three scripts in their new form.
+
+**Checked.** A scratch line with one `??` and one `x!` in `packages/catalog/model/src/Words.rules.ts`, then
+`bun run check`: exit 1, 104 of 107 tasks passed, and the output ended with
+
+```
+//#assertions:check (exit 1)
+  packages/catalog/model/src/Words.rules.ts:16:62: error typescript(no-non-null-assertion): Forbidden non-null assertion.
+//#defaults:check (exit 1)
+  packages/catalog/model/src/Words.rules.ts  holds 1 fallback, and may hold 0: ... Put the starting value on the schema ...
+  packages/catalog/model/src/Words.rules.ts:16  xs[0]! ?? "x"
+//#format:check (exit 1)
+  packages/catalog/model/src/Words.rules.ts (0ms)
+3 of 107 tasks failed
+```
+
+Both laws are reported in one run, where step 5 saw only the first. With the line removed, `bun run check` passed
+107 of 107 and printed no summary; run again it replayed 96 from the cache in 3.9 s, as before.
+`bun run check -- --filter=@beep/repo-cli` ran 32 tasks. The test `test/CheckSummary.test.ts` feeds the summary two
+laws' failures and a package's type error.
+
+**Not checked.** `check:full` and `check:ci` were not run whole; they share the runner, and CI runs `check:ci` on
+the pull request. The assertions law's line says what is forbidden and not what to write: that is oxlint's text, and
+the summary adds nothing to a law's words.
 
 ## 7. `check:changed`
 

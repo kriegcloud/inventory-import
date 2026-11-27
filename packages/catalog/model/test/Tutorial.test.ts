@@ -12,7 +12,9 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import { type Actor, CurrentActor } from "../src/Actor/Actor.context.ts"
 import { Catalog } from "../src/Catalog.model.ts"
-import { Import, ImportStaged, StageImport } from "../src/Import/Import.aggregate.ts"
+import * as StageImport from "../src/Import/commands/StageImport.command.ts"
+import * as ImportStaged from "../src/Import/events/ImportStaged.event.ts"
+import { Import } from "../src/Import/Import.aggregate.ts"
 
 const id = ImportId.make("0190a5c2-7b1e-4c3a-9f10-4d2e8b6a1c57")
 const ana: Actor = { organizationId: "org_prairie", memberId: "ana", role: "editor" }
@@ -22,10 +24,10 @@ it.effect("Tutorial part 1: an aggregate with a story: an editor stages a file, 
     expect(A.isReadonlyArrayNonEmpty(Catalog.aggregates)).toBe(true)
     yield* Story.make(Catalog)(
       Story.provide(CurrentActor, ana),
-      Story.when(StageImport.make({ importId: id, rows: 25, columns: "by heading" })),
+      Story.when(StageImport.Command.make({ importId: id, rows: 25, columns: "by heading" })),
       Story.then(
         Import.ref(id),
-        ImportStaged.make({ organizationId: "org_prairie", rows: 25, columns: "by heading", by: "ana" })
+        ImportStaged.Event.make({ organizationId: "org_prairie", rows: 25, columns: "by heading", by: "ana" })
       )
     )
   })

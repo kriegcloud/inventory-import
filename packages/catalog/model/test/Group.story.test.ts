@@ -10,21 +10,17 @@ import * as A from "effect/Array"
 import { type Actor, CurrentActor } from "../src/Actor/Actor.context.ts"
 import { Catalog } from "../src/Catalog.model.ts"
 import { Group, GroupDecided, GroupUndone } from "../src/Group/Group.aggregate.ts"
-import {
-  ActCounted,
-  ColumnMatched,
-  ConfirmedSince,
-  ConfirmImport,
-  GroupCounted,
-  Import,
-  ImportConfirmed,
-  ImportReopened,
-  ImportStaged,
-  MatchColumn,
-  MatchedSince,
-  ReopenImport,
-  ReviewMovedOn
-} from "../src/Import/Import.aggregate.ts"
+import * as ConfirmImport from "../src/Import/commands/ConfirmImport.command.ts"
+import * as MatchColumn from "../src/Import/commands/MatchColumn.command.ts"
+import * as ReopenImport from "../src/Import/commands/ReopenImport.command.ts"
+import * as ActCounted from "../src/Import/events/ActCounted.event.ts"
+import * as ColumnMatched from "../src/Import/events/ColumnMatched.event.ts"
+import * as GroupCounted from "../src/Import/events/GroupCounted.event.ts"
+import * as ImportConfirmed from "../src/Import/events/ImportConfirmed.event.ts"
+import * as ImportReopened from "../src/Import/events/ImportReopened.event.ts"
+import * as ImportStaged from "../src/Import/events/ImportStaged.event.ts"
+import { Import } from "../src/Import/Import.aggregate.ts"
+import { ConfirmedSince, MatchedSince, ReviewMovedOn } from "../src/Import/Import.rejection.ts"
 import {
   DecidedSince,
   DecideRow,
@@ -52,7 +48,12 @@ const row14 = Row.ref(`${id}/row-14`)
 const ana: Actor = { organizationId: "org_prairie", memberId: "ana", role: "editor" }
 const dana: Actor = { organizationId: "org_prairie", memberId: "dana", role: "editor" }
 const carl: Actor = { organizationId: "org_prairie", memberId: "carl", role: "editor" }
-const staged = ImportStaged.make({ organizationId: "org_prairie", rows: 50_000, columns: "by heading", by: "ana" })
+const staged = ImportStaged.Event.make({
+  organizationId: "org_prairie",
+  rows: 50_000,
+  columns: "by heading",
+  by: "ana"
+})
 // 6,000 rows named in one text, as the screen encodes them.
 const rows = A.join(
   A.makeBy(6_000, (n) => `row-${n + 1}`),
@@ -109,7 +110,7 @@ const groupCounted = (
   input: { readonly change: number; readonly top?: number } & Partial<typeof groupCountedStart>
 ) => {
   const given = { ...groupCountedStart, top: input.change, ...input }
-  return GroupCounted.make({
+  return GroupCounted.Event.make({
     change: given.change,
     step: given.step,
     rows: given.rows,
@@ -201,10 +202,10 @@ const counted = (
   >
 ) => {
   const given = { ...rowStart, ...input }
-  return ActCounted.make({
+  return ActCounted.Event.make({
     change: given.change,
     step: given.step,
-    row: given.row,
+    row: RowId.make(given.row),
     label: "Decide",
     holds: given.change,
     by: given.by,
@@ -218,10 +219,10 @@ const undoneToNothing = (
   input: { readonly change: number; readonly step: string; readonly actor: string } & Partial<typeof rowStart>
 ) => {
   const given = { ...rowStart, ...input }
-  return ActCounted.make({
+  return ActCounted.Event.make({
     change: given.change,
     step: given.step,
-    row: given.row,
+    row: RowId.make(given.row),
     label: "undo",
     holds: 0,
     by: "",
@@ -232,7 +233,7 @@ const undoneToNothing = (
 }
 const counts = { created: 155, updated: 0, already: 0, notImported: 49_845 }
 const confirm = (seen: number) =>
-  ConfirmImport.make({ importId: id, shown: "155", plan: "155", seen, planAt: seen, ...counts })
+  ConfirmImport.Command.make({ importId: id, shown: "155", plan: "155", seen, planAt: seen, ...counts })
 
 it.effect("a group of 6,000 rows is one act and one change, and a confirm has to have received it", () =>
   story(
@@ -245,7 +246,7 @@ it.effect("a group of 6,000 rows is one act and one change, and a confirm has to
     Story.when(confirm(0)),
     Story.rejected(ReviewMovedOn.make({ last: 1 })),
     Story.when(confirm(1)),
-    Story.then(life, ImportConfirmed.make({ change: 2, ...counts, by: "dana" }))
+    Story.then(life, ImportConfirmed.Event.make({ change: 2, ...counts, by: "dana" }))
   )
 )
 it.effect(
@@ -487,8 +488,8 @@ it.effect(
       Story.then(g1, groupDecided({ change: 1, rows: "row-3,row-14", count: 2, patch: leftOut })),
       Story.then(life, groupCounted({ change: 1, rows: 2 })),
       Story.provide(CurrentActor, dana),
-      Story.when(MatchColumn.make({ importId: id, columns: "unit: UoM", saw: 0, opening: 0 })),
-      Story.then(life, ColumnMatched.make({ change: 2, matching: 1, columns: "unit: UoM", by: "dana" })),
+      Story.when(MatchColumn.Command.make({ importId: id, columns: "unit: UoM", saw: 0, opening: 0 })),
+      Story.then(life, ColumnMatched.Event.make({ change: 2, matching: 1, columns: "unit: UoM", by: "dana" })),
       // Carl's screen has the group and not the match. His press leaves row 14 reading as it read to him, on the
       // matching before: it is refused with the matching now, not answered "no change", and nothing is recorded.
       Story.provide(CurrentActor, carl),
@@ -537,10 +538,10 @@ it.effect(
       Story.then(row14, StepUndone.make({ next: noLevel, below: "", undo: 3, step: "u1", by: "dana" })),
       Story.then(
         life,
-        ActCounted.make({
+        ActCounted.Event.make({
           change: 4,
           step: "u1",
-          row: "row-14",
+          row: RowId.make("row-14"),
           label: "undo",
           holds: 1,
           by: "dana",
@@ -857,24 +858,29 @@ it.effect("a group made on an older matching is refused", () =>
     Story.given(
       life,
       staged,
-      ColumnMatched.make({ change: 1, matching: 1, columns: "unit: Unit of measure", by: "dana" })
+      ColumnMatched.Event.make({ change: 1, matching: 1, columns: "unit: Unit of measure", by: "dana" })
     ),
     Story.provide(CurrentActor, ana),
     Story.when(group({ seen: 1, madeOn: 0 })),
     Story.rejected(MatchedSince.make({ matching: 1 })),
-    Story.when(MatchColumn.make({ importId: id, columns: "unit: UoM", saw: 1, opening: 0 })),
-    Story.then(life, ColumnMatched.make({ change: 2, matching: 2, columns: "unit: UoM", by: "ana" }))
+    Story.when(MatchColumn.Command.make({ importId: id, columns: "unit: UoM", saw: 1, opening: 0 })),
+    Story.then(life, ColumnMatched.Event.make({ change: 2, matching: 2, columns: "unit: UoM", by: "ana" }))
   )
 )
 it.effect(
   "a group's undo does not reach past a confirm that stands, and a group made before it is not taken after a reopen",
   () =>
     story(
-      Story.given(life, staged, groupCounted({ change: 1 }), ImportConfirmed.make({ change: 2, ...counts, by: "ana" })),
+      Story.given(
+        life,
+        staged,
+        groupCounted({ change: 1 }),
+        ImportConfirmed.Event.make({ change: 2, ...counts, by: "ana" })
+      ),
       Story.given(g1, groupDecided({ change: 1 })),
       Story.provide(CurrentActor, ana),
-      Story.when(ReopenImport.make({ importId: id, seen: 2 })),
-      Story.then(life, ImportReopened.make({ change: 3, by: "ana" })),
+      Story.when(ReopenImport.Command.make({ importId: id, seen: 2 })),
+      Story.then(life, ImportReopened.Event.make({ change: 3, by: "ana" })),
       Story.when(undoGroup({ undo: 1, opening: 0 })),
       Story.rejected(ConfirmedSince.make({})),
       Story.when(undoGroup({ undo: 1, opening: 1 })),
@@ -888,7 +894,7 @@ it.effect("a group decided after another was taken back goes over the one still 
     Story.given(
       life,
       staged,
-      ColumnMatched.make({ change: 1, matching: 1, columns: "unit: UoM", by: "dana" }),
+      ColumnMatched.Event.make({ change: 1, matching: 1, columns: "unit: UoM", by: "dana" }),
       groupCounted({ change: 2 }),
       groupCounted({ change: 3, step: "g2", rows: 900, label: danasLabel, by: "dana" }),
       groupCounted({ change: 4, step: "g2", rows: 900, label: "undo", by: "dana", top: 2 })

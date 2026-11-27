@@ -16,40 +16,37 @@ import * as Str from "effect/String"
 import { type Actor, CurrentActor } from "../src/Actor/Actor.context.ts"
 import { Catalog } from "../src/Catalog.model.ts"
 import { Group, GroupDecided } from "../src/Group/Group.aggregate.ts"
+import * as ConfirmImport from "../src/Import/commands/ConfirmImport.command.ts"
+import * as MatchColumn from "../src/Import/commands/MatchColumn.command.ts"
+import * as RecordSuggestion from "../src/Import/commands/RecordSuggestion.command.ts"
+import * as RemoveImport from "../src/Import/commands/RemoveImport.command.ts"
+import * as ReopenImport from "../src/Import/commands/ReopenImport.command.ts"
+import * as StageImport from "../src/Import/commands/StageImport.command.ts"
+import * as TakeBackImport from "../src/Import/commands/TakeBackImport.command.ts"
+import { AlreadyStaged } from "../src/Import/commands/StageImport.command.ts"
+import { CountsDoNotAddUp, NotWhatWasShown, PlanBehind } from "../src/Import/commands/ConfirmImport.command.ts"
+import { HasItemsInForce } from "../src/Import/commands/RemoveImport.command.ts"
+import { MoreKeptThanInForce, NotImported } from "../src/Import/commands/TakeBackImport.command.ts"
+import { NotClosed } from "../src/Import/commands/ReopenImport.command.ts"
+import * as ActCounted from "../src/Import/events/ActCounted.event.ts"
+import * as ColumnMatched from "../src/Import/events/ColumnMatched.event.ts"
+import * as GroupCounted from "../src/Import/events/GroupCounted.event.ts"
+import * as ImportConfirmed from "../src/Import/events/ImportConfirmed.event.ts"
+import * as ImportRemoved from "../src/Import/events/ImportRemoved.event.ts"
+import * as ImportReopened from "../src/Import/events/ImportReopened.event.ts"
+import * as ImportStaged from "../src/Import/events/ImportStaged.event.ts"
+import * as ImportTakenBack from "../src/Import/events/ImportTakenBack.event.ts"
+import * as SuggestionRecorded from "../src/Import/events/SuggestionRecorded.event.ts"
+import { Import } from "../src/Import/Import.aggregate.ts"
 import {
-  ActCounted,
-  AlreadyStaged,
-  ColumnMatched,
   ConfirmedSince,
-  ConfirmImport,
-  CountsDoNotAddUp,
-  GroupCounted,
-  HasItemsInForce,
-  Import,
-  ImportConfirmed,
   ImportNotFound,
-  ImportRemoved,
-  ImportReopened,
-  ImportStaged,
-  ImportTakenBack,
-  MatchColumn,
   MatchedSince,
-  MoreKeptThanInForce,
   NoImportThere,
-  NotClosed,
-  NotImported,
   NotOpen,
   NotPermitted,
-  NotWhatWasShown,
-  PlanBehind,
-  RecordSuggestion,
-  RemoveImport,
-  ReopenImport,
-  ReviewMovedOn,
-  StageImport,
-  SuggestionRecorded,
-  TakeBackImport
-} from "../src/Import/Import.aggregate.ts"
+  ReviewMovedOn
+} from "../src/Import/Import.rejection.ts"
 import { DecidedSince, DecideRow, NoLongerThere, PutBackSince, UndoneSince } from "../src/Review/Deciding.decision.ts"
 import { DecideGroup } from "../src/Review/DecidingGroup.decision.ts"
 import {
@@ -78,7 +75,7 @@ const admin: Actor = { organizationId: "org_prairie", memberId: "ada", role: "ad
 const anaViewer: Actor = { ...ana, role: "viewer" }
 // An admin of another organization: a role is no key to an organization's imports.
 const oli: Actor = { organizationId: "org_other", memberId: "oli", role: "admin" }
-const staged = ImportStaged.make({ organizationId: "org_prairie", rows: 200, columns: "by heading", by: "ana" })
+const staged = ImportStaged.Event.make({ organizationId: "org_prairie", rows: 200, columns: "by heading", by: "ana" })
 const leftOut = '{"out":true}'
 const kept = '{"kept":true}'
 const typed = '{"edits":{"name":"Hex bolt M8"}}'
@@ -163,10 +160,10 @@ const counted = (
   } & Partial<typeof madeOnStart>
 ) => {
   const given = { ...madeOnStart, ...input }
-  return ActCounted.make({
+  return ActCounted.Event.make({
     change: given.change,
     step: given.step,
-    row: given.row,
+    row: RowId.make(given.row),
     label: "Decide",
     holds: given.change,
     by: given.by,
@@ -189,10 +186,10 @@ const undone = (
   } & Partial<typeof undoneStart>
 ) => {
   const given = { ...undoneStart, ...input }
-  return ActCounted.make({
+  return ActCounted.Event.make({
     change: given.change,
     step: given.step,
-    row: given.row,
+    row: RowId.make(given.row),
     label: "undo",
     holds: given.holds,
     by: given.by,
@@ -203,10 +200,10 @@ const undone = (
 }
 const counts = { created: 155, updated: 0, already: 0, notImported: 45 }
 const confirm = (input: { readonly seen: number; readonly planAt: number }) =>
-  ConfirmImport.make({ importId: id, shown: "155", plan: "155", ...counts, ...input })
+  ConfirmImport.Command.make({ importId: id, shown: "155", plan: "155", ...counts, ...input })
 // A confirm recorded as change `change`, by Ana with the sample's counts, unless `more` says otherwise.
 const confirmedAs = (change: number, more: Partial<typeof counts & { readonly by: string }>) =>
-  ImportConfirmed.make({ change, ...counts, by: "ana", ...more })
+  ImportConfirmed.Event.make({ change, ...counts, by: "ana", ...more })
 const confirmed = (change: number) => confirmedAs(change, {})
 const level = (input: {
   readonly change: number
@@ -304,19 +301,19 @@ const groupDecidedIn = (change: number, where: Partial<typeof groupStart>) => {
 }
 const groupDecided = (change: number) => groupDecidedIn(change, {})
 const groupCounted = (change: number) =>
-  GroupCounted.make({ change, step: "g1", rows: 2, label: "2 fixes accepted", by: "ana", top: change })
+  GroupCounted.Event.make({ change, step: "g1", rows: 2, label: "2 fixes accepted", by: "ana", top: change })
 
 // ---- a file staged, a suggestion
 it.effect("a viewer may not stage a file; an editor stages it, once", () =>
   story(
     Story.provide(CurrentActor, anaViewer),
-    Story.when(StageImport.make({ importId: id, rows: 200, columns: "by heading" })),
+    Story.when(StageImport.Command.make({ importId: id, rows: 200, columns: "by heading" })),
     Story.rejected(NotPermitted.make({ required: "editor" })),
     Story.provide(CurrentActor, ana),
-    Story.when(StageImport.make({ importId: id, rows: 200, columns: "by heading" })),
+    Story.when(StageImport.Command.make({ importId: id, rows: 200, columns: "by heading" })),
     Story.then(life, staged),
     Story.provide(CurrentActor, dana),
-    Story.when(StageImport.make({ importId: id, rows: 12, columns: "sku: A" })),
+    Story.when(StageImport.Command.make({ importId: id, rows: 12, columns: "sku: A" })),
     Story.rejected(AlreadyStaged.make({}))
   )
 )
@@ -324,13 +321,13 @@ it.effect("a suggestion is recorded as its asker's and changes no number; a view
   story(
     Story.given(life, staged),
     Story.provide(CurrentActor, dana),
-    Story.when(RecordSuggestion.make({ importId: id })),
-    Story.then(life, SuggestionRecorded.make({ by: "dana" })),
+    Story.when(RecordSuggestion.Command.make({ importId: id })),
+    Story.then(life, SuggestionRecorded.Event.make({ by: "dana" })),
     // The next change is still number 1.
-    Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
-    Story.then(life, ColumnMatched.make({ change: 1, matching: 1, columns: "tags: none", by: "dana" })),
+    Story.when(MatchColumn.Command.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
+    Story.then(life, ColumnMatched.Event.make({ change: 1, matching: 1, columns: "tags: none", by: "dana" })),
     Story.provide(CurrentActor, anaViewer),
-    Story.when(RecordSuggestion.make({ importId: id })),
+    Story.when(RecordSuggestion.Command.make({ importId: id })),
     Story.rejected(NotPermitted.make({ required: "editor" }))
   )
 )
@@ -340,17 +337,17 @@ it.effect(
     story(
       Story.given(life, staged),
       Story.provide(CurrentActor, ana),
-      Story.when(RemoveImport.make({ importId: id, seen: 0 })),
-      Story.then(life, ImportRemoved.make({ change: 1, by: "ana" })),
-      Story.when(RecordSuggestion.make({ importId: id })),
+      Story.when(RemoveImport.Command.make({ importId: id, seen: 0 })),
+      Story.then(life, ImportRemoved.Event.make({ change: 1, by: "ana" })),
+      Story.when(RecordSuggestion.Command.make({ importId: id })),
       Story.rejected(NotOpen.make({})),
-      Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
+      Story.when(MatchColumn.Command.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
       Story.rejected(NotOpen.make({})),
-      Story.when(TakeBackImport.make({ importId: id, seen: 1, kept: 0, keptReplaced: 0 })),
+      Story.when(TakeBackImport.Command.make({ importId: id, seen: 1, kept: 0, keptReplaced: 0 })),
       Story.rejected(NotImported.make({})),
-      Story.when(ReopenImport.make({ importId: id, seen: 1 })),
+      Story.when(ReopenImport.Command.make({ importId: id, seen: 1 })),
       Story.rejected(NotClosed.make({})),
-      Story.when(StageImport.make({ importId: id, rows: 200, columns: "by heading" })),
+      Story.when(StageImport.Command.make({ importId: id, rows: 200, columns: "by heading" })),
       Story.rejected(AlreadyStaged.make({}))
     )
 )
@@ -367,13 +364,13 @@ it.effect("an admin of another organization changes nothing in this one's import
     Story.given(row12, decided({ change: 1, by: "ana", step: "a1", flags: leftOut })),
     Story.given(g1, groupDecided(2)),
     Story.provide(CurrentActor, oli),
-    Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
+    Story.when(MatchColumn.Command.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
     Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
-    Story.when(RecordSuggestion.make({ importId: id })),
+    Story.when(RecordSuggestion.Command.make({ importId: id })),
     Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
     Story.when(confirm({ seen: 2, planAt: 2 })),
     Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
-    Story.when(RemoveImport.make({ importId: id, seen: 2 })),
+    Story.when(RemoveImport.Command.make({ importId: id, seen: 2 })),
     Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
     Story.when(act({ row: "row-12", step: "o1", saw: 1, sawGroup: 2, covered: true, flags: kept })),
     Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
@@ -389,9 +386,9 @@ it.effect("an admin of another organization neither takes back nor reopens this 
   story(
     Story.given(life, staged, confirmed(1)),
     Story.provide(CurrentActor, oli),
-    Story.when(TakeBackImport.make({ importId: id, seen: 1, kept: 0, keptReplaced: 0 })),
+    Story.when(TakeBackImport.Command.make({ importId: id, seen: 1, kept: 0, keptReplaced: 0 })),
     Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
-    Story.when(ReopenImport.make({ importId: id, seen: 1 })),
+    Story.when(ReopenImport.Command.make({ importId: id, seen: 1 })),
     Story.rejected(ImportNotFound.make({ reason: NoImportThere }))
   )
 )
@@ -400,26 +397,26 @@ it.effect("an admin of another organization neither takes back nor reopens this 
 it.effect("an id no import has, and another organization's import in any state, are answered alike: not found", () =>
   story(
     Story.provide(CurrentActor, ana),
-    Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
+    Story.when(MatchColumn.Command.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
     Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
-    Story.when(TakeBackImport.make({ importId: id, seen: 0, kept: 0, keptReplaced: 0 })),
+    Story.when(TakeBackImport.Command.make({ importId: id, seen: 0, kept: 0, keptReplaced: 0 })),
     Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
-    Story.when(ReopenImport.make({ importId: id, seen: 0 })),
+    Story.when(ReopenImport.Command.make({ importId: id, seen: 0 })),
     Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
     Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: leftOut })),
     Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
     Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 1, opening: 0, seen: 0 })),
     Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
-    Story.given(life, staged, ImportRemoved.make({ change: 1, by: "ana" })),
+    Story.given(life, staged, ImportRemoved.Event.make({ change: 1, by: "ana" })),
     Story.provide(CurrentActor, oli),
     // Not "staged already", and not "not open": the import is Prairie's, and Northline has none with this id.
-    Story.when(StageImport.make({ importId: id, rows: 200, columns: "by heading" })),
+    Story.when(StageImport.Command.make({ importId: id, rows: 200, columns: "by heading" })),
     Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
-    Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 1, opening: 0 })),
+    Story.when(MatchColumn.Command.make({ importId: id, columns: "tags: none", saw: 1, opening: 0 })),
     Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
-    Story.when(RemoveImport.make({ importId: id, seen: 1 })),
+    Story.when(RemoveImport.Command.make({ importId: id, seen: 1 })),
     Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
-    Story.when(RecordSuggestion.make({ importId: id })),
+    Story.when(RecordSuggestion.Command.make({ importId: id })),
     Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
     Story.when(confirm({ seen: 1, planAt: 1 })),
     Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
@@ -444,13 +441,13 @@ it.effect("a viewer changes nothing: no match, suggestion, confirm, remove, row 
     Story.given(row12, decided({ change: 1, by: "ana", step: "a1", flags: leftOut })),
     Story.given(g1, groupDecided(2)),
     Story.provide(CurrentActor, anaViewer),
-    Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
+    Story.when(MatchColumn.Command.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
     Story.rejected(NotPermitted.make({ required: "editor" })),
-    Story.when(RecordSuggestion.make({ importId: id })),
+    Story.when(RecordSuggestion.Command.make({ importId: id })),
     Story.rejected(NotPermitted.make({ required: "editor" })),
     Story.when(confirm({ seen: 2, planAt: 2 })),
     Story.rejected(NotPermitted.make({ required: "editor" })),
-    Story.when(RemoveImport.make({ importId: id, seen: 2 })),
+    Story.when(RemoveImport.Command.make({ importId: id, seen: 2 })),
     Story.rejected(NotPermitted.make({ required: "editor" })),
     Story.when(act({ row: "row-12", step: "v1", saw: 1, sawGroup: 2, covered: true, flags: kept })),
     Story.rejected(NotPermitted.make({ required: "editor" })),
@@ -466,9 +463,9 @@ it.effect("a viewer neither takes back nor reopens a confirmed import", () =>
   story(
     Story.given(life, staged, confirmed(1)),
     Story.provide(CurrentActor, anaViewer),
-    Story.when(TakeBackImport.make({ importId: id, seen: 1, kept: 0, keptReplaced: 0 })),
+    Story.when(TakeBackImport.Command.make({ importId: id, seen: 1, kept: 0, keptReplaced: 0 })),
     Story.rejected(NotPermitted.make({ required: "editor" })),
-    Story.when(ReopenImport.make({ importId: id, seen: 1 })),
+    Story.when(ReopenImport.Command.make({ importId: id, seen: 1 })),
     Story.rejected(NotPermitted.make({ required: "editor" }))
   )
 )
@@ -527,13 +524,13 @@ it.effect(
       Story.given(row12, decided({ change: 1, by: "ana", step: "a1", flags: leftOut })),
       Story.given(g1, groupDecided(2)),
       Story.provide(CurrentActor, ana),
-      Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 1 })),
+      Story.when(MatchColumn.Command.make({ importId: id, columns: "tags: none", saw: 0, opening: 1 })),
       Story.rejected(NotOpen.make({})),
-      Story.when(RecordSuggestion.make({ importId: id })),
+      Story.when(RecordSuggestion.Command.make({ importId: id })),
       Story.rejected(NotOpen.make({})),
       Story.when(confirm({ seen: 3, planAt: 3 })),
       Story.rejected(NotOpen.make({})),
-      Story.when(RemoveImport.make({ importId: id, seen: 3 })),
+      Story.when(RemoveImport.Command.make({ importId: id, seen: 3 })),
       Story.rejected(NotOpen.make({})),
       Story.when(act({ row: "row-12", step: "a2", saw: 1, sawGroup: 2, covered: true, flags: kept, opening: 1 })),
       Story.rejected(NotOpen.make({})),
@@ -543,17 +540,17 @@ it.effect(
       Story.rejected(NotOpen.make({})),
       Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 1, seen: 2 })),
       Story.rejected(NotOpen.make({})),
-      Story.when(ReopenImport.make({ importId: id, seen: 3 })),
-      Story.then(life, ImportReopened.make({ change: 4, by: "ana" }))
+      Story.when(ReopenImport.Command.make({ importId: id, seen: 3 })),
+      Story.then(life, ImportReopened.Event.make({ change: 4, by: "ana" }))
     )
 )
 it.effect("an import never confirmed is not taken back, and an open one is not opened again", () =>
   story(
     Story.given(life, staged),
     Story.provide(CurrentActor, ana),
-    Story.when(TakeBackImport.make({ importId: id, seen: 0, kept: 0, keptReplaced: 0 })),
+    Story.when(TakeBackImport.Command.make({ importId: id, seen: 0, kept: 0, keptReplaced: 0 })),
     Story.rejected(NotImported.make({})),
-    Story.when(ReopenImport.make({ importId: id, seen: 0 })),
+    Story.when(ReopenImport.Command.make({ importId: id, seen: 0 })),
     Story.rejected(NotClosed.make({}))
   )
 )
@@ -563,29 +560,32 @@ it.effect("an import whose confirm stands is not removed, even when it created n
       life,
       staged,
       confirmedAs(1, { created: 0, already: 155 }),
-      ImportReopened.make({ change: 2, by: "ana" })
+      ImportReopened.Event.make({ change: 2, by: "ana" })
     ),
     Story.provide(CurrentActor, ana),
-    Story.when(RemoveImport.make({ importId: id, seen: 2 })),
+    Story.when(RemoveImport.Command.make({ importId: id, seen: 2 })),
     Story.rejected(HasItemsInForce.make({})),
-    Story.when(TakeBackImport.make({ importId: id, seen: 2, kept: 0, keptReplaced: 0 })),
-    Story.then(life, ImportTakenBack.make({ change: 3, removed: 0, kept: 0, restored: 0, keptReplaced: 0, by: "ana" })),
-    Story.when(RemoveImport.make({ importId: id, seen: 3 })),
-    Story.then(life, ImportRemoved.make({ change: 4, by: "ana" }))
+    Story.when(TakeBackImport.Command.make({ importId: id, seen: 2, kept: 0, keptReplaced: 0 })),
+    Story.then(
+      life,
+      ImportTakenBack.Event.make({ change: 3, removed: 0, kept: 0, restored: 0, keptReplaced: 0, by: "ana" })
+    ),
+    Story.when(RemoveImport.Command.make({ importId: id, seen: 3 })),
+    Story.then(life, ImportRemoved.Event.make({ change: 4, by: "ana" }))
   )
 )
 it.effect("an import with items in force is not removed: a take-back that keeps some leaves them in force", () =>
   story(
-    Story.given(life, staged, confirmed(1), ImportReopened.make({ change: 2, by: "ana" })),
+    Story.given(life, staged, confirmed(1), ImportReopened.Event.make({ change: 2, by: "ana" })),
     Story.provide(CurrentActor, ana),
-    Story.when(RemoveImport.make({ importId: id, seen: 2 })),
+    Story.when(RemoveImport.Command.make({ importId: id, seen: 2 })),
     Story.rejected(HasItemsInForce.make({})),
-    Story.when(TakeBackImport.make({ importId: id, seen: 2, kept: 3, keptReplaced: 0 })),
+    Story.when(TakeBackImport.Command.make({ importId: id, seen: 2, kept: 3, keptReplaced: 0 })),
     Story.then(
       life,
-      ImportTakenBack.make({ change: 3, removed: 152, kept: 3, restored: 0, keptReplaced: 0, by: "ana" })
+      ImportTakenBack.Event.make({ change: 3, removed: 152, kept: 3, restored: 0, keptReplaced: 0, by: "ana" })
     ),
-    Story.when(RemoveImport.make({ importId: id, seen: 3 })),
+    Story.when(RemoveImport.Command.make({ importId: id, seen: 3 })),
     Story.rejected(HasItemsInForce.make({}))
   )
 )
@@ -611,7 +611,7 @@ it.effect("a plan that would do something else than the button said is refused: 
     Story.given(life, staged),
     Story.provide(CurrentActor, ana),
     Story.when(
-      ConfirmImport.make({
+      ConfirmImport.Command.make({
         importId: id,
         seen: 0,
         planAt: 0,
@@ -646,10 +646,10 @@ it.effect(
   "counts that do not add up to the file's rows are refused, and so is more in force than the file has rows",
   () =>
     story(
-      Story.given(life, staged, confirmed(1), ImportReopened.make({ change: 2, by: "ana" })),
+      Story.given(life, staged, confirmed(1), ImportReopened.Event.make({ change: 2, by: "ana" })),
       Story.provide(CurrentActor, ana),
       Story.when(
-        ConfirmImport.make({
+        ConfirmImport.Command.make({
           importId: id,
           seen: 2,
           planAt: 2,
@@ -664,7 +664,7 @@ it.effect(
       Story.rejected(CountsDoNotAddUp.make({})),
       // An item of the first confirm was changed: its row is no longer already there.
       Story.when(
-        ConfirmImport.make({
+        ConfirmImport.Command.make({
           importId: id,
           seen: 2,
           planAt: 2,
@@ -678,13 +678,13 @@ it.effect(
       ),
       Story.then(
         life,
-        ImportConfirmed.make({ change: 3, created: 0, updated: 0, already: 154, notImported: 46, by: "ana" })
+        ImportConfirmed.Event.make({ change: 3, created: 0, updated: 0, already: 154, notImported: 46, by: "ana" })
       ),
-      Story.when(ReopenImport.make({ importId: id, seen: 3 })),
-      Story.then(life, ImportReopened.make({ change: 4, by: "ana" })),
+      Story.when(ReopenImport.Command.make({ importId: id, seen: 3 })),
+      Story.then(life, ImportReopened.Event.make({ change: 4, by: "ana" })),
       // More than the file has rows is never in force.
       Story.when(
-        ConfirmImport.make({
+        ConfirmImport.Command.make({
           importId: id,
           seen: 4,
           planAt: 4,
@@ -707,34 +707,34 @@ it.effect("a take-back, a reopen and a remove each name the last change, so a pr
       life,
       staged,
       confirmed(1),
-      ImportTakenBack.make({ change: 2, removed: 155, kept: 0, restored: 0, keptReplaced: 0, by: "ana" }),
-      ImportReopened.make({ change: 3, by: "ana" }),
+      ImportTakenBack.Event.make({ change: 2, removed: 155, kept: 0, restored: 0, keptReplaced: 0, by: "ana" }),
+      ImportReopened.Event.make({ change: 3, by: "ana" }),
       confirmed(4)
     ),
     Story.provide(CurrentActor, ana),
-    Story.when(TakeBackImport.make({ importId: id, seen: 1, kept: 0, keptReplaced: 0 })),
+    Story.when(TakeBackImport.Command.make({ importId: id, seen: 1, kept: 0, keptReplaced: 0 })),
     Story.rejected(ReviewMovedOn.make({ last: 4 })),
-    Story.when(ReopenImport.make({ importId: id, seen: 2 })),
+    Story.when(ReopenImport.Command.make({ importId: id, seen: 2 })),
     Story.rejected(ReviewMovedOn.make({ last: 4 })),
-    Story.when(TakeBackImport.make({ importId: id, seen: 4, kept: 0, keptReplaced: 0 })),
+    Story.when(TakeBackImport.Command.make({ importId: id, seen: 4, kept: 0, keptReplaced: 0 })),
     Story.then(
       life,
-      ImportTakenBack.make({ change: 5, removed: 155, kept: 0, restored: 0, keptReplaced: 0, by: "ana" })
+      ImportTakenBack.Event.make({ change: 5, removed: 155, kept: 0, restored: 0, keptReplaced: 0, by: "ana" })
     ),
-    Story.when(ReopenImport.make({ importId: id, seen: 5 })),
-    Story.then(life, ImportReopened.make({ change: 6, by: "ana" })),
-    Story.when(RemoveImport.make({ importId: id, seen: 5 })),
+    Story.when(ReopenImport.Command.make({ importId: id, seen: 5 })),
+    Story.then(life, ImportReopened.Event.make({ change: 6, by: "ana" })),
+    Story.when(RemoveImport.Command.make({ importId: id, seen: 5 })),
     Story.rejected(ReviewMovedOn.make({ last: 6 })),
-    Story.when(RemoveImport.make({ importId: id, seen: 6 })),
-    Story.then(life, ImportRemoved.make({ change: 7, by: "ana" }))
+    Story.when(RemoveImport.Command.make({ importId: id, seen: 6 })),
+    Story.then(life, ImportRemoved.Event.make({ change: 7, by: "ana" }))
   )
 )
 it.effect("a take-back takes back everything in force: the second round's items and the first's", () =>
   story(
-    Story.given(life, staged, confirmed(1), ImportReopened.make({ change: 2, by: "ana" })),
+    Story.given(life, staged, confirmed(1), ImportReopened.Event.make({ change: 2, by: "ana" })),
     Story.provide(CurrentActor, ana),
     Story.when(
-      ConfirmImport.make({
+      ConfirmImport.Command.make({
         importId: id,
         seen: 2,
         planAt: 2,
@@ -748,29 +748,29 @@ it.effect("a take-back takes back everything in force: the second round's items 
     ),
     Story.then(
       life,
-      ImportConfirmed.make({ change: 3, created: 10, updated: 0, already: 155, notImported: 35, by: "ana" })
+      ImportConfirmed.Event.make({ change: 3, created: 10, updated: 0, already: 155, notImported: 35, by: "ana" })
     ),
-    Story.when(TakeBackImport.make({ importId: id, seen: 3, kept: 0, keptReplaced: 0 })),
+    Story.when(TakeBackImport.Command.make({ importId: id, seen: 3, kept: 0, keptReplaced: 0 })),
     Story.then(
       life,
-      ImportTakenBack.make({ change: 4, removed: 165, kept: 0, restored: 0, keptReplaced: 0, by: "ana" })
+      ImportTakenBack.Event.make({ change: 4, removed: 165, kept: 0, restored: 0, keptReplaced: 0, by: "ana" })
     ),
-    Story.when(TakeBackImport.make({ importId: id, seen: 4, kept: 0, keptReplaced: 0 })),
+    Story.when(TakeBackImport.Command.make({ importId: id, seen: 4, kept: 0, keptReplaced: 0 })),
     Story.rejected(NotImported.make({})),
-    Story.when(ReopenImport.make({ importId: id, seen: 4 })),
-    Story.then(life, ImportReopened.make({ change: 5, by: "ana" })),
-    Story.when(RemoveImport.make({ importId: id, seen: 5 })),
-    Story.then(life, ImportRemoved.make({ change: 6, by: "ana" }))
+    Story.when(ReopenImport.Command.make({ importId: id, seen: 4 })),
+    Story.then(life, ImportReopened.Event.make({ change: 5, by: "ana" })),
+    Story.when(RemoveImport.Command.make({ importId: id, seen: 5 })),
+    Story.then(life, ImportRemoved.Event.make({ change: 6, by: "ana" }))
   )
 )
 it.effect("an import opened again is taken back without confirming it again", () =>
   story(
-    Story.given(life, staged, confirmed(1), ImportReopened.make({ change: 2, by: "ana" })),
+    Story.given(life, staged, confirmed(1), ImportReopened.Event.make({ change: 2, by: "ana" })),
     Story.provide(CurrentActor, ana),
-    Story.when(TakeBackImport.make({ importId: id, seen: 2, kept: 5, keptReplaced: 0 })),
+    Story.when(TakeBackImport.Command.make({ importId: id, seen: 2, kept: 5, keptReplaced: 0 })),
     Story.then(
       life,
-      ImportTakenBack.make({ change: 3, removed: 150, kept: 5, restored: 0, keptReplaced: 0, by: "ana" })
+      ImportTakenBack.Event.make({ change: 3, removed: 150, kept: 5, restored: 0, keptReplaced: 0, by: "ana" })
     )
   )
 )
@@ -782,17 +782,17 @@ it.effect(
         life,
         staged,
         confirmedAs(1, { created: 100, updated: 50, notImported: 50 }),
-        ImportReopened.make({ change: 2, by: "ana" })
+        ImportReopened.Event.make({ change: 2, by: "ana" })
       ),
       Story.provide(CurrentActor, ana),
-      Story.when(TakeBackImport.make({ importId: id, seen: 2, kept: 101, keptReplaced: 3 })),
+      Story.when(TakeBackImport.Command.make({ importId: id, seen: 2, kept: 101, keptReplaced: 3 })),
       Story.rejected(MoreKeptThanInForce.make({})),
-      Story.when(TakeBackImport.make({ importId: id, seen: 2, kept: 2, keptReplaced: 51 })),
+      Story.when(TakeBackImport.Command.make({ importId: id, seen: 2, kept: 2, keptReplaced: 51 })),
       Story.rejected(MoreKeptThanInForce.make({})),
-      Story.when(TakeBackImport.make({ importId: id, seen: 2, kept: 2, keptReplaced: 3 })),
+      Story.when(TakeBackImport.Command.make({ importId: id, seen: 2, kept: 2, keptReplaced: 3 })),
       Story.then(
         life,
-        ImportTakenBack.make({ change: 3, removed: 98, kept: 2, restored: 47, keptReplaced: 3, by: "ana" })
+        ImportTakenBack.Event.make({ change: 3, removed: 98, kept: 2, restored: 47, keptReplaced: 3, by: "ana" })
       )
     )
 )
@@ -805,19 +805,19 @@ it.effect(
       Story.given(life, staged),
       Story.provide(CurrentActor, ana),
       // By hand, what the headings gave already: nothing is taken back.
-      Story.when(MatchColumn.make({ importId: id, columns: "by heading", saw: 0, opening: 0 })),
+      Story.when(MatchColumn.Command.make({ importId: id, columns: "by heading", saw: 0, opening: 0 })),
       Story.then(life),
       // None, on purpose, for a column its heading gave: that is a match.
-      Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
-      Story.then(life, ColumnMatched.make({ change: 1, matching: 1, columns: "tags: none", by: "ana" })),
+      Story.when(MatchColumn.Command.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
+      Story.then(life, ColumnMatched.Event.make({ change: 1, matching: 1, columns: "tags: none", by: "ana" })),
       Story.provide(CurrentActor, dana),
-      Story.when(MatchColumn.make({ importId: id, columns: "uom: Unit", saw: 0, opening: 0 })),
+      Story.when(MatchColumn.Command.make({ importId: id, columns: "uom: Unit", saw: 0, opening: 0 })),
       Story.rejected(MatchedSince.make({ matching: 1 }))
     )
 )
 it.effect("an act made on an older matching is refused, whatever it decides", () =>
   story(
-    Story.given(life, staged, ColumnMatched.make({ change: 1, matching: 1, columns: "sku: B", by: "dana" })),
+    Story.given(life, staged, ColumnMatched.Event.make({ change: 1, matching: 1, columns: "sku: B", by: "dana" })),
     Story.provide(CurrentActor, ana),
     Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: '{"stored":"replace"}', madeOn: 0 })),
     Story.rejected(MatchedSince.make({ matching: 1 })),
@@ -837,8 +837,8 @@ it.effect(
       Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: kept, madeOn: 0 })),
       ...recorded({ change: 1, by: "ana", step: "a1", flags: kept }, row12, "row-12"),
       Story.provide(CurrentActor, dana),
-      Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
-      Story.then(life, ColumnMatched.make({ change: 2, matching: 1, columns: "tags: none", by: "dana" })),
+      Story.when(MatchColumn.Command.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
+      Story.then(life, ColumnMatched.Event.make({ change: 2, matching: 1, columns: "tags: none", by: "dana" })),
       // A screen that has neither the match nor Ana's keep sends the same keep on the matching before: refused with
       // the matching now, not "no change". So is one that has the keep.
       Story.provide(CurrentActor, admin),
@@ -864,7 +864,7 @@ it.effect(
 )
 it.effect("an act made before a confirm is not taken after the import is opened again", () =>
   story(
-    Story.given(life, staged, confirmed(1), ImportReopened.make({ change: 2, by: "ana" })),
+    Story.given(life, staged, confirmed(1), ImportReopened.Event.make({ change: 2, by: "ana" })),
     Story.provide(CurrentActor, ana),
     Story.when(act({ row: "row-3", step: "a1", saw: 0, flags: leftOut, opening: 0 })),
     Story.rejected(ConfirmedSince.make({})),
@@ -881,20 +881,20 @@ it.effect(
         staged,
         counted({ change: 1, step: "a1", row: "row-12", by: "ana", flags: leftOut }),
         confirmed(2),
-        ImportTakenBack.make({ change: 3, removed: 155, kept: 0, restored: 0, keptReplaced: 0, by: "dana" }),
-        ImportReopened.make({ change: 4, by: "dana" })
+        ImportTakenBack.Event.make({ change: 3, removed: 155, kept: 0, restored: 0, keptReplaced: 0, by: "dana" }),
+        ImportReopened.Event.make({ change: 4, by: "dana" })
       ),
       Story.given(row12, decided({ change: 1, by: "ana", step: "a1", flags: leftOut })),
       Story.provide(CurrentActor, ana),
       Story.when(undo({ row: "row-12", undo: 1, step: "u1", opening: 0 })),
       Story.rejected(ConfirmedSince.make({})),
-      Story.when(MatchColumn.make({ importId: id, columns: "unitCost: List price", saw: 0, opening: 0 })),
+      Story.when(MatchColumn.Command.make({ importId: id, columns: "unitCost: List price", saw: 0, opening: 0 })),
       Story.rejected(ConfirmedSince.make({})),
       Story.when(group({ step: "g1", seen: 4, opening: 0 })),
       Story.rejected(ConfirmedSince.make({})),
       // Made in this opening, the match is taken.
-      Story.when(MatchColumn.make({ importId: id, columns: "unitCost: List price", saw: 0, opening: 1 })),
-      Story.then(life, ColumnMatched.make({ change: 5, matching: 1, columns: "unitCost: List price", by: "ana" }))
+      Story.when(MatchColumn.Command.make({ importId: id, columns: "unitCost: List price", saw: 0, opening: 1 })),
+      Story.then(life, ColumnMatched.Event.make({ change: 5, matching: 1, columns: "unitCost: List price", by: "ana" }))
     )
 )
 it.effect(
@@ -906,10 +906,10 @@ it.effect(
         staged,
         counted({ change: 1, step: "a1", row: "row-12", by: "ana", flags: leftOut }),
         counted({ change: 2, step: "d1", row: "row-12", by: "dana", flags: kept }),
-        ActCounted.make({
+        ActCounted.Event.make({
           change: 3,
           step: "u1",
-          row: "row-12",
+          row: RowId.make("row-12"),
           label: "undo",
           holds: 1,
           by: "ana",
@@ -918,8 +918,8 @@ it.effect(
           madeOn: 0
         }),
         confirmed(4),
-        ImportTakenBack.make({ change: 5, removed: 155, kept: 0, restored: 0, keptReplaced: 0, by: "dana" }),
-        ImportReopened.make({ change: 6, by: "dana" })
+        ImportTakenBack.Event.make({ change: 5, removed: 155, kept: 0, restored: 0, keptReplaced: 0, by: "dana" }),
+        ImportReopened.Event.make({ change: 6, by: "dana" })
       ),
       Story.given(
         row12,
@@ -945,7 +945,7 @@ it.effect("an undo does not reach past a confirm that stands", () =>
       staged,
       counted({ change: 1, step: "a1", row: "row-12", by: "ana", flags: typed }),
       confirmed(2),
-      ImportReopened.make({ change: 3, by: "ana" })
+      ImportReopened.Event.make({ change: 3, by: "ana" })
     ),
     Story.given(row12, decided({ change: 1, by: "ana", step: "a1", flags: typed })),
     Story.provide(CurrentActor, ana),
@@ -979,10 +979,10 @@ it.effect(
       Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "dana" })),
       Story.then(
         life,
-        ActCounted.make({
+        ActCounted.Event.make({
           change: 3,
           step: "u1",
-          row: "row-12",
+          row: RowId.make("row-12"),
           label: "undo",
           holds: 1,
           by: "ana",
@@ -1142,10 +1142,10 @@ it.effect(
       Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "dana" })),
       Story.then(
         life,
-        ActCounted.make({
+        ActCounted.Event.make({
           change: 3,
           step: "u1",
-          row: "row-12",
+          row: RowId.make("row-12"),
           label: "undo",
           holds: 1,
           by: "ana",
@@ -1195,10 +1195,10 @@ it.effect(
       Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "dana" })),
       Story.then(
         life,
-        ActCounted.make({
+        ActCounted.Event.make({
           change: 3,
           step: "u1",
-          row: "row-12",
+          row: RowId.make("row-12"),
           label: "undo",
           holds: 1,
           by: "ana",
@@ -1232,8 +1232,8 @@ it.effect(
       Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: kept })),
       ...recorded({ change: 1, by: "dana", step: "d1", flags: kept }, row12, "row-12"),
       Story.provide(CurrentActor, admin),
-      Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
-      Story.then(life, ColumnMatched.make({ change: 2, matching: 1, columns: "tags: none", by: "ada" })),
+      Story.when(MatchColumn.Command.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
+      Story.then(life, ColumnMatched.Event.make({ change: 2, matching: 1, columns: "tags: none", by: "ada" })),
       // The answer to Dana's keep was lost and her screen sends the very same press: the row holds it already, as
       // hers, under that step, with that text on the matching it was made on. Nothing more is recorded, and she is
       // not told it was made on an older matching, which would have her screen hold a press that is on the row.
@@ -1263,8 +1263,8 @@ it.effect(
         staged,
         counted({ change: 1, step: "d1", row: "row-12", by: "dana", flags: kept }),
         confirmed(2),
-        ImportTakenBack.make({ change: 3, removed: 155, kept: 0, restored: 0, keptReplaced: 0, by: "dana" }),
-        ImportReopened.make({ change: 4, by: "dana" })
+        ImportTakenBack.Event.make({ change: 3, removed: 155, kept: 0, restored: 0, keptReplaced: 0, by: "dana" }),
+        ImportReopened.Event.make({ change: 4, by: "dana" })
       ),
       Story.given(row12, decided({ change: 1, by: "dana", step: "d1", flags: kept })),
       // The row holds this very keep, recorded in the first opening: its copy records nothing, and is not refused.
@@ -1295,8 +1295,8 @@ it.effect(
       Story.when(act({ row: "row-12", step: "d1", saw: 1, flags: kept })),
       ...recorded({ change: 2, by: "dana", step: "d1", flags: kept }, row12, "row-12"),
       Story.provide(CurrentActor, admin),
-      Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
-      Story.then(life, ColumnMatched.make({ change: 3, matching: 1, columns: "tags: none", by: "ada" })),
+      Story.when(MatchColumn.Command.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
+      Story.then(life, ColumnMatched.Event.make({ change: 3, matching: 1, columns: "tags: none", by: "ada" })),
       // Dana's undo would put Ana's decision back on the row, made on the older matching, from a screen that does
       // not show the match. It is refused with the matching now, as her act on the row would be.
       Story.provide(CurrentActor, dana),
@@ -1308,10 +1308,10 @@ it.effect(
       Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "dana" })),
       Story.then(
         life,
-        ActCounted.make({
+        ActCounted.Event.make({
           change: 4,
           step: "u1",
-          row: "row-12",
+          row: RowId.make("row-12"),
           label: "undo",
           holds: 1,
           by: "ana",

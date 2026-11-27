@@ -3,7 +3,8 @@
 // added to it with no story fails here, naming it. The one thing not to break: no list of names is written in this file.
 //
 // What it holds, and what it does not: that a name is written in a story file, not which story or which step. A
-// command counts once its `<Tag>.make(` is in a story file, directly in `Story.when(` or in a helper a story sends
+// command counts once its `<Tag>.make(` is in a story file (`<Tag>.Command.make(` for a command in a file of its
+// own, read as a namespace), directly in `Story.when(` or in a helper a story sends
 // (`act`, `undo`, `group` and `confirm` build four of them). A rejection counts once a `Story.rejected(<Tag>` is
 // there, held once for the model, so a rejection one command already has a story for is not asked again of a twelfth
 // command that declares it: that needs the stories' steps as data. That a step ran and stated every event is the
@@ -20,7 +21,7 @@ type Told = { readonly tag: string; readonly rejects: ReadonlyArray<{ readonly t
 
 /**
  * The commands no story sends and the rejections no story names, given a model's commands and its story files. A tag
- * counts only as a whole name: `Import.make(` is not found inside `StageImport.make(`, nor `History` inside
+ * counts only as a whole name: `Import.make(` is not found inside `StageImport.Command.make(`, nor `History` inside
  * `Story.rejected(HistoryEnds`. A tag is a class name, so it holds no character a pattern would read.
  */
 const untold = (commands: ReadonlyArray<Told>, stories: ReadonlyArray<string>) => {
@@ -28,7 +29,7 @@ const untold = (commands: ReadonlyArray<Told>, stories: ReadonlyArray<string>) =
   return {
     commands: A.filter(
       A.map(commands, (command) => command.tag),
-      (tag) => !said(new RegExp(`(?<![\\w$])${tag}\\.make\\(`))
+      (tag) => !said(new RegExp(`(?<![\\w$])${tag}(?:\\.Command)?\\.make\\(`))
     ),
     rejections: A.filter(
       A.dedupe(A.flatMap(commands, (command) => A.map(command.rejects, (rejection) => rejection.tag))),

@@ -8,7 +8,7 @@ whether anything notices. A **mutant** is one change to the model's source, made
   `by: actor.organizationId`), 105;
 - **nothing**: an accepted act made to record nothing (`return []` before the events), 11.
 
-They cover the import's seven commands (`src/Import/Import.aggregate.ts`) and the four decisions
+They cover the import's seven commands (`src/Import/commands/<Tag>.command.ts`, each with its `decide`) and the four decisions
 (`src/Review/{Deciding,Undoing,DecidingGroup,UndoingGroup}.decision.ts`). Each runs against its proof
 (`test/Import.prove.test.ts` or the decision's `test/*.prove.test.ts`) and the story files `mutants.json` names in
 `stories`: the two story files (`test/Review.story.test.ts`, `test/Group.story.test.ts`) and the Api's test
@@ -220,10 +220,9 @@ an object to `mutants` in `mutants.json`:
   "key": "confirm-sum",
   "target": "import",
   "kind": "check",
-  "file": "src/Import/Import.aggregate.ts",
+  "file": "src/Import/commands/ConfirmImport.command.ts",
   "anchors": ["Effect.fn(\"Import.ConfirmImport\")"],
-  "until": "Effect.fn(\"Import.TakeBackImport\")",
-  "old": "        if (cmd.created + cmd.updated + cmd.already + cmd.notImported !== s.rows) {\n          return yield* CountsDoNotAddUp.make({})\n        }\n",
+  "old": "  if (cmd.created + cmd.updated + cmd.already + cmd.notImported !== s.rows) {\n    return yield* CountsDoNotAddUp.make({})\n  }\n",
   "new": "",
   "proof": "test/Import.prove.test.ts",
   "expect": "rule",
@@ -241,9 +240,9 @@ an object to `mutants` in `mutants.json`:
 - `anchors`: texts found in order; the change lands after the last. For the import, the handler
   (`Effect.fn("Import.ConfirmImport")`); for a decision, its `decide` (`Effect.fn("Deciding.decide")`); for a field,
   that, then the event (`RowDecided.make({`).
-- `until`: where the region ends: the next handler, `    evolve: {` after the last one, `    transitions: {` for a
-  decision, `})` for a field of an event written over several lines, `\n` for one written on one line. Left out, the
-  region runs to the end of the file.
+- `until`: where the region ends: `    transitions: {` for a decision, `})` for a field of an event written over
+  several lines, `\n` for one written on one line. Left out, the region runs to the end of the file, as it does for
+  a command of the import, whose file holds its one `decide`.
 - `old`, `new`: the exact text, indentation and line ends included. A removed check is its whole line or lines,
   ending with `\n`, and `new` is `""`. `old` must occur exactly once between the anchors and `until`, or the runner
   refuses the mutant.

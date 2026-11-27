@@ -23,16 +23,16 @@ import type { Actor } from "../src/Actor/Actor.context.ts"
 import type { Session } from "../src/Actor/Session.middleware.ts"
 import { CatalogApi } from "../src/Catalog.api.ts"
 import { Catalog } from "../src/Catalog.model.ts"
+import { AlreadyStaged } from "../src/Import/commands/StageImport.command.ts"
+import { NotClosed } from "../src/Import/commands/ReopenImport.command.ts"
+import { NotImported } from "../src/Import/commands/TakeBackImport.command.ts"
 import {
-  AlreadyStaged,
   ImportNotFound,
   MatchedSince,
   NoImportThere,
-  NotClosed,
-  NotImported,
   NotPermitted,
   ReviewMovedOn
-} from "../src/Import/Import.aggregate.ts"
+} from "../src/Import/Import.rejection.ts"
 import { NotYourStep } from "../src/Review/Undoing.decision.ts"
 import { noLevel } from "../src/Row/Row.aggregate.ts"
 import { noSession, sessionAs } from "./session.ts"

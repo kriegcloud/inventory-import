@@ -63,7 +63,8 @@ this repo, check it in `node_modules/effect/src/` or the guides in `node_modules
 
 ### The model's blocks: what Verify reads
 
-The review is also a model of `@alchemy.run/domain` (`packages/catalog/model`: `Import/Import.aggregate.ts`,
+The review is also a model of `@alchemy.run/domain` (`packages/catalog/model`: the `Import/` module, one block to a file of its kind
+(`Import.aggregate.ts`, `Import.state.ts`, `Import.transition.ts`, `Import.rejection.ts`, `commands/`, `events/`),
 `Row/Row.aggregate.ts`, `Group/Group.aggregate.ts`, the four `Review/*.decision.ts`, `Catalog.model.ts` and its Api,
 `Catalog.api.ts`). Verify proves its rules from the code of `decide` and `evolve`, so that code is written for two
 readers. Before changing one of those files, read [docs/verify.md](verify.md).

@@ -29,7 +29,8 @@ class Taken extends S.Opaque<Taken, { readonly brand: unique symbol }>()(
     identifier: "CatalogAllowanceTaken",
     description: "One call was taken from the day's allowance"
   })
-) {}
+) {
+}
 
 class UsedUp extends S.Opaque<UsedUp, { readonly brand: unique symbol }>()(
   S.Struct({
@@ -38,7 +39,8 @@ class UsedUp extends S.Opaque<UsedUp, { readonly brand: unique symbol }>()(
       S.annotateKey({ description: "That the day's calls are used, in the words an answer begins with" })
     )
   }).annotate({ identifier: "CatalogAllowanceUsedUp", description: "The day's calls are used: the rules answer" })
-) {}
+) {
+}
 
 /** Whether a call was taken: the catalog's own union of the access context's two cases. */
 export const AllowanceAnswer = AllowanceAnswerKind.mapMembers(() => Tuple.make(Taken, UsedUp)).pipe(
@@ -71,13 +73,17 @@ export class ModelAllowance extends Context.Service<
     Layer.effect(
       ModelAllowance,
       Effect.gen(function* () {
+
         const calls = yield* Ref.make(left)
+
+        const take = Effect.fnUntraced(function* () {
+          yield* CurrentActor
+          const had = yield* Ref.getAndUpdate(calls, (n) => Math.max(0, n - 1))
+          return had > 0 ? taken : usedUp(memoryUsedUpWords)
+        })
+
         return ModelAllowance.of({
-          take: Effect.fnUntraced(function* () {
-            yield* CurrentActor
-            const had = yield* Ref.getAndUpdate(calls, (n) => Math.max(0, n - 1))
-            return had > 0 ? taken : usedUp(memoryUsedUpWords)
-          })
+          take
         })
       })
     )

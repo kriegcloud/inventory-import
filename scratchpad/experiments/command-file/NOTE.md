@@ -56,6 +56,15 @@ sorted lines.
 - **A decide written apart names its parameter types** (`s: ImportState, cmd: MatchColumn`); inline in the aggregate
   they are inferred.
 
+- **An event's `evolve` can sit beside the event as an exported function, not as a static of its class**
+  (`EventStatics.test.ts`, on `Import`). With `ColumnMatched: evolveColumnMatched` the import stands as the baseline
+  does. With `static readonly evolve` on the class and `ColumnMatched: ColumnMatched.evolve` in the aggregate, the
+  code type-checks and runs, and the prover answers `NotTranslated` for all 27 rules of `MatchColumn`: it follows a
+  name to its declaration and does not follow a member of a class. Either form needs the state in its own file. The
+  repository's diagnostics refuse a bare exported `(s, e) =>` (`missingPipeableSignature`), so the function is written
+  with `dual`, and the prover reads through it: with `matching: e.matching` dropped from it, `AMatchIsTheNextOne` was
+  `Violated` for `MatchColumn`. The line was put back.
+
 Not tried here: the stories; `laws block-files` and `laws model-inputs` on the new files. The model's mutants name a file, an
 anchor and the exact text of a line with its indentation (60 of the 192 name `src/Import/Import.aggregate.ts`), so
 moving a decide means writing those again; moving only a command and its event leaves every decide where its mutants

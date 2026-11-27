@@ -285,3 +285,6 @@ whether a block's name, tag and stem being equal is a law.
   aggregate only, so a sixth copy, `model-split-command`, put it under the whole model's verify: verified against
   the package's lock, the lock unchanged.
 - 2026-11-27: he said the brief matches, and asked for the packet committed.
+- 2026-11-27: he asked whether an event could carry its own `evolve` (`GroupDecided: GroupDecided.evolve`), and
+  rules and decisions likewise. Tried on `Import`: as a static of the event's class the prover does not read it (27
+  rules `NotTranslated`); as an exported function beside the event it stands as the baseline. Not a decision yet.

@@ -3,7 +3,7 @@ import * as Domain from "@alchemy.run/domain"
 import { dual } from "effect/Function"
 import * as S from "effect/Schema"
 import { Change } from "../Review/Change.schema.ts"
-import { ImportState } from "./Import.state.ts"
+import * as ImportState from "./Import.state.ts"
 
 /**
  * The import was taken back. Of the items its confirms created: how many were removed, and kept because someone
@@ -20,13 +20,13 @@ export class Event extends Domain.Event(
 
 /** What an import is after `ImportTakenBack`. */
 export const evolve: {
-  (e: Event): (s: ImportState) => ImportState
-  (s: ImportState, e: Event): ImportState
-} = dual(2, (s: ImportState, e: Event): ImportState =>
+  (e: Event): (s: ImportState.State) => ImportState.State
+  (s: ImportState.State, e: Event): ImportState.State
+} = dual(2, (s: ImportState.State, e: Event): ImportState.State =>
   ImportState.guards.Open(s)
     ? { ...s, changes: e.change, confirmedAt: 0, inForce: e.kept, replaced: 0, standing: 0 }
     : ImportState.guards.Imported(s)
-      ? ImportState.cases.TakenBack.make({
+      ? ImportState.TakenBack.make({
           status: "TakenBack",
           organizationId: s.organizationId,
           rows: s.rows,

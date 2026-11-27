@@ -5,7 +5,7 @@ import { CurrentActor } from "../Actor/Actor.context.ts"
 import { Session } from "../Actor/Session.middleware.ts"
 import { Change, ImportKey } from "../Review/Change.schema.ts"
 import { NotOpen, NotPermitted, ReviewMovedOn } from "./Import.rejection.ts"
-import { ImportState } from "./Import.state.ts"
+import * as ImportState from "./Import.state.ts"
 import * as ImportRemoved from "./ImportRemoved.event.ts"
 
 /** Items it created are in force, or a confirm of it was not taken back: it stays with them. */
@@ -28,7 +28,7 @@ export class Command extends Domain.Command(
 ) {}
 
 /** What the import decides of `RemoveImport`. */
-export const decide = Effect.fn("Import.RemoveImport")(function* (s: ImportState, cmd: Command) {
+export const decide = Effect.fn("Import.RemoveImport")(function* (s: ImportState.State, cmd: Command) {
   const actor = yield* CurrentActor
   if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})
   if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})

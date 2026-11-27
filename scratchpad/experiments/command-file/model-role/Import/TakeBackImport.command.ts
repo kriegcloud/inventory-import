@@ -6,7 +6,7 @@ import { CurrentActor } from "../Actor/Actor.context.ts"
 import { Session } from "../Actor/Session.middleware.ts"
 import { Change, ImportKey } from "../Review/Change.schema.ts"
 import { NotPermitted, ReviewMovedOn } from "./Import.rejection.ts"
-import { ImportState } from "./Import.state.ts"
+import * as ImportState from "./Import.state.ts"
 import * as ImportTakenBack from "./ImportTakenBack.event.ts"
 
 /** No confirm of this import stands, so there is nothing to take back. */
@@ -36,7 +36,7 @@ export class Command extends Domain.Command(
 ) {}
 
 /** What the import decides of `TakeBackImport`. */
-export const decide = Effect.fn("Import.TakeBackImport")(function* (s: ImportState, cmd: Command) {
+export const decide = Effect.fn("Import.TakeBackImport")(function* (s: ImportState.State, cmd: Command) {
   const actor = yield* CurrentActor
   if (!ImportState.guards.Imported(s) && !ImportState.guards.Open(s)) return yield* NotImported.make({})
   if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})

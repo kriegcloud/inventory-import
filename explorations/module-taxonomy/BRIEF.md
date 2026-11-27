@@ -80,7 +80,7 @@ was.
 | `<Tag>.event.ts` | `Event`, `evolve` | `ImportStaged.Event`, `ImportStaged.evolve` |
 | `<Tag>.command.ts` | `Command`, `decide`, the rejections only it returns | `StageImport.Command`, `StageImport.decide` |
 | `<Aggregate>.rejection.ts` | each rejection several commands return, by its own name | named imports |
-| `<Aggregate>.state.ts` | the state's schema and each invariant, a named function | named imports |
+| `<Aggregate>.state.ts` | `State`, each case by its name, `guards`, `cases`, `isAnyOf`, and each invariant, a named function | `ImportState.State`, `ImportState.Open`, `ImportState.guards.Open` |
 | `<Aggregate>.aggregate.ts` | the two unions, the transitions in place, and the listing | as today |
 
 The aggregate's listing then has every key equal to its namespace: `evolve: { ImportStaged: ImportStaged.evolve }`,
@@ -110,8 +110,18 @@ the lock unchanged (`scratchpad/experiments/command-file`, `model-role`).
 - **The four decisions.** Their commands record events of `Row`, `Group` and `Import`. The experiment moved
   `Import`'s events only and left each decision's command, `decide` and rules in its file. What a decision's file
   becomes is not in this brief.
-- **The transitions do not move.** In a file of their own they prove the same and the lock refuses all 23. And
-  `invariants` and `transitions` are objects written in the aggregate's file: imported whole, the prover finds none.
+- **The transitions do not move without a change to the library.** In a file of their own they prove the same and
+  the lock refuses all 23: it keeps the text written at the rule's place in the aggregate. About 25 lines of the
+  lock make it follow a name to its declaration (`scratchpad/experiments/command-file/lock-rule-by-name.patch`);
+  with them the 23 moved and the whole model verified against the unchanged lock, on copies. Until that is in
+  `packages/patches`, they stay. `invariants` and `transitions` are objects written in the aggregate's file:
+  imported whole, the prover finds none.
+- **A listed invariant and the lock.** Read in the library, not run: once a lock is written again, an invariant
+  listed by name is kept as its name, and a change to its body in `<Aggregate>.state.ts` no longer shows as a
+  changed rule. The same change to the lock closes it. No lock is written by this goal, so the first relock after
+  it is where this bites.
+- **Defaults on the state.** The prover reads a `make` as the object written: a count left to a constructor default
+  is `Misread`. An `evolve` writes every field.
 - **`laws model-inputs`.** Every file a model, an aggregate or a decision imports must be an input of the package's
   `verify`, `prove` and mutant tasks. Each new `.command.ts` and `.rejection.ts` is one.
 - **The mutants.** Each names a file, an anchor and a line's exact text with its indentation. All 60 that name

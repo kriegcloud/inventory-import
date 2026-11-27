@@ -1,7 +1,7 @@
 // One event of the import, and what it makes of an import.
 import * as Domain from "@alchemy.run/domain"
 import * as S from "effect/Schema"
-import { ImportState } from "./Import.state.ts"
+import * as ImportState from "./Import.state.ts"
 
 /** A suggestion was asked for. It changes nothing a person decided. */
 export class Event extends Domain.Event(
@@ -11,5 +11,5 @@ export class Event extends Domain.Event(
 ) {}
 
 /** What an import is after `SuggestionRecorded`. */
-export const evolve = (s: ImportState): ImportState =>
+export const evolve = (s: ImportState.State): ImportState.State =>
   ImportState.guards.Open(s) ? { ...s, suggestions: s.suggestions + 1 } : s

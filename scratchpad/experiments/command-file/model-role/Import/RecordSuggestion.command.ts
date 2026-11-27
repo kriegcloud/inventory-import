@@ -5,7 +5,7 @@ import { CurrentActor } from "../Actor/Actor.context.ts"
 import { Session } from "../Actor/Session.middleware.ts"
 import { ImportKey } from "../Review/Change.schema.ts"
 import { NotOpen, NotPermitted } from "./Import.rejection.ts"
-import { ImportState } from "./Import.state.ts"
+import * as ImportState from "./Import.state.ts"
 import * as SuggestionRecorded from "./SuggestionRecorded.event.ts"
 
 /** Record that a suggestion was asked for. */
@@ -21,7 +21,7 @@ export class Command extends Domain.Command(
 ) {}
 
 /** What the import decides of `RecordSuggestion`. */
-export const decide = Effect.fn("Import.RecordSuggestion")(function* (s: ImportState) {
+export const decide = Effect.fn("Import.RecordSuggestion")(function* (s: ImportState.State) {
   const actor = yield* CurrentActor
   if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})
   if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})

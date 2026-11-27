@@ -7,7 +7,7 @@ import { Session } from "../Actor/Session.middleware.ts"
 import { Columns, ImportKey } from "../Review/Change.schema.ts"
 import * as ColumnMatched from "./ColumnMatched.event.ts"
 import { ConfirmedSince, MatchedSince, NotOpen, NotPermitted } from "./Import.rejection.ts"
-import { ImportState } from "./Import.state.ts"
+import * as ImportState from "./Import.state.ts"
 
 /** Match a column to a field. `columns` is every field's column after it; `saw` the matching the sender's screen has. */
 export class Command extends Domain.Command(
@@ -22,7 +22,7 @@ export class Command extends Domain.Command(
 ) {}
 
 /** What the import decides of `MatchColumn`. */
-export const decide = Effect.fn("Import.MatchColumn")(function* (s: ImportState, cmd: Command) {
+export const decide = Effect.fn("Import.MatchColumn")(function* (s: ImportState.State, cmd: Command) {
   const actor = yield* CurrentActor
   if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})
   if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})

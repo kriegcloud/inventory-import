@@ -23,7 +23,7 @@ sixteen by scripts (not kept) and formatted with the repository's settings. No l
 | `<Tag>.event.ts` (nine) | event | `Event`, the event's class, and `evolve`, what it makes of an import |
 | `<Tag>.command.ts` (seven) | command | `Command`, the command's class; `decide`, what the import decides of it; and the rejections only it returns, by their own names |
 | `Import.rejection.ts` | rejection | the five rejections several commands or decisions return |
-| `Import.state.ts` | state | the state's schema and the four invariants, each a named function |
+| `Import.state.ts` | state | `State`, the state's schema; each case of it under its own name (`Open`, `Imported`, ...); `guards`, `cases` and `isAnyOf`; and the four invariants, each a named function |
 | `Import.aggregate.ts` | aggregate | the two unions the transitions read, the 23 transitions, and the listing of everything else |
 
 Every file of a kind exports the same names, and the stem is the block's tag. Each is read as a namespace, as
@@ -31,6 +31,11 @@ Every file of a kind exports the same names, and the stem is the block's tag. Ea
 `ImportStaged.evolve`, `StageImport.Command`, `StageImport.decide` (Benjamin, 2026-11-27: the namespace form, then
 "Role names, event per file"). In the aggregate's listing every key is its namespace:
 `ImportStaged: ImportStaged.evolve`, `StageImport: StageImport.decide`.
+
+The state's file is read as `ImportState`, since four files share the stem `Import`: `ImportState.State`,
+`ImportState.Open.make(...)`, `ImportState.guards.Open(s)`, `ImportState.OutcomesAddUpToTheRows` (Benjamin,
+2026-11-27: each case under its own name, and `State` for the schema). Every rule reads `ImportState.guards` as it
+did before, letter for letter.
 
 An earlier form, with the event beside its command and each class under its own name (`StageImport.ImportStaged`),
 is `../command-file/full-ns`.
@@ -66,19 +71,13 @@ is `../command-file/full-ns`.
   (`../command-file/prover-static-member.patch`): with them the static form proves as the baseline does.
 - **Only the `decide`s cost mutants**: all 60 that name `Import.aggregate.ts` change a line of a `decide`.
 
-Three things he proposed for `Import.state.ts`, each tried on a copy of this module (not kept) and none applied here:
-
-- **Each case of the state under its own name** (`export const Open = S.Struct({...})`, the union made of the five
-  names, `Open.make({ status: "Open", ... })`): proves as the package's file does, with nothing changed in the
-  prover. The discriminator stays `status`: `_tag` would change every rule that reads it and what is stored.
-- **Defaults on the state's fields** (`S.withConstructorDefault(Effect.succeed(0))` on each count, and
-  `ImportStaged`'s `evolve` naming only what the event gives): type-checks, and every rule is `Misread` for
-  `StageImport`. The prover reads a `make` as the object written, without the defaults. It would need to be taught
-  them.
-- **`State` for the schema, the file read as `ImportState`** (`import * as ImportState`, `ImportState.State`,
-  `ImportState.Open`, each invariant `ImportState.Name`, and `export const { guards, cases, isAnyOf } = State`):
-  proves as the package's file does, and every transition reads `ImportState.guards.Open(before)` as it did, letter
-  for letter, so the lock would hold. The namespace cannot be the stem: four files share `Import`.
+- **The state's cases under their own names and `State` read as `ImportState` change nothing the prover or the lock
+  reads.** Proved as the package's file, and the whole model verified against the unchanged lock (`command-file`,
+  `model-role`). The discriminator stays `status`: `_tag` would change every rule that reads it and what is stored.
+- **Defaults on the state's fields are not read.** Tried on a copy, not kept: with
+  `S.withConstructorDefault(Effect.succeed(0))` on each count and `ImportStaged`'s `evolve` naming only what the event
+  gives, the code type-checks and every rule is `Misread` for `StageImport`. The prover reads a `make` as the object
+  written, without the defaults; it would need to be taught them. So `ImportStaged.event.ts` still writes every zero.
 
 Not done: `laws block-files` has no `.state.ts` and no `.event.ts`, and was not run on these files; the stories were
 not run; what the library or a tool prints from a class's own name, now `Event` nine times, was not looked for; the

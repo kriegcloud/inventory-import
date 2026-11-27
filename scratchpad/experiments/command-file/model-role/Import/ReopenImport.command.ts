@@ -5,7 +5,7 @@ import { CurrentActor } from "../Actor/Actor.context.ts"
 import { Session } from "../Actor/Session.middleware.ts"
 import { Change, ImportKey } from "../Review/Change.schema.ts"
 import { NotPermitted, ReviewMovedOn } from "./Import.rejection.ts"
-import { ImportState } from "./Import.state.ts"
+import * as ImportState from "./Import.state.ts"
 import * as ImportReopened from "./ImportReopened.event.ts"
 
 /** The import is open: only a confirmed or taken-back one is opened again. */
@@ -24,7 +24,7 @@ export class Command extends Domain.Command(
 ) {}
 
 /** What the import decides of `ReopenImport`. */
-export const decide = Effect.fn("Import.ReopenImport")(function* (s: ImportState, cmd: Command) {
+export const decide = Effect.fn("Import.ReopenImport")(function* (s: ImportState.State, cmd: Command) {
   const actor = yield* CurrentActor
   if (!ImportState.guards.Imported(s) && !ImportState.guards.TakenBack(s)) return yield* NotClosed.make({})
   if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})

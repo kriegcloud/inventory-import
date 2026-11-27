@@ -3,7 +3,7 @@ import * as Domain from "@alchemy.run/domain"
 import { dual } from "effect/Function"
 import * as S from "effect/Schema"
 import { Change } from "../Review/Change.schema.ts"
-import { ImportState } from "./Import.state.ts"
+import * as ImportState from "./Import.state.ts"
 
 /** A closed import was opened again, to fix rows it did not import. */
 export class Event extends Domain.Event(
@@ -14,11 +14,11 @@ export class Event extends Domain.Event(
 
 /** What an import is after `ImportReopened`. */
 export const evolve: {
-  (e: Event): (s: ImportState) => ImportState
-  (s: ImportState, e: Event): ImportState
-} = dual(2, (s: ImportState, e: Event): ImportState =>
+  (e: Event): (s: ImportState.State) => ImportState.State
+  (s: ImportState.State, e: Event): ImportState.State
+} = dual(2, (s: ImportState.State, e: Event): ImportState.State =>
   ImportState.guards.Imported(s) || ImportState.guards.TakenBack(s)
-    ? ImportState.cases.Open.make({
+    ? ImportState.Open.make({
         status: "Open",
         organizationId: s.organizationId,
         rows: s.rows,

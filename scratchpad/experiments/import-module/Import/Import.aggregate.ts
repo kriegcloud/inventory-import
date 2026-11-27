@@ -26,13 +26,7 @@ import * as ActCounted from "./ActCounted.event.ts"
 import * as ColumnMatched from "./ColumnMatched.event.ts"
 import * as ConfirmImport from "./ConfirmImport.command.ts"
 import * as GroupCounted from "./GroupCounted.event.ts"
-import {
-  ImportState,
-  NoMoreInForceThanRows,
-  NothingStandsThatWasTakenBack,
-  OutcomesAddUpToTheRows,
-  WhatIsInForceThenIsWhatWasKept
-} from "./Import.state.ts"
+import * as ImportState from "./Import.state.ts"
 import * as ImportConfirmed from "./ImportConfirmed.event.ts"
 import * as ImportRemoved from "./ImportRemoved.event.ts"
 import * as ImportReopened from "./ImportReopened.event.ts"
@@ -86,13 +80,13 @@ export class Import extends Domain.Aggregate(
   "Import",
   {
     id: ImportKey,
-    state: ImportState,
-    initial: ImportState.cases.Unstaged.make({ status: "Unstaged" }),
+    state: ImportState.State,
+    initial: ImportState.Unstaged.make({ status: "Unstaged" }),
     invariants: {
-      OutcomesAddUpToTheRows,
-      NoMoreInForceThanRows,
-      NothingStandsThatWasTakenBack,
-      WhatIsInForceThenIsWhatWasKept
+      OutcomesAddUpToTheRows: ImportState.OutcomesAddUpToTheRows,
+      NoMoreInForceThanRows: ImportState.NoMoreInForceThanRows,
+      NothingStandsThatWasTakenBack: ImportState.NothingStandsThatWasTakenBack,
+      WhatIsInForceThenIsWhatWasKept: ImportState.WhatIsInForceThenIsWhatWasKept
     },
     transitions: {
       // The status becomes Imported only by a confirm.

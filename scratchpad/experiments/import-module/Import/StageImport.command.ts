@@ -6,7 +6,7 @@ import { CurrentActor } from "../Actor/Actor.context.ts"
 import { Session } from "../Actor/Session.middleware.ts"
 import { Columns, ImportKey } from "../Review/Change.schema.ts"
 import { NotPermitted } from "./Import.rejection.ts"
-import { ImportState } from "./Import.state.ts"
+import * as ImportState from "./Import.state.ts"
 import * as ImportStaged from "./ImportStaged.event.ts"
 
 /** An import with this id was staged already. */
@@ -29,7 +29,7 @@ export class Command extends Domain.Command(
 ) {}
 
 /** What the import decides of `StageImport`. */
-export const decide = Effect.fn("Import.StageImport")(function* (s: ImportState, cmd: Command) {
+export const decide = Effect.fn("Import.StageImport")(function* (s: ImportState.State, cmd: Command) {
   const actor = yield* CurrentActor
   if (actor.role === "viewer") return yield* NotPermitted.make({})
   if (!ImportState.guards.Unstaged(s)) return yield* AlreadyStaged.make({})

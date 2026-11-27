@@ -321,3 +321,12 @@ are open.
   broken moved `decide` and a broken moved `evolve` are each caught, and the whole model verifies against the
   unchanged lock (`command-file`, `model-role`). Decision 1 is replaced and the brief's command part rewritten.
 - 2026-11-27: he answered decision 2: a law. The brief holds the first move of an event behind it.
+- 2026-11-27: he asked how the transitions could be listed as the rest is. The lock keeps the text written in the
+  aggregate; taught in about 25 lines to follow a name to its declaration, all 23 moved to a file and the whole
+  model verified against the unchanged lock, and a changed moved rule was refused. On copies; the change is
+  `command-file/lock-rule-by-name.patch`, not applied. `effect/Predicate`'s `P.Struct`, which he asked about, is not
+  read by the prover and cannot say one field or another.
+- 2026-11-27: he proposed the state's cases under their own names, defaults on its fields, and `State` for the
+  schema. The first and third are in `import-module` now, the file read as `ImportState`: proved, and the whole
+  model verified against the unchanged lock. Defaults are `Misread` by the prover. At his word the superseded
+  copies under `command-file` were removed; they are in history at `52b53e36`.

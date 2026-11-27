@@ -10,7 +10,7 @@ import * as A from "effect/Array"
 import { Group, GroupState, GroupEvent } from "./Group/Group.aggregate.ts"
 import type { DecidedGroup } from "./Group/Group.aggregate.ts"
 import { Import, ImportEvent } from "./Import/Import.aggregate.ts"
-import { ImportState } from "./Import/Import.state.ts"
+import * as ImportState from "./Import/Import.state.ts"
 import { Deciding } from "./Review/Deciding.decision.ts"
 import { DecidingGroup } from "./Review/DecidingGroup.decision.ts"
 import { Undoing } from "./Review/Undoing.decision.ts"
@@ -25,7 +25,7 @@ import { dual } from "effect/Function"
 type Held<State> = { readonly id: string; readonly state: State }
 
 /** An import that was staged and not removed: the cases that number changes. */
-type StagedImport = Exclude<ImportState, typeof ImportState.cases.Unstaged.Type | typeof ImportState.cases.Removed.Type>
+type StagedImport = Exclude<ImportState.State, typeof ImportState.Unstaged.Type | typeof ImportState.Removed.Type>
 
 /**
  * Whether an act on a group still gives its rows what it decided. `undoneAt` is the change that took the act back, and
@@ -59,19 +59,19 @@ const everyDecidedGroup = (groups: ReadonlyArray<Held<GroupState>>, holds: (grou
  */
 const everyGroupOfItsImport: {
   (
-    all: { readonly Group: ReadonlyArray<Held<GroupState>>; readonly Import: ReadonlyArray<Held<ImportState>> },
+    all: { readonly Group: ReadonlyArray<Held<GroupState>>; readonly Import: ReadonlyArray<Held<ImportState.State>> },
     holds: (group: DecidedGroup, life: StagedImport) => boolean
   ): boolean
   (
     holds: (group: DecidedGroup, life: StagedImport) => boolean
   ): (all: {
     readonly Group: ReadonlyArray<Held<GroupState>>
-    readonly Import: ReadonlyArray<Held<ImportState>>
+    readonly Import: ReadonlyArray<Held<ImportState.State>>
   }) => boolean
 } = dual(
   2,
   (
-    all: { readonly Group: ReadonlyArray<Held<GroupState>>; readonly Import: ReadonlyArray<Held<ImportState>> },
+    all: { readonly Group: ReadonlyArray<Held<GroupState>>; readonly Import: ReadonlyArray<Held<ImportState.State>> },
     holds: (group: DecidedGroup, life: StagedImport) => boolean
   ): boolean =>
     everyDecidedGroup(all.Group, (group) =>
@@ -91,19 +91,19 @@ const everyGroupOfItsImport: {
  */
 const everyRowOfItsImport: {
   (
-    all: { readonly Row: ReadonlyArray<Held<RowState>>; readonly Import: ReadonlyArray<Held<ImportState>> },
+    all: { readonly Row: ReadonlyArray<Held<RowState>>; readonly Import: ReadonlyArray<Held<ImportState.State>> },
     holds: (row: ReachedRow, life: StagedImport) => boolean
   ): boolean
   (
     holds: (row: ReachedRow, life: StagedImport) => boolean
   ): (all: {
     readonly Row: ReadonlyArray<Held<RowState>>
-    readonly Import: ReadonlyArray<Held<ImportState>>
+    readonly Import: ReadonlyArray<Held<ImportState.State>>
   }) => boolean
 } = dual(
   2,
   (
-    all: { readonly Row: ReadonlyArray<Held<RowState>>; readonly Import: ReadonlyArray<Held<ImportState>> },
+    all: { readonly Row: ReadonlyArray<Held<RowState>>; readonly Import: ReadonlyArray<Held<ImportState.State>> },
     holds: (row: ReachedRow, life: StagedImport) => boolean
   ): boolean => {
     const besideItsImport = (row: ReachedRow): boolean =>

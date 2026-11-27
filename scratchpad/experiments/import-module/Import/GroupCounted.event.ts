@@ -3,7 +3,7 @@ import * as Domain from "@alchemy.run/domain"
 import { dual } from "effect/Function"
 import * as S from "effect/Schema"
 import { Change, Step } from "../Review/Change.schema.ts"
-import { ImportState } from "./Import.state.ts"
+import * as ImportState from "./Import.state.ts"
 
 /**
  * One act on a group of rows, or its undo, numbered by its import and recorded by the decision that also records the
@@ -21,8 +21,8 @@ export class Event extends Domain.Event(
 
 /** What an import is after `GroupCounted`. */
 export const evolve: {
-  (e: Event): (s: ImportState) => ImportState
-  (s: ImportState, e: Event): ImportState
-} = dual(2, (s: ImportState, e: Event): ImportState =>
+  (e: Event): (s: ImportState.State) => ImportState.State
+  (s: ImportState.State, e: Event): ImportState.State
+} = dual(2, (s: ImportState.State, e: Event): ImportState.State =>
   ImportState.guards.Open(s) ? { ...s, changes: e.change, lastGroup: e.change, topGroup: e.top } : s
 )

@@ -14,7 +14,7 @@ import { Group, GroupDecided, GroupSize, GroupState } from "../Group/Group.aggre
 import { ConfirmedSince, MatchedSince, NotOpen, NotPermitted, ReviewMovedOn } from "../Import/Import.rejection.ts"
 import * as GroupCounted from "../Import/GroupCounted.event.ts"
 import { Import, ImportEvent } from "../Import/Import.aggregate.ts"
-import { ImportState } from "../Import/Import.state.ts"
+import * as ImportState from "../Import/Import.state.ts"
 import { Change, ImportKey, Patch, Rows, Step } from "./Change.schema.ts"
 import { Label } from "./Deciding.decision.ts"
 

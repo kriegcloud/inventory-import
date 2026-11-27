@@ -2,7 +2,7 @@
 import * as Domain from "@alchemy.run/domain"
 import * as S from "effect/Schema"
 import { Change } from "../Review/Change.schema.ts"
-import { ImportState } from "./Import.state.ts"
+import * as ImportState from "./Import.state.ts"
 
 /** An open import with nothing in force was removed. */
 export class Event extends Domain.Event(
@@ -12,7 +12,5 @@ export class Event extends Domain.Event(
 ) {}
 
 /** What an import is after `ImportRemoved`. */
-export const evolve = (s: ImportState): ImportState =>
-  ImportState.guards.Open(s)
-    ? ImportState.cases.Removed.make({ status: "Removed", organizationId: s.organizationId })
-    : s
+export const evolve = (s: ImportState.State): ImportState.State =>
+  ImportState.guards.Open(s) ? ImportState.Removed.make({ status: "Removed", organizationId: s.organizationId }) : s

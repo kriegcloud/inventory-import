@@ -15,7 +15,7 @@ import { Session } from "../Actor/Session.middleware.ts"
 import * as ActCounted from "../Import/ActCounted.event.ts"
 import { ConfirmedSince, MatchedSince, NotOpen, NotPermitted } from "../Import/Import.rejection.ts"
 import { Import, ImportEvent } from "../Import/Import.aggregate.ts"
-import { ImportState } from "../Import/Import.state.ts"
+import * as ImportState from "../Import/Import.state.ts"
 import {
   CUT,
   letGo,

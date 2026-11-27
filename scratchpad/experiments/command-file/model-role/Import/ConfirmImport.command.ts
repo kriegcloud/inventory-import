@@ -6,7 +6,7 @@ import { CurrentActor } from "../Actor/Actor.context.ts"
 import { Session } from "../Actor/Session.middleware.ts"
 import { Change, Digest, ImportKey } from "../Review/Change.schema.ts"
 import { NotOpen, NotPermitted, ReviewMovedOn } from "./Import.rejection.ts"
-import { ImportState } from "./Import.state.ts"
+import * as ImportState from "./Import.state.ts"
 import * as ImportConfirmed from "./ImportConfirmed.event.ts"
 
 /** The plan was built at a change that is no longer the last: the handler builds it again. */
@@ -57,7 +57,7 @@ export class Command extends Domain.Command(
 ) {}
 
 /** What the import decides of `ConfirmImport`. */
-export const decide = Effect.fn("Import.ConfirmImport")(function* (s: ImportState, cmd: Command) {
+export const decide = Effect.fn("Import.ConfirmImport")(function* (s: ImportState.State, cmd: Command) {
   const actor = yield* CurrentActor
   if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})
   if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})

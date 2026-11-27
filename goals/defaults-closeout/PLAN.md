@@ -79,6 +79,20 @@ signed in as Dana Whitfield. No error in the browser's console.
   Viewer 1.
 - Not seen on screen: a column a row does not hold, the case the reader's None is for. No file reaches it.
 
+2026-11-26, on the branch of pull request 25, a fresh database in its worktree, port 5174, signed in as Dana
+Whitfield. Seen on rows edited by hand, as Benjamin chose for the last acceptance line.
+
+- Pressed "Use items_messy.csv", picked "Category: 3 left", pressed "Use finished-goods for the 2 ticked": Ready read
+  157. Pressed "Import 157, skip 43", then "Import 157 items". The stored changes of rows 135 (XEF-3241) and 172
+  (FJK-4550) read decided by a person, Dana Whitfield, confidence medium.
+- Activity, Decisions, before any edit: both rows read "Rule · medium" and "Dana Whitfield".
+- Cleared row 135's `decidedByName` and row 172's `confidence` in `importChange` with an `UPDATE` on that local
+  database. Reloaded Activity: row 135 read "Rule · medium" and "Not recorded"; row 172 read "Rule", with no
+  confidence word, and "Dana Whitfield".
+- Not seen on screen: the review region asking a fix with no confidence (the last decision, below). The import
+  always passes a confidence, and a stored suggestion's column refuses none, so no row of the app reaches it. A
+  test holds it (`Review.test.ts`, "a fix with no confidence").
+
 ## Blocker
 
 None.
@@ -123,6 +137,9 @@ started was the dev server reloading the page, and is fixed in this pull request
   imports is ready at start. Pressed again on a cold dev server: no reload, and Review read Needs a decision 24,
   Cannot import 21, Ready 155, All 200.
 
+- 2026-11-26. The last open decision, Benjamin's: a fix with no confidence in the review region follows the ruling
+  on stored proposals. It was a one-press answer that a group accept could take; `choicesOf` now makes it a
+  question between its value and the alternatives, as a `low` fix is.
 - 2026-11-26. The stored change's `confidence` and a left-out row's `name` became optional on the wire, so absence
   is carried as absence. Stored columns are unchanged.
 - 2026-11-26. A stored left-out row whose name cannot be read used to show as "nobody settled it". It now shows as

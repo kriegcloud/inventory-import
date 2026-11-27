@@ -14,13 +14,13 @@ pull request is merged, or, for a step with none, when its record below is writt
 | --- | --- | --- | --- |
 | 1 | This packet | | doing |
 | 2 | Benjamin's ruling on what waits for the person's session | none: a decision | done: 2026-11-26 (below) |
-| 3 | The person's session: prepared, run by Benjamin, written down | one for the record | todo |
-| 4 | `CLAUDE.md` as an index: which goal owns it, to what length, then the move | one | todo |
+| 3 | The person's session: prepared, run by Benjamin, written down | one for the record | doing: prepared |
+| 4 | `CLAUDE.md` as an index: which goal owns it, to what length, then the move | one | doing |
 | 5 | Measure `bun run check`: how long, and what a failure prints | the record below | done: 2026-11-26 |
 | 6 | One summary at the end of a failing check | 35 | done: 2026-11-26 |
-| 7 | `bun run check:changed` | one | doing |
+| 7 | `bun run check:changed` | 40 | done: 2026-11-26 |
 | 8 | A merge that finishes on its own | none, or one for the rule in `CLAUDE.md` | todo |
-| 9 | The worktrees and the main checkout | one for `CLAUDE.md` | todo |
+| 9 | The worktrees and the main checkout | one for `CLAUDE.md` | done: #36, 2026-11-26 |
 | 10 | Close: the closing note, `status: done`, `bun run check:full` on main | one | todo |
 
 Every question was answered on 2026-11-26 ("Decided", below). Step 5 is done. Steps 4, 6, 7 and 9 can start. Step 8 waits on Benjamin's change to the settings, and step 3 on a person he brings.
@@ -47,6 +47,11 @@ who did not build the import is recorded anywhere in `goals/`, `docs/qa/` or the
 The file stays theirs. The record holds counts and observations, never a value, a heading or a name from it. Where
 the session runs (Benjamin's machine with `bun run dev`, or a hosted stage he deploys) is his.
 
+**Prepared, 2026-11-26.** [SESSION.md](SESSION.md) holds the three parts: the page the person reads, what Benjamin
+watches for, and the record he fills in and copies here. Its screen words were read on screen, from the messy sample
+on an empty database at `5aa253aa`. The session itself is Benjamin's to run with the person he brings. Until it is
+recorded here, step 2's ruling holds.
+
 ## 4. `CLAUDE.md`
 
 **Found.** 796 lines and 12,434 words on 2026-11-26, up from 775 lines when [quality](../quality/PLAN.md) measured
@@ -58,6 +63,31 @@ the longest sections. Quality's step 3 already holds "under 400 lines" and is `t
 quality's place), and the layout to `docs/architecture.md`, which exists. What stays: what the app is, how we work, the
 import's rules, the UI's rules in short, and one line for each moved section with its link. The pull request lists
 every moved rule and where it now is.
+
+**Done, 2026-11-26.** `CLAUDE.md` went from 800 lines to 170 (the limit is 200; 166 before step 9's rule on worktrees joined it). It keeps the header, "What this is",
+"How we work", "Rules for an import", a short "UI, in short", and "Where the rest is", a table that names each moved
+section and its file. Every moved section kept its heading, so a pointer elsewhere that reads `CLAUDE.md`, "Commands"
+finds the section through that table. No pointer had to change, except the two that said `CLAUDE.md` holds the skills
+table (`AGENTS.md`, `.agents/skills/README.md`).
+
+| Moved | To |
+| --- | --- |
+| What is there, Layout | `docs/architecture.md`, after its diagrams |
+| Skills, Sub-agents | `docs/agents.md`, new |
+| Commands | `docs/commands.md`, new |
+| What the type-check enforces | `docs/laws.md`, new |
+| Adding a feature; Effect (version 4) with The model's blocks and Tests; Platform; Identity and permissions; AI features; Comments and documentation | `docs/building.md`, new |
+| UI | `docs/ui.md`, new |
+
+The move was a script, and a second script checked it. It read every non-blank line of the old file and looked for
+each one, as a whole line, in the new `CLAUDE.md` and the six `docs/` files. 721 of 723 lines were found. Ten of them
+were found only through a listed rewrite: two link targets made relative to `docs/`, and five cross-references to a
+section now in another file ("UI" below became "UI" in `[ui](ui.md)`). The two not found are the old intro sentence,
+which named the sections the file no longer holds, and it was rewritten. The line "Paths in this file and in `docs/`
+that start `src/`..." stays in both places.
+
+Found on the way and not changed, since a move changes no words: "UI" still names the views "Needs you N · Can't
+fix here N", where the screen reads "Needs a decision" and "Cannot import".
 
 ## 5. Measuring the check
 
@@ -219,6 +249,17 @@ named both `//#assertions:check` and `//#defaults:check`: 2 of 107 tasks failed.
 byte from its saved copy. The full `bun run check` then passed 107 of 107 tasks, 92 replayed, in 3.62 s wall time
 (turbo: 3.445 s). SPEC's acceptance remains unticked; step 7 stays `doing` until its pull request is merged.
 
+**Timed on main after the merge, 2026-11-26**, at `4db228f2`, each with `bun run check:changed` itself:
+
+| Change | `bun run check` (step 5) | `bun run check:changed` | Tasks |
+| --- | --- | --- | --- |
+| One comment line in `packages/catalog/model/src/Item/Items.handler.ts` | 167 s | 37 s | 39 |
+| One comment line in `apps/inventory/src/web/Workspace.tsx` | 10 s | 10 s | 32 |
+| Nothing changed | 3.5 s | 4 s | 29 |
+
+The target SPEC's acceptance names is this table: a one-file change in one package finishes in at most 60 s. The
+failing case was run before the merge, on the branch (above). Step 7 is done.
+
 ## 8. A merge that finishes on its own
 
 **Found.** Merging pull requests 23 and 24 meant an agent waited on both required checks, then merged with
@@ -246,6 +287,90 @@ one. `.claude/worktrees/` is where the Claude app puts them, and nothing written
 yes, remove the clean ones whose branch is in main and the clean detached ones whose commit is in main, then
 `git worktree prune`. He says whose the main checkout's changes are. `CLAUDE.md`, "How we work", gets one line on where
 worktrees go.
+
+**Done, 2026-11-26, 20:55.** 57 worktrees were listed with `git worktree list --porcelain`, and each was read for its
+branch, whether its commit is in `origin/main`, `git status --porcelain` and its last commit's date. None of them had a
+process running inside it. Seven were clean with their commit in main, and were removed with `git worktree remove`,
+then `git worktree prune`:
+
+| Removed | Branch | Commit |
+| --- | --- | --- |
+| `.claude/worktrees/alchemy-uptake-setup` | `docs/alchemy-uptake-goal` (#30, merged) | `a4c37ae9` |
+| `.claude/worktrees/integration-b24a` | `integration/b48` | `c66937b5` |
+| `.claude/worktrees/kernel-drivers-c595b2` | detached | `3a3ff59b` |
+| `.claude/worktrees/party-slice` | `goal/party-slice` (#23, merged) | `e8b5aafb` |
+| `.claude/worktrees/patches` | `claude/patches` | `5e99a950` |
+| `.claude/worktrees/strict-hosts-5e2ab1` | detached | `c21d5482` |
+| the atoms session's cache, `scratchpad/loop` | detached | `c0391da7` |
+
+The four local branches among them were deleted with `git branch -d`, which refuses a branch that is not merged. Their
+copies on GitHub were left, since deleting those is the setting of step 8. What git ignores in them went with them:
+`.mutants/` folders, `.scratch/` screenshots and one `.scratch-dev.log`.
+
+The 51 left, this step's own included, each with why it stays:
+
+| Worktree | Branch | In main | Changed files | Last commit | Why it stays |
+| --- | --- | --- | --- | --- | --- |
+| the main checkout | `feat/domain-uptake-move-1` | no | 63 | 2026-11-26 | Pull request 32, open; a session is working there. Whose the changes are is Benjamin's |
+| `.claude/worktrees/focus-and-friction` | `goal/ff-summary` | no | 0 | 2026-11-26 | Step 6, pull request 35, open |
+| `.claude/worktrees/ff-worktrees` | `goal/ff-worktrees` | no | 2 | 2026-11-26 | This step's pull request |
+| `.claude/worktrees/ci-speed` | `fix/ci-cache-run-counts` | yes | 1 | 2026-11-26 | One changed file |
+| `.claude/worktrees/integration` | `integration/b10` | yes | 0 | 2026-11-22 | Clean and in main, but git ignores an `.alchemy/` state folder and `packages/infra/env/op.env.local` in it. Benjamin's |
+| `sean-demo/rebuild` (a sibling folder) | detached | yes | 0 | 2026-11-22 | Clean and in main, but in another project's folder. Benjamin's |
+| `interview/inventory-import-latest` (a sibling folder) | `chore/actions-node24` | no | 0 | 2026-11-26 | Branch not in main |
+| `.claude/worktrees/integration-b11` | `integration/b43` | no | 0 | 2026-11-23 | Branch not in main |
+| `.claude/worktrees/wf_9da7e007-88f-3` | `worktree-wf_9da7e007-88f-3` | no | 0 | 2026-11-23 | Branch not in main |
+| `.claude/worktrees/atoms-b569e5` | detached | no | 0 | 2026-11-25 | Commit not in main |
+| `.claude/worktrees/defaults-last` | detached | no | 0 | 2026-11-26 | Commit not in main |
+| `.claude/worktrees/wf_083b9049-27a-1`, `wf_0a2b9bdf-fd3-1` | detached | no | 2 each | 2026-11-22 | Changed, commit not in main |
+| `.claude/worktrees/wf_29cd7dc9-997-1` | detached | no | 11 | 2026-11-22 | Changed, commit not in main |
+| `.claude/worktrees/wf_31a2095e-a44-1`, `-2` | their own `worktree-wf_…` branches | yes | 2 and 1 | 2026-11-22 | Changed |
+| 21 other `.claude/worktrees/wf_*` of workflows from 2026-11-21 and 22 | detached | yes | 1 to 57 | 2026-11-21 to 22 | Changed |
+| 14 under the atoms session's cache: `scratchpad/chk-world` and its 13 mutant copies in `.mut/` | detached | no | 22 to 25 | 2026-11-22 | Changed, commit not in main |
+
+The `wf_*` worktrees are what Workflow runs left behind: a child agent's worktree is kept when it has changes. Most
+of those changes may be work that a merged pull request already holds in another form, but that was not checked file
+by file, so they stay until Benjamin says.
+
+`CLAUDE.md`, "How we work", now says where this repository's worktrees go and when one is removed.
+
+**Compared, 2026-11-26, on Benjamin's answer** (the exploration's decisions, "the commit check's tests, and the
+worktrees left"). Each of the 26 changed `wf_*` worktrees was compared with `origin/main` at `4043181f`, file by
+file: a changed or new file counts as held when its content hashes the same as main's file at that path, a deleted
+file when main no longer has it either. A worktree would be removed only if every file were held. None was, so none
+was removed. Most were cut before main's packages moved (the catalog's web package, the review region), so a
+difference may only mean the file now lives elsewhere, not that it holds work main lacks. That was not checked.
+
+| Worktree | Changed files | Different from main | First of them |
+| --- | --- | --- | --- |
+| `wf_083b9049-27a-1` | 2 | 2 | `packages/review/src/internal/ReviewGrid.tsx`, `packages/review/src/internal/ReviewQueue.tsx` |
+| `wf_0a2b9bdf-fd3-1` | 2 | 2 | `packages/catalog/web/test/Draft.machine.test.ts`, `packages/catalog/web/test/support/draftWorld.ts` |
+| `wf_1d27d04d-290-1` | 23 | 21 | `apps/inventory/test/server/ConfirmRevision.slow.test.ts`, `apps/inventory/test/server/Imports.slow.test.ts`, `apps/inventory/test/server/MatchAtomic.slow.test.ts`, … |
+| `wf_1d27d04d-290-2` | 23 | 20 | `packages/catalog/web/src/Draft.atoms.ts`, `packages/catalog/web/src/Draft.machine.ts`, `packages/catalog/web/src/Notices.atoms.ts`, … |
+| `wf_1d27d04d-290-3` | 39 | 36 | `apps/inventory/src/web/App.tsx`, `apps/inventory/src/web/Workspace.tsx`, `apps/inventory/src/web/components/app/AppSidebar.tsx`, … |
+| `wf_29973122-576-1` | 3 | 3 | `DECISIONS.md`, `packages/catalog/web/src/Draft.machine.ts`, `packages/catalog/web/test/Draft.machine.test.ts` |
+| `wf_29973122-576-2` | 57 | 31 | `apps/inventory/test/web/gridCallbacks.test.ts`, `docs/kit.md`, `docs/standards/engineering.md`, … |
+| `wf_29cd7dc9-997-1` | 11 | 11 | `DECISIONS.md`, `docs/review-table.md`, `packages/review/src/ReviewDraft.rules.ts`, … |
+| `wf_29cece89-99a-1` | 1 | 1 | `packages/catalog/web/test/zz_probe.test.ts` |
+| `wf_29cece89-99a-2` | 50 | 32 | `docs/kit.md`, `docs/standards/engineering.md`, `docs/standards/no-try.md`, … |
+| `wf_2d6f9c1b-d53-1` | 16 | 15 | `apps/inventory/test/server/MatchAtomic.slow.test.ts`, `apps/inventory/test/server/Rematch.slow.test.ts`, `apps/inventory/test/server/WaitedRows.slow.test.ts`, … |
+| `wf_31a2095e-a44-1` | 2 | 2 | `packages/catalog/web/src/Draft.machine.ts`, `packages/catalog/web/test/Draft.machine.test.ts` |
+| `wf_31a2095e-a44-2` | 1 | 1 | `packages/catalog/web/test/SessionAsked.test.ts` |
+| `wf_6903598d-ac8-1` | 4 | 3 | `apps/inventory/test/server/Tenancy.slow.test.ts`, `packages/catalog/host/src/ImportStore.adapter.ts`, `apps/inventory/test/server/WriteLimits.slow.test.ts` |
+| `wf_6903598d-ac8-2` | 1 | 1 | `packages/catalog/web/src/Draft.machine.ts` |
+| `wf_6ea7687d-dc3-1` | 12 | 10 | `goals/atoms/PLAN.md`, `packages/catalog/model/src/Item/ItemSearch.rules.ts`, `packages/catalog/model/src/Review/CellReading.rules.ts`, … |
+| `wf_721d0736-442-1` | 13 | 12 | `apps/inventory/test/server/MatchAtomic.slow.test.ts`, `apps/inventory/test/server/Rematch.slow.test.ts`, `apps/inventory/test/server/WaitedRows.slow.test.ts`, … |
+| `wf_721d0736-442-2` | 23 | 20 | `DECISIONS.md`, `apps/inventory/src/web/Workspace.tsx`, `apps/inventory/src/web/lib/ofThisPage.ts`, … |
+| `wf_85855b04-75e-1` | 21 | 6 | `docs/kit.md`, `goals/atoms/PLAN.md`, `packages/catalog/web/test/ItemsTableAddress.test.ts`, … |
+| `wf_df3fabe5-99a-1` | 27 | 24 | `DECISIONS.md`, `packages/catalog/web/src/Draft.atoms.ts`, `packages/catalog/web/src/Draft.machine.ts`, … |
+| `wf_e0d42d40-674-1` | 14 | 13 | `apps/inventory/test/server/MatchAtomic.slow.test.ts`, `apps/inventory/test/server/Rematch.slow.test.ts`, `apps/inventory/test/server/StaleAccepts.slow.test.ts`, … |
+| `wf_e0d42d40-674-2` | 22 | 21 | `apps/inventory/src/web/Workspace.tsx`, `packages/catalog/web/package.json`, `packages/catalog/web/src/Draft.atoms.ts`, … |
+| `wf_e2345590-b7b-1` | 12 | 10 | `docs/standards/engineering.md`, `docs/standards/no-try.md`, `package.json`, … |
+| `wf_e2345590-b7b-2` | 38 | 23 | `apps/inventory/scripts/grid-keys.mjs`, `docs/kit.md`, `packages/access/web/src/Session.atoms.ts`, … |
+| `wf_e4a7914b-cfd-1` | 20 | 20 | `apps/inventory/test/web/gridAtoms.test.ts`, `docs/kit.md`, `goals/atoms/PLAN.md`, … |
+| `wf_f2fe47fa-07d-1` | 10 | 8 | `goals/atoms/PLAN.md`, `packages/catalog/model/src/Item/ItemSearch.rules.ts`, `packages/catalog/model/src/Review/CellReading.rules.ts`, … |
+
+`integration` and `sean-demo/rebuild` stay, on the same answer.
 
 ## Decided 2026-11-26
 

@@ -11,6 +11,11 @@ Paths here that start `src/`, `test/`, `migrations/`, `public/` or `scripts/` ar
 
 # Look up when needed
 
+* [Commands](commands.md) - Which runner, where commands run, every root and app command and what it does, adding a dependency, a second dev server, and running with AI turned off.
+* [Building a feature](building.md) - How a feature is built here: the Items example step by step, Effect 4, the review model's blocks that Verify reads, tests, Cloudflare Workers and D1, identity and permissions, AI features, and comments.
+* [What the type-check and the laws enforce](laws.md) - The one compiler profile, its two recorded exceptions, and what fails `bun run check`.
+* [UI](ui.md) - The house style for screens of dense business tables, every rule with what it guards.
+* [Skills and sub-agents](agents.md) - Which skill is used when and how here, and the sub-agents: who writes what, the brief, owners and hand-backs.
 * [Reviewing a screen](reviewing/index.md) - How a screen is reviewed before it is called done, and the defects a review screen tends to have, each with its check.
 * [Architecture in four diagrams](architecture.md) - The stored data model, one row through the import, one import through its steps, and how the layers depend on each other, as Mermaid diagrams read from the code.
 * [The import kit](kit.md) - The components ready for an import screen and a list of records, when to use each, and what was changed after installing them.

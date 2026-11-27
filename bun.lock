@@ -103,6 +103,27 @@
         "wrangler": "catalog:",
       },
     },
+    "apps/model": {
+      "name": "@inventory/model-app",
+      "version": "0.0.0",
+      "dependencies": {
+        "@alchemy.run/cloudflare": "2.0.0-beta.87-e1c3e6d",
+        "@alchemy.run/domain": "2.0.0-beta.87-e1c3e6d",
+        "@beep/d1": "workspace:*",
+        "@inventory/access-model": "workspace:*",
+        "@inventory/kernel": "workspace:*",
+        "@inventory/usage-model": "workspace:*",
+        "alchemy": "2.0.0-beta.87-e1c3e6d",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/platform-node": "catalog:",
+        "@effect/vitest": "catalog:",
+        "@types/node": "catalog:",
+        "vitest": "catalog:",
+        "wrangler": "catalog:",
+      },
+    },
     "packages/access/contract": {
       "name": "@inventory/access-contract",
       "version": "0.0.0",
@@ -457,9 +478,11 @@
       "dependencies": {
         "@alchemy.run/1password": "2.0.0-beta.87-e1c3e6d",
         "@alchemy.run/cloudflare": "2.0.0-beta.87-e1c3e6d",
+        "@alchemy.run/domain": "2.0.0-beta.87-e1c3e6d",
         "@alchemy.run/github": "2.0.0-beta.87-e1c3e6d",
         "@beep/identity": "workspace:*",
         "@beep/schema": "workspace:*",
+        "@inventory/model-app": "workspace:*",
         "alchemy": "2.0.0-beta.87-e1c3e6d",
         "effect": "catalog:",
       },
@@ -1042,6 +1065,8 @@
     "@inventory/client": ["@inventory/client@workspace:packages/client"],
 
     "@inventory/kernel": ["@inventory/kernel@workspace:packages/kernel"],
+
+    "@inventory/model-app": ["@inventory/model-app@workspace:apps/model"],
 
     "@inventory/ontology": ["@inventory/ontology@workspace:packages/ontology"],
 

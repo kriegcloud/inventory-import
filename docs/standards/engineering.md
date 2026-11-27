@@ -76,7 +76,7 @@ My engineering rules are in `CLAUDE.md` and [patterns](../patterns.md). This pag
   wrong. It is three jobs that start at once, each on a runner of its own under that same rule: the catalog's
   screens (`web`), the slow tests with the live one and the data grid (`slow`) and everything else (`rest`); the job the rule on
   main requires waits for the three, and each job keeps turbo's own time for every task with the run
-  (`goals/ci-speed`). On a pull request the longest properties run fewer times (`PROPERTY_RUNS=short`, read in
+  (`goals/ci-speed`). On a pull request, while no cache is shared, the longest properties run fewer times (`PROPERTY_RUNS=short`, read in
   `vitest.shared.ts` and hashed by the `test` task); a push to main and the nightly leave it unset and run today's
   counts. Every job reads turbo's results from beep-effect's cache Worker, team `inventory`, once the repository's
   stack has written its settings (`packages/infra/src/TurboCache.rules.ts`): a pull request only reads; a push to

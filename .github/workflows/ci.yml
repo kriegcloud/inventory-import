@@ -121,10 +121,12 @@ jobs:
       # over what was there: a result a pull request replayed from a workstation is made again on CI at the merge, so
       # a difference between the two turns main red (decision "what a shared cache asks", 1).
       # The longest properties run fewer times on a pull request (vitest.shared.ts; Benjamin's decision of
-      # 2026-11-26). A push leaves the variable unset, as a workstation does: turbo hashes unset apart from any value,
-      # so only unset lets a push and a workstation share a result made at today's counts.
-      - name: Fewer property runs on a pull request
-        if: ${{ github.event_name == 'pull_request' }}
+      # 2026-11-26), and only while no cache is shared. A push leaves the variable unset, as a workstation does: turbo
+      # hashes unset apart from any value, and those two are the cache's only writers, so a pull request that set it
+      # could replay no test. Once the cache exists a pull request leaves it unset too, and pays today's counts on
+      # the tests it changed (Benjamin's decision of 2026-11-26, the second).
+      - name: Fewer property runs on a pull request, while no cache is shared
+        if: ${{ github.event_name == 'pull_request' && vars.TURBO_CACHE_API == '' }}
         run: echo "PROPERTY_RUNS=short" >> "$GITHUB_ENV"
       - name: Check, test and build
         run: bun run check:ci -- --filter='!@inventory/catalog-web' --summarize --continue --concurrency=2 ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '--force' || '' }}
@@ -186,10 +188,12 @@ jobs:
           { echo "TURBO_API=$API"; echo "TURBO_TEAM=$TEAM"; echo "TURBO_TOKEN=$TOKEN"; echo "TURBO_CACHE=$MODE"; } >> "$GITHUB_ENV"
           echo "The shared cache, team $TEAM: $MODE"
       # The longest properties run fewer times on a pull request (vitest.shared.ts; Benjamin's decision of
-      # 2026-11-26). A push leaves the variable unset, as a workstation does: turbo hashes unset apart from any value,
-      # so only unset lets a push and a workstation share a result made at today's counts.
-      - name: Fewer property runs on a pull request
-        if: ${{ github.event_name == 'pull_request' }}
+      # 2026-11-26), and only while no cache is shared. A push leaves the variable unset, as a workstation does: turbo
+      # hashes unset apart from any value, and those two are the cache's only writers, so a pull request that set it
+      # could replay no test. Once the cache exists a pull request leaves it unset too, and pays today's counts on
+      # the tests it changed (Benjamin's decision of 2026-11-26, the second).
+      - name: Fewer property runs on a pull request, while no cache is shared
+        if: ${{ github.event_name == 'pull_request' && vars.TURBO_CACHE_API == '' }}
         run: echo "PROPERTY_RUNS=short" >> "$GITHUB_ENV"
       - name: Check, lint and test
         run: bunx turbo run check lint test --filter=@inventory/catalog-web --summarize --continue --concurrency=2 ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '--force' || '' }}
@@ -297,8 +301,9 @@ jobs:
   # the web package or what it imports. The three long ones start at once, a runner each: the proofs, the search,
   # and the fold beside the mutants. Their results are in the shared cache with everything else, written by main's
   # pushes and the workstation, so a pull request that leaves those files alone, or whose commit passed them
-  # locally, replays them in seconds. Main does not force them: every night they run again with nothing replayed
-  # and every mutant (proofs-nightly.yml).
+  # locally, replays them in seconds. The search is the exception: its hash holds `CI` (under CI it writes no lock),
+  # so it replays what a push to main wrote and never a workstation's run without `CI=true`. Main does not force
+  # them: every night they run again with nothing replayed and every mutant (proofs-nightly.yml).
   model:
     name: ${{ matrix.name }}
     runs-on: ubuntu-latest

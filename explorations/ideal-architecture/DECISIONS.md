@@ -2225,6 +2225,22 @@ Reverse: 1, the parts are named in the stack and I deploy it; 2, the seed loop c
 come out of the workflow and a cache step takes their place; 4, the variable is removed and the counts are literals
 again.
 
+### 2026-11-26 — CI speed: property run counts once the cache is shared
+
+Asked from the review of the shared cache's branch: a pull request set `PROPERTY_RUNS=short`, which is in every `test`
+task's hash, while the cache's only writers, main's push and the workstation, leave it unset. No pull request could
+have replayed a `test` task.
+
+1. **Which counts does a pull request run once the cache is shared?** I chose; the agent recommended the same. Today's
+   counts: a pull request sets `short` only while no cache is shared, and after that hashes as main and the
+   workstation do, so one that touches only documents replays every test, and one that changes a test's inputs pays
+   about 30 s more. This changes entry 4 of "the split, the seeds, the cache and the run counts" from the day the
+   stack is deployed; the variable stays in each task's `env`. Rejected: keeping `short` and saying a pull request's
+   fast tests never replay; taking the variable out of the hash, so a result made at one count replays at another.
+
+Reverse: the step's condition loses `vars.TURBO_CACHE_API == ''`, and the plan says a pull request's tests never
+replay.
+
 ### 2026-11-26 — CI speed: who writes to the cache, where its settings live, main's runs and the largest save
 
 The second round, after the cache Worker was chosen.

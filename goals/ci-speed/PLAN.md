@@ -182,6 +182,8 @@ What the acceptance needs once the cache exists, each read from a run:
    "$TURBO_CACHE_API/v8/artifacts/status?slug=beep"` answers 403 (run by Benjamin, with the token from `op read`).
 2. A pull request that touches only documents: "N cached" in the log of each of the check's jobs.
 3. A pull request whose commit passed `bun run check` with the workstation's token: its tasks and the proofs replay.
+   Not the search (`verify`): its hash holds `CI`, which a runner sets and the workstation does not, so it replays
+   only what a push to main wrote, or a workstation's `CI=true bun run proofs`.
 4. The push to main that merges it: "0 cached" in the check's three jobs, and the next pull request replays what it
    wrote.
 
@@ -336,8 +338,10 @@ Vitest's `provide`. A test reads it with `runsOf({ full, short })` (`packages/ca
 `WaitedRows.property` asks for 2,000 and 500. The `test` task names it in its `env`, so it is in the hash and strict
 mode lets it through.
 
-CI sets `short` on a pull request only, in a step of `rest` and `web` that writes it to the job's environment. A
-push leaves it unset, as a workstation does: turbo hashes unset, empty and `full` as three different values (seen
+CI sets `short` on a pull request only, and only while no cache is shared (`vars.TURBO_CACHE_API` is empty), in a
+step of `rest` and `web` that writes it to the job's environment: the cache's writers leave it unset, so a pull
+request that set it could replay no `test` task (found by the review of step 9; decision "property run counts once
+the cache is shared"). A push leaves it unset, as a workstation does: turbo hashes unset, empty and `full` as three different values (seen
 below), so only unset lets a push and a workstation share a result made at today's counts once the cache is shared
 (step 9). The nightly's proofs job runs the model's tests again with nothing replayed and the variable unset. Run on
 2026-11-26:

@@ -15,7 +15,7 @@ read; how it was arrived at is in [command-file](../command-file/NOTE.md).
 ## What was tried
 
 `Import/` is `packages/catalog/model/src/Import/Import.aggregate.ts` at `a184783d`, one file of 725 lines, cut into
-sixteen by scripts (not kept) and formatted with the repository's settings. No line of logic was written by hand.
+eighteen by scripts (not kept) and formatted with the repository's settings. No line of logic was written by hand.
 `Actor/` and `Review/` are the three files it imports, copied unchanged.
 
 | File | Kind | Exports |
@@ -24,7 +24,9 @@ sixteen by scripts (not kept) and formatted with the repository's settings. No l
 | `<Tag>.command.ts` (seven) | command | `Command`, the command's class; `decide`, what the import decides of it; and the rejections only it returns, by their own names |
 | `Import.rejection.ts` | rejection | the five rejections several commands or decisions return |
 | `Import.state.ts` | state | `State`, the state's schema; each case of it under its own name (`Open`, `Imported`, ...); `guards`, `cases` and `isAnyOf`; and the four invariants, each a named function |
-| `Import.aggregate.ts` | aggregate | the two unions the transitions read, the 23 transitions, and the listing of everything else |
+| `Import.union.ts` | (no kind yet) | `ImportCommand` and `ImportEvent`, the two unions the transitions and the decisions read |
+| `Import.transition.ts` | transition | the 23 transitions, each `export const Name: Rule = ` and then the rule as it was written |
+| `Import.aggregate.ts` | aggregate | the listing and nothing else: 138 lines, of which 18 are its comment |
 
 Every file of a kind exports the same names, and the stem is the block's tag. Each is read as a namespace, as
 `effect/Option` is read: `import * as ImportStaged from "./ImportStaged.event.ts"`, then `ImportStaged.Event`,
@@ -57,10 +59,15 @@ is `../command-file/full-ns`.
   own aggregate, read from the package.
 - **The whole model verifies with it against the unchanged lock** (`command-file`, `model-role`): the four
   decisions take `ActCounted.Event` and `GroupCounted.Event` from the two files there.
-- **The transitions stay in the aggregate's file, written in place.** Moved to a file of their own they prove the
-  same, and the lock then refuses all 23: it keeps each rule's text, and "only an invariant of an aggregate is
-  compared with the one it was". Moving them is a relock a person reads, not a refactor. The invariants moved and
-  were accepted.
+- **The transitions are listed by name here, and the whole model cannot be yet.** This module proves the same with
+  them in `Import.transition.ts` (Benjamin, 2026-11-27). Under the whole model the lock refuses all 23, because it
+  keeps the text written at the rule's place in the aggregate, and there that is now a name. About 25 lines of the
+  lock make it follow the name (`../command-file/lock-rule-by-name.patch`): with them, on copies, the whole model
+  verified against the unchanged lock and a changed moved rule was refused. So `command-file/model-role` keeps its
+  transitions in the aggregate's file, and differs from this module in that alone.
+- **A moved rule carries its type on its name.** `export const Name: Rule = ({ before, after }) => ...`: typed on its
+  parameters its text is not the text the lock keeps. A rule that asks who is acting is typed `Asked`, and
+  `Effect.fn`'s generator takes its parameter's type from it.
 - **`invariants` cannot be one imported object.** With `invariants` and `transitions` each exported as an object and
   the aggregate holding `invariants, transitions`, the prover fails: "declares Import without its invariants". The
   aggregate's file must hold the object, so it lists them by name.

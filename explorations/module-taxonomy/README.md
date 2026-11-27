@@ -330,3 +330,6 @@ are open.
   schema. The first and third are in `import-module` now, the file read as `ImportState`: proved, and the whole
   model verified against the unchanged lock. Defaults are `Misread` by the prover. At his word the superseded
   copies under `command-file` were removed; they are in history at `52b53e36`.
+- 2026-11-27: he chose the transitions by name in `import-module` only: eighteen files, the aggregate's a listing of
+  138 lines. It proves as the package's file does. The whole-model copy keeps them inline until the lock change is
+  in `packages/patches`.

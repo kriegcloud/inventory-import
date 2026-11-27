@@ -17,10 +17,6 @@
 // an event or a rejection built with `make` as the instance it builds, through the same patch: no file here turns a
 // diagnostic off.
 import * as Domain from "@alchemy.run/domain"
-import * as A from "effect/Array"
-import * as Effect from "effect/Effect"
-import * as S from "effect/Schema"
-import { CurrentActor } from "../Actor/Actor.context.ts"
 import { ImportKey } from "../Review/Change.schema.ts"
 import * as ActCounted from "./ActCounted.event.ts"
 import * as ColumnMatched from "./ColumnMatched.event.ts"
@@ -39,38 +35,31 @@ import * as ReopenImport from "./ReopenImport.command.ts"
 import * as StageImport from "./StageImport.command.ts"
 import * as SuggestionRecorded from "./SuggestionRecorded.event.ts"
 import * as TakeBackImport from "./TakeBackImport.command.ts"
-
-/** A command the import itself decides, told by its `_tag`. */
-export const ImportCommand = S.Union([
-  StageImport.Command,
-  MatchColumn.Command,
-  RecordSuggestion.Command,
-  ConfirmImport.Command,
-  TakeBackImport.Command,
-  ReopenImport.Command,
-  RemoveImport.Command
-])
-  .annotate({ description: "A command the import itself decides" })
-  .pipe(S.toTaggedUnion("_tag"))
-/** The decoded value of `ImportCommand`. */
-export type ImportCommand = typeof ImportCommand.Type
-
-/** An event the import folds: its own commands', and `ActCounted` and `GroupCounted`, which only a decision records. */
-export const ImportEvent = S.Union([
-  ImportStaged.Event,
-  ColumnMatched.Event,
-  ActCounted.Event,
-  GroupCounted.Event,
-  SuggestionRecorded.Event,
-  ImportConfirmed.Event,
-  ImportTakenBack.Event,
-  ImportReopened.Event,
-  ImportRemoved.Event
-])
-  .annotate({ description: "An event the import folds, its own or one a decision records on it" })
-  .pipe(S.toTaggedUnion("_tag"))
-/** The decoded value of `ImportEvent`. */
-export type ImportEvent = typeof ImportEvent.Type
+import {
+  AConfirmLeavesAClosedImportsStatusAsItWas,
+  AConfirmNamesEveryChange,
+  AMatchHoldsTheColumnsItSays,
+  AMatchIsMadeOnTheLastOne,
+  AMatchIsOfThisOpening,
+  AMatchIsTheNextOne,
+  APlanDoesWhatWasShown,
+  APlanIsOfEveryChange,
+  ARemovedImportStaysRemoved,
+  ASuggestionWritesNothing,
+  ATakeBackIsOfEverythingInForce,
+  AViewerChangesNothing,
+  AnImportIsOpenedAgainOnlyByReopen,
+  AnImportNeverChangesOrganization,
+  AndOfEverythingReplaced,
+  EveryChangeHasItsOwnNumber,
+  EveryEventSaysWhose,
+  NothingIsWrittenBeforeConfirm,
+  OnlyAnImportWithAConfirmStandingIsTakenBack,
+  OnlyAnImportWithNothingInForceIsRemoved,
+  OnlyItsOwnOrganizationChangesAnImport,
+  TheMatchingMovesOnlyOnAnOpenImport,
+  TheRestNameEveryChangeToo
+} from "./Import.transition.ts"
 
 /**
  * One import's lifecycle: staged, matched, confirmed, taken back, opened again, removed, with the number of its last
@@ -89,145 +78,29 @@ export class Import extends Domain.Aggregate(
       WhatIsInForceThenIsWhatWasKept: ImportState.WhatIsInForceThenIsWhatWasKept
     },
     transitions: {
-      // The status becomes Imported only by a confirm.
-      NothingIsWrittenBeforeConfirm: ({ before, after, command }) =>
-        !ImportState.guards.Imported(after) ||
-        ImportState.guards.Imported(before) ||
-        ImportCommand.guards.ConfirmImport(command),
-      // A confirm leaves the status of an import that is not open as it was. It says no more: what stops a second
-      // confirm from writing is that one on a closed import is refused, and "every change has its own number".
-      AConfirmLeavesAClosedImportsStatusAsItWas: ({ before, after, command }) =>
-        !ImportCommand.guards.ConfirmImport(command) ||
-        ImportState.guards.Open(before) ||
-        after.status === before.status,
-      // Nothing is confirmed that was not on screen: the confirm names the last change, as the last of every one its
-      // screen received; its plan is of that change; and the plan does what the screen said it would.
-      AConfirmNamesEveryChange: ({ before, after, command }) =>
-        !ImportCommand.guards.ConfirmImport(command) ||
-        !ImportState.guards.Open(before) ||
-        !ImportState.guards.Imported(after) ||
-        command.seen === before.changes,
-      APlanIsOfEveryChange: ({ before, after, command }) =>
-        !ImportCommand.guards.ConfirmImport(command) ||
-        !ImportState.guards.Open(before) ||
-        !ImportState.guards.Imported(after) ||
-        command.planAt === before.changes,
-      APlanDoesWhatWasShown: ({ before, after, command }) =>
-        !ImportCommand.guards.ConfirmImport(command) ||
-        !ImportState.guards.Open(before) ||
-        !ImportState.guards.Imported(after) ||
-        command.plan === command.shown,
-      // Nor is an import taken back, opened again or removed by someone who has not received its last change.
-      TheRestNameEveryChangeToo: ({ before, after, command }) =>
-        !ImportCommand.isAnyOf(["TakeBackImport", "ReopenImport", "RemoveImport"])(command) ||
-        ImportState.guards.Unstaged(before) ||
-        ImportState.guards.Removed(before) ||
-        ImportState.guards.Unstaged(after) ||
-        command.seen === before.changes,
-      // Every change has a number of its own: each raises the import's number by exactly one, and nothing else moves it.
-      EveryChangeHasItsOwnNumber: ({ before, after, command }) =>
-        ImportState.guards.Unstaged(before) ||
-        ImportState.guards.Removed(before) ||
-        ImportState.guards.Unstaged(after) ||
-        ImportState.guards.Removed(after) ||
-        after.changes === before.changes + (ImportCommand.guards.RecordSuggestion(command) ? 0 : 1),
-      OnlyAnImportWithAConfirmStandingIsTakenBack: ({ before, after, command }) =>
-        !ImportCommand.guards.TakeBackImport(command) ||
-        ImportState.guards.Unstaged(before) ||
-        ImportState.guards.Removed(before) ||
-        ImportState.guards.Unstaged(after) ||
-        before.standing >= 1,
-      // A take-back is of everything in force: what was removed and what was kept add up to it, and nothing stands
-      // after.
-      ATakeBackIsOfEverythingInForce: ({ before, after, command, events }) =>
-        !ImportCommand.guards.TakeBackImport(command) ||
-        ImportState.guards.Unstaged(before) ||
-        ImportState.guards.Removed(before) ||
-        ImportState.guards.Unstaged(after) ||
-        ImportState.guards.Removed(after) ||
-        (after.standing === 0 &&
-          after.replaced === 0 &&
-          after.inForce === command.kept &&
-          A.every(events, (e) => !ImportEvent.guards.ImportTakenBack(e) || e.removed + e.kept === before.inForce)),
-      // What its confirms replaced is put back or kept, and nothing is left out of the two counts.
-      AndOfEverythingReplaced: ({ before, command, events }) =>
-        !ImportCommand.guards.TakeBackImport(command) ||
-        ImportState.guards.Unstaged(before) ||
-        ImportState.guards.Removed(before) ||
-        A.every(
-          events,
-          (e) => !ImportEvent.guards.ImportTakenBack(e) || e.restored + e.keptReplaced === before.replaced
-        ),
-      // Every event of the import says whose it is.
-      EveryEventSaysWhose: Effect.fn("Import.EveryEventSaysWhose")(function* ({ events }) {
-        const actor = yield* CurrentActor
-        return A.every(events, (e) =>
-          ImportEvent.guards.ActCounted(e) ? e.actor === actor.memberId : e.by === actor.memberId
-        )
-      }),
-      // A match is made in this opening of the import.
-      AMatchIsOfThisOpening: ({ before, after, command }) =>
-        !ImportCommand.guards.MatchColumn(command) ||
-        !ImportState.guards.Open(before) ||
-        !ImportState.guards.Open(after) ||
-        command.opening === before.confirms,
-      ASuggestionWritesNothing: ({ before, after, command }) =>
-        !ImportCommand.guards.RecordSuggestion(command) ||
-        !ImportState.guards.Open(before) ||
-        (ImportState.guards.Open(after) && after.matching === before.matching && after.changes === before.changes),
-      // A match is made by someone who saw the last one, whatever field it moved; it raises the matching by one and
-      // holds the columns it says. The same columns again are no match.
-      AMatchIsMadeOnTheLastOne: ({ before, after, command }) =>
-        !ImportCommand.guards.MatchColumn(command) ||
-        !ImportState.guards.Open(before) ||
-        !ImportState.guards.Open(after) ||
-        command.saw === before.matching,
-      AMatchHoldsTheColumnsItSays: ({ before, after, command }) =>
-        !ImportCommand.guards.MatchColumn(command) ||
-        !ImportState.guards.Open(before) ||
-        !ImportState.guards.Open(after) ||
-        after.columns === command.columns,
-      AMatchIsTheNextOne: ({ before, after, command }) =>
-        !ImportCommand.guards.MatchColumn(command) ||
-        !ImportState.guards.Open(before) ||
-        !ImportState.guards.Open(after) ||
-        after.matching === before.matching + 1,
-      // The matching moves only on an open import. It reads the matching alone: that no row or group act lands on a
-      // closed import is each decision's own rule ("a row is decided only on an open import" and its like).
-      TheMatchingMovesOnlyOnAnOpenImport: ({ before, after }) =>
-        ImportState.guards.Open(before) ||
-        ImportState.guards.Unstaged(before) ||
-        ImportState.guards.Removed(before) ||
-        ImportState.guards.Removed(after) ||
-        ImportState.guards.Unstaged(after) ||
-        after.matching === before.matching,
-      AnImportIsOpenedAgainOnlyByReopen: ({ before, after, command }) =>
-        !ImportState.guards.Open(after) ||
-        ImportState.guards.Open(before) ||
-        ImportState.guards.Unstaged(before) ||
-        (ImportCommand.guards.ReopenImport(command) &&
-          (ImportState.guards.Imported(before) || ImportState.guards.TakenBack(before))),
-      ARemovedImportStaysRemoved: ({ before, after }) =>
-        !ImportState.guards.Removed(before) || ImportState.guards.Removed(after),
-      OnlyAnImportWithNothingInForceIsRemoved: ({ before, after }) =>
-        !ImportState.guards.Removed(after) ||
-        ImportState.guards.Removed(before) ||
-        (ImportState.guards.Open(before) && before.inForce === 0 && before.standing === 0),
-      AnImportNeverChangesOrganization: ({ before, after }) =>
-        ImportState.guards.Unstaged(before) ||
-        ImportState.guards.Unstaged(after) ||
-        before.organizationId === after.organizationId,
-      OnlyItsOwnOrganizationChangesAnImport: Effect.fn("Import.OnlyItsOwnOrganizationChangesAnImport")(function* ({
-        before
-      }) {
-        if (ImportState.guards.Unstaged(before)) return true
-        const actor = yield* CurrentActor
-        return actor.organizationId === before.organizationId
-      }),
-      AViewerChangesNothing: Effect.fn("Import.AViewerChangesNothing")(function* () {
-        const actor = yield* CurrentActor
-        return actor.role !== "viewer"
-      })
+      NothingIsWrittenBeforeConfirm,
+      AConfirmLeavesAClosedImportsStatusAsItWas,
+      AConfirmNamesEveryChange,
+      APlanIsOfEveryChange,
+      APlanDoesWhatWasShown,
+      TheRestNameEveryChangeToo,
+      EveryChangeHasItsOwnNumber,
+      OnlyAnImportWithAConfirmStandingIsTakenBack,
+      ATakeBackIsOfEverythingInForce,
+      AndOfEverythingReplaced,
+      EveryEventSaysWhose,
+      AMatchIsOfThisOpening,
+      ASuggestionWritesNothing,
+      AMatchIsMadeOnTheLastOne,
+      AMatchHoldsTheColumnsItSays,
+      AMatchIsTheNextOne,
+      TheMatchingMovesOnlyOnAnOpenImport,
+      AnImportIsOpenedAgainOnlyByReopen,
+      ARemovedImportStaysRemoved,
+      OnlyAnImportWithNothingInForceIsRemoved,
+      AnImportNeverChangesOrganization,
+      OnlyItsOwnOrganizationChangesAnImport,
+      AViewerChangesNothing
     },
     commands: [
       StageImport.Command,

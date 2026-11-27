@@ -1,55 +1,35 @@
 /**
- * SIGNED-IN IDENTITY. The Worker's `Identity` middleware: the session cookie names a user and their active
- * organization, and their membership there is the actor. Nothing in a request header or payload can choose who the
- * actor is; the header a page names its member in (`pageMemberHeader`) can only refuse the request, when the session's
- * member is somebody else. Handlers read `CurrentActor` and call `requireRole`. Writes from another site have already been refused
- * (`SameOrigin` on the whole API, and the same rule on /api/auth/* in `SignIn.route.ts`).
+ * SIGNED-IN IDENTITY. The Worker's `Identity` middleware for what stays on `/api/v1`: the one session lookup
+ * (`SessionLookupLive`, the kernel's `SessionLookup`) names the member, and this provides them as the kernel's
+ * `CurrentActor`. Nothing in a request header or payload can choose who the actor is; the header a page names its
+ * member in (`pageMemberHeader`) can only refuse the request, when the session's member is somebody else. Handlers
+ * read `CurrentActor` and call `requireRole`. Writes from another site have already been refused (`SameOrigin` on the
+ * whole API, and the same rule on /api/auth/* in `SignIn.route.ts`).
  *
  * @packageDocumentation
  */
 import { BetterAuth } from "@beep/better-auth/BetterAuth"
-import type { AuthSession } from "@beep/better-auth/BetterAuthSession"
-import { pageMemberHeader } from "@inventory/access-contract/Access"
-import {
-  AccountEmail,
-  type SessionState,
-  SignInFeatures,
-  TestAccountsOffer
-} from "@inventory/access-contract/SessionState"
+import { type SessionState, SignInFeatures, TestAccountsOffer } from "@inventory/access-contract/SessionState"
 import { accessHandlers } from "@inventory/access-model/Handlers"
-import { MemberDirectory, SignedInUser } from "@inventory/access-model/MemberDirectory"
+import { MemberDirectory } from "@inventory/access-model/MemberDirectory"
 import { CurrentActor } from "@inventory/kernel/Actor"
-import { NotSignedIn } from "@inventory/kernel/AccessError"
 import { Identity } from "@inventory/kernel/Identity"
-import { OrganizationId, UserId } from "@inventory/kernel/Ids"
+import { UserId } from "@inventory/kernel/Ids"
+import { SessionLookup, SessionVerdict } from "@inventory/kernel/SessionLookup"
 import * as A from "effect/Array"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
-import * as S from "effect/Schema"
 import * as HttpServerRequest from "effect/http/HttpServerRequest"
 import { signUpOfferOf } from "@inventory/access-model/SignUp"
 import { authSettings } from "./Config.ts"
 import { $AccessHostId } from "./internal/identity.ts"
+import { signedIn } from "./internal/signedIn.ts"
 import { seededAccounts, testAccountPassword } from "./internal/TestAccounts.ts"
+import { SessionLookupLive } from "./SessionLookup.adapter.ts"
 
 const $I = $AccessHostId.create("SessionIdentity")
-
-const PageIdentity = S.Struct({
-  page: S.String.pipe(
-    S.annotateKey({ description: "The page’s member and organization claim when supplied" }),
-    S.OptionFromOptional
-  )
-}).annotate({ description: "The optional page identity header at the request boundary" })
-
-/** What Better Auth's session says, in the access context's own ids: the two share their text and their rules. */
-const signedIn = (session: AuthSession): SignedInUser =>
-  SignedInUser.make({
-    userId: UserId.make(session.userId),
-    email: AccountEmail.make(session.email),
-    active: O.map(session.activeOrganizationId, (id) => OrganizationId.make(id))
-  })
 
 /**
  * Resolves `CurrentActor` from the Better Auth session on the request, or fails with `NotSignedIn` (401).
@@ -59,42 +39,24 @@ const signedIn = (session: AuthSession): SignedInUser =>
 export const SessionIdentityLive: Layer.Layer<Identity, never, BetterAuth | MemberDirectory> = Layer.effect(
   Identity,
   Effect.gen(function* () {
-    const auth = yield* BetterAuth
-    const directory = yield* MemberDirectory
+    const sessions = yield* SessionLookup
     return Identity.of(
       Effect.fn("Identity")(function* (httpEffect) {
         const request = yield* HttpServerRequest.HttpServerRequest
-        // A Better Auth failure is no fault of the request: it ends as a 500, as before the driver typed it.
-        const session = yield* auth.session(new Headers(request.headers)).pipe(Effect.orDie)
-        const member = yield* accessHandlers
-          .actorOf(O.map(session, signedIn))
-          .pipe(Effect.provideService(MemberDirectory, directory))
-        // The page that sent it is another member's (somebody signed in, out or switched in another tab of the same
-        // browser): refused before the handler runs, so nothing is done as, or read for, whoever the cookie is now.
-        const forPage = yield* S.decodeEffect(PageIdentity)({ page: request.headers[pageMemberHeader] }).pipe(
-          Effect.orDie
-        )
-        if (O.exists(forPage.page, (page) => page !== `${member.id}/${member.organizationId}`)) {
-          return yield* NotSignedIn.make({
-            reason: "This page was opened for somebody else than is signed in now. Load the page again."
-          })
-        }
+        // A request is judged on every call, so the verdict's expiry, which is to end a live read, is not read here.
+        const verdict = yield* sessions.verdictOf(request.headers)
         // Ids only, never a name or an email: every span and log line inside the request carries who acted.
-        const who = {
-          "actor.id": member.id,
-          "actor.role": member.role,
-          "organization.id": member.organizationId
-        }
+        const who = SessionVerdict.annotations(verdict)
         yield* Effect.annotateCurrentSpan(who)
         return yield* httpEffect.pipe(
-          Effect.provideService(CurrentActor, member),
+          Effect.provideService(CurrentActor, verdict.member),
           Effect.annotateSpans(who),
           Effect.annotateLogs(who)
         )
       })
     )
   })
-)
+).pipe(Layer.provide(SessionLookupLive))
 
 /**
  * The session as the browser needs it, in one answer (`GET /api/v1/identity/session`): the Better Auth session, the

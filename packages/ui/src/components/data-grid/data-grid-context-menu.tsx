@@ -1,7 +1,10 @@
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 2); no longer as its registry has it.
+// The menu's handlers were `useCallback`s that nothing compares by identity (they go to Radix's menu items), so they
+// are plain functions; the trigger's style was a memo, and is a plain object.
 "use client"
 
 import { type ReactTable, type RowData, Subscribe } from "@tanstack/react-table"
-import * as React from "react"
+import { type CSSProperties, memo, type RefObject } from "react"
 import { toast } from "sonner"
 
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
@@ -18,7 +21,7 @@ import { CopyIcon, ScissorsIcon, EraserIcon, Trash2Icon } from "lucide-react"
 
 interface DataGridContextMenuProps<TData extends RowData> {
   table: ReactTable<DataGridFeatures, TData, unknown>
-  dataGridRef: React.RefObject<HTMLDivElement | null>
+  dataGridRef: RefObject<HTMLDivElement | null>
 }
 
 export function DataGridContextMenu<TData extends RowData>(props: DataGridContextMenuProps<TData>) {
@@ -33,7 +36,7 @@ interface ContextMenuProps<TData extends RowData> extends DataGridContextMenuPro
   contextMenu: ContextMenuState
 }
 
-const ContextMenu = React.memo(ContextMenuImpl, (prev, next) => {
+const ContextMenu = memo(ContextMenuImpl, (prev, next) => {
   if (prev.contextMenu.open !== next.contextMenu.open) return false
   if (!next.contextMenu.open) return true
   return prev.contextMenu.x === next.contextMenu.x && prev.contextMenu.y === next.contextMenu.y
@@ -43,71 +46,62 @@ function ContextMenuImpl<TData extends RowData>({ table, dataGridRef, contextMen
   const readOnly = table.getIsReadOnly()
   const canDeleteRows = !readOnly && !!table.options.enableRowDeletion
 
-  const triggerStyle = React.useMemo<React.CSSProperties>(
-    () => ({
-      position: "fixed",
-      left: `${contextMenu.x}px`,
-      top: `${contextMenu.y}px`,
-      width: "1px",
-      height: "1px",
-      padding: 0,
-      margin: 0,
-      border: "none",
-      background: "transparent",
-      pointerEvents: "none",
-      opacity: 0
-    }),
-    [contextMenu.x, contextMenu.y]
-  )
+  const triggerStyle: CSSProperties = {
+    position: "fixed",
+    left: `${contextMenu.x}px`,
+    top: `${contextMenu.y}px`,
+    width: "1px",
+    height: "1px",
+    padding: 0,
+    margin: 0,
+    border: "none",
+    background: "transparent",
+    pointerEvents: "none",
+    opacity: 0
+  }
 
-  const onCloseAutoFocus = React.useCallback(
-    (event: Event) => {
-      event.preventDefault()
-      const focusedCell = table.getFocusedCell()
-      if (focusedCell && table.options.onCellFocus) {
-        table.options.onCellFocus({
-          rowId: focusedCell.row.id,
-          columnId: focusedCell.column.id
-        })
-        return
-      }
-      dataGridRef.current?.focus()
-    },
-    [table, dataGridRef]
-  )
+  function onCloseAutoFocus(event: Event) {
+    event.preventDefault()
+    const focusedCell = table.getFocusedCell()
+    if (focusedCell && table.options.onCellFocus) {
+      table.options.onCellFocus({
+        rowId: focusedCell.row.id,
+        columnId: focusedCell.column.id
+      })
+      return
+    }
+    dataGridRef.current?.focus()
+  }
 
-  const onOpenChange = React.useCallback(
-    (open: boolean) => {
-      if (!open) table.closeContextMenu()
-    },
-    [table]
-  )
+  function onOpenChange(open: boolean) {
+    if (!open) table.closeContextMenu()
+  }
 
-  const onCopy = React.useCallback(() => {
+  function onCopy() {
     void table.copySelectedCells()
-  }, [table])
+  }
 
-  const onCut = React.useCallback(() => {
+  function onCut() {
     void table.cutSelectedCells()
-  }, [table])
+  }
 
-  const onClear = React.useCallback(() => {
+  function onClear() {
     const cells = table.getSelectedCells()
     if (cells.length === 0) return
 
     table.clearCells(cells)
 
     toast.success(`${cells.length} cell${cells.length !== 1 ? "s" : ""} cleared`)
-  }, [table])
+  }
 
-  const onDelete = React.useCallback(() => {
+  function onDelete() {
     const rowIds = new Set(table.getSelectedCells().map((cell) => cell.rowId))
     if (rowIds.size === 0) return
 
     table.deleteRows(Array.from(rowIds))
 
     toast.success(`${rowIds.size} row${rowIds.size !== 1 ? "s" : ""} deleted`)
-  }, [table])
+  }
 
   return (
     <DropdownMenu open={contextMenu.open} onOpenChange={onOpenChange}>

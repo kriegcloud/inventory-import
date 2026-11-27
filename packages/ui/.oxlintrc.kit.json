@@ -27,6 +27,22 @@
     "!src/components/faceted.tsx",
     "!src/components/sortable.tsx",
     "!src/components/calendar.tsx",
-    "!src/components/slider.tsx"
+    "!src/components/slider.tsx",
+    // Batch 2, the data grid.
+    "!src/components/data-grid/",
+    "!src/components/data-grid/use-data-grid.ts",
+    "!src/components/data-grid/data-grid.tsx",
+    "!src/components/data-grid/data-grid-state.ts",
+    "!src/components/data-grid/data-grid-cell.tsx",
+    "!src/components/data-grid/data-grid-data-cell.tsx",
+    "!src/components/data-grid/data-grid-cell-variants.tsx",
+    "!src/components/data-grid/data-grid-cell-preview.tsx",
+    "!src/components/data-grid/data-grid-row.tsx",
+    "!src/components/data-grid/data-grid-column-header.tsx",
+    "!src/components/data-grid/data-grid-context-menu.tsx",
+    "!src/components/data-grid/data-grid-paste-dialog.tsx",
+    "!src/components/data-grid/data-grid-search.tsx",
+    "!src/components/data-grid/data-grid-select-column.tsx",
+    "!src/components/data-grid/use-badge-overflow.ts"
   ]
 }

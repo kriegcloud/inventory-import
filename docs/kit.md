@@ -236,7 +236,7 @@ return (
   "is between", "is empty") and joins them with "and" or "or"; `DataTableSortMenu` sorts by several columns in an
   order the person can drag. Both write the same state as the toolbar and the headings, so they can be mixed.
 
-- The server's half is `packages/catalog/contract/src/Item/ItemQuery.command.ts` (the query as a Schema), `GET /api/v1/records/page` and
+- The server's half is `packages/catalog/contract/src/Item/ItemQuery.payload.ts` (the query as a Schema), `GET /api/v1/records/page` and
   `packages/catalog/host/src/ItemStore.adapter.ts`:
   a column id becomes a column name only through a fixed table and every value is a bound parameter. Copy that file
   for another list; do not build SQL from a column id the browser sent.

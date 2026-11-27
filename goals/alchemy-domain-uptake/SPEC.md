@@ -41,8 +41,8 @@ use here" with a reason that still holds.
 
 - **Answered decisions bind.** Decisions 1 to 40 (all but 21a) and the Foldkit answer are binding as written in the
   exploration's `DECISIONS.md`. The nine items that go against one wait for a new decision of his.
-- **Nothing is built before the brief is signed**, except what he counts as part of the review's model on main
-  (`.claude/agents/domain.md`, "What binds you").
+- **The brief is signed** (2026-11-26, "I've approved"): a Build brief names this goal, as
+  `.claude/agents/domain.md`, "What binds you", asks.
 - **Open decisions are asked when their move opens** (42 to 56, 60 to 62, 21a), through `AskUserQuestion`, and
   written down at once.
 - **One item to a brief**, built by the `domain` agent, schema first, then the contract, then the code. An item
@@ -67,4 +67,5 @@ use here" with a reason that still holds.
 ## Decisions
 
 - 2026-11-26: Foldkit is not used ("No need for foldkit").
+- 2026-11-26: the brief is signed ("I've approved").
 - The rest are the exploration's [DECISIONS](../../explorations/alchemy-domain/DECISIONS.md).

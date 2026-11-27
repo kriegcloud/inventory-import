@@ -4,7 +4,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { AuditTrail } from "@inventory/access-contract/AuditTrail"
 import { AllowanceAnswer, ModelCallPurpose, taken, usedUp } from "@inventory/access-contract/ModelAllowance"
-import { AddPerson, AddPersonProblem, ChangeRole, EmailToFind } from "@inventory/access-contract/PeopleCommand"
+import { AddPerson, AddPersonProblem, ChangeRole, EmailToFind } from "@inventory/access-contract/PeoplePayload"
 import { Person } from "@inventory/access-contract/Person"
 import {
   AccountEmail,

@@ -1,7 +1,7 @@
 name: Proofs, every night
 
 # Every proof of the review's model, the search of the whole model, the property that holds it against the review
-# region, and every mutant of it, again with nothing replayed, once a night and on request. The job in ci.yml replays
+# region, every mutant of it, and more walks over it on a new seed, again with nothing replayed, once a night and on request. The job in ci.yml replays
 # each result until what it reads changes, and runs only a sample of the mutants; these jobs do not, so what changed
 # under them (the runner's image, a solver that answers otherwise) shows here. A failure of either job opens one
 # issue, or adds a comment to it while it is open. GitHub turns a schedule off, without a word, after 60 days in which
@@ -54,6 +54,47 @@ jobs:
             const label = "proofs-nightly"
             const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
             const body = `The nightly run of the model's proofs and search failed: ${run}`
+            // The list holds pull requests too: only an issue is commented on.
+            const open = await github.rest.issues.listForRepo({ ...context.repo, labels: label, state: "open", per_page: 100 })
+            const issue = open.data.find((item) => item.pull_request === undefined)
+            if (issue !== undefined) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: issue.number, body })
+            } else {
+              await github.rest.issues.create({ ...context.repo, title: "The nightly proofs failed", body, labels: [label] })
+            }
+
+  # More walks over the whole model (packages/catalog/model/test/Catalog.explore.test.ts): the rules over every import,
+  # row and group at once, searched again at three commands deep and then on 5,000 walks from a seed taken from the
+  # day, which the test prints: a failing night is run again with `EXPLORE_SEED=<that number>`. It is a search, never a
+  # proof. Measured on a busy workstation: 364 s. At half that speed here about twelve minutes; not measured on this
+  # runner. The test's own limit is 90 minutes, under the step's, so a run out of time fails and opens the issue.
+  explore:
+    name: More walks over the whole model, a new seed each night
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: Walk the model
+        timeout-minutes: 100
+        run: bunx turbo run explore --filter=@inventory/catalog-model --summarize
+      - name: Open the issue, or add to it
+        if: failure()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const label = "proofs-nightly"
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            const body = `The nightly walks over the model (explore) failed: a rule was broken by a sequence its log gives as a story's steps, with the seed, or it ran out of time: ${run}`
             // The list holds pull requests too: only an issue is commented on.
             const open = await github.rest.issues.listForRepo({ ...context.repo, labels: label, state: "open", per_page: 100 })
             const issue = open.data.find((item) => item.pull_request === undefined)

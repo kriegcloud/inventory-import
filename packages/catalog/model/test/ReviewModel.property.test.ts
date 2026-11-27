@@ -2,17 +2,14 @@
 // and gives only values the schema accepts (docs/standards/schema-first.md, SF-7): that fails for a schema whose checks
 // no generator can meet, or whose own generator disagrees with it, and says nothing of what the bounds are, since the
 // generator is made from the same checks. So the bounds a rule or a comment leans on are stated once more as values
-// that must be refused. And every command, event and
-// rejection, each aggregate and decision, the model and its Api say in words what they are: an Api's tool list, its
-// command line and its OpenAPI document are written from those words.
+// that must be refused. That every declaration says in
+// words what it is, is `Annotations.test.ts`.
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as S from "effect/Schema"
-import * as O from "effect/Option"
 import * as Str from "effect/String"
 import { Actor } from "../src/Actor/Actor.context.ts"
-import { Catalog, CatalogApi } from "../src/Catalog.model.ts"
 import { GroupState } from "../src/Group/Group.aggregate.ts"
 import { ImportState } from "../src/Import/Import.aggregate.ts"
 import { Change, Columns, Flags, Patch, Rows, Step } from "../src/Review/Change.schema.ts"
@@ -86,48 +83,5 @@ describe("refuses what its bounds say", () => {
   })
   it("a change is a whole number", () => {
     expect(S.is(Change)(1.5)).toBe(false)
-  })
-})
-
-describe("says what it is", () => {
-  /** The names of the declarations that carry no description. */
-  const silent = (declared: ReadonlyArray<{ readonly name: string; readonly description: string | undefined }>) =>
-    A.map(
-      A.filter(declared, (one) => !O.exists(O.fromUndefinedOr(one.description), Str.isNonEmpty)),
-      (one) => one.name
-    )
-
-  it("every command, event and rejection of the model", () => {
-    const commands = [...Catalog.commands]
-    expect(commands.length).toBe(11)
-    expect(
-      silent([
-        ...A.map(commands, (command) => ({ name: command.tag, description: command.annotations.description })),
-        ...A.flatMap(commands, (command) => [
-          ...A.map(command.events, (event) => ({ name: event.tag, description: event.annotations.description })),
-          ...A.map(command.rejects, (rejection) => ({
-            name: rejection.tag,
-            description: rejection.annotations.description
-          }))
-        ])
-      ])
-    ).toEqual([])
-  })
-
-  it("each aggregate, each decision, the model and its Api", () => {
-    expect(
-      silent([
-        ...A.map(Catalog.aggregates, (aggregate) => ({
-          name: aggregate.aggregateName,
-          description: aggregate.annotations.description
-        })),
-        ...A.map(Catalog.decisions, (decision) => ({
-          name: decision.command.tag,
-          description: decision.annotations.description
-        })),
-        { name: Catalog.modelName, description: Catalog.annotations.description },
-        { name: CatalogApi.apiName, description: CatalogApi.annotations.description }
-      ])
-    ).toEqual([])
   })
 })

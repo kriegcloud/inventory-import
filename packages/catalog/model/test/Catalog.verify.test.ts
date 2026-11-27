@@ -22,7 +22,8 @@ import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
-import { Catalog, CatalogApi } from "../src/Catalog.model.ts"
+import { CatalogApi } from "../src/Catalog.api.ts"
+import { Catalog } from "../src/Catalog.model.ts"
 
 /** The lock file as Verify writes it: each rule's kind and text, under the model's name. */
 const LockFile = S.fromJsonString(

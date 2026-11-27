@@ -3,20 +3,8 @@
 import { dual } from "effect/Function"
 // undo. Acts on groups of rows are in `Group.story.test.ts`. No rule of the model holds that a valid act is taken (a
 // `sometimes` rule only finds one sequence that takes it); these stories do (Benjamin, 2026-11-22: "Yes, one per
-// command"). So every command has at least one story in which it is taken and every event it records is stated:
-//
-//   Command          Taken, its events in full, in
-//   StageImport      "a viewer may not stage a file; an editor stages it, once"
-//   MatchColumn      "a match made over one its sender never saw is refused, ..."
-//   RecordSuggestion "a suggestion is recorded as its asker's and changes no number; a viewer's is refused"
-//   ConfirmImport    "a plan built before the last act may not be confirmed after it"
-//   TakeBackImport   "a take-back, a reopen and a remove each name the last change, ..."
-//   ReopenImport     "a take-back, a reopen and a remove each name the last change, ..."
-//   RemoveImport     "a take-back, a reopen and a remove each name the last change, ..."
-//   DecideRow        "another person's act lands before the screen's own waiting act: the confirm is refused"
-//   UndoRowStep      "undos go down every level exactly as it was, and end at none"
-//   DecideGroup      "a group of 6,000 rows is one act and one change, ..." (Group.story.test.ts)
-//   UndoGroup        "walk-back: ..." (Group.story.test.ts)
+// command"). Every command is sent and every rejection named in a story here or in `Group.story.test.ts`, and
+// `StoryCoverage.test.ts` fails on one that is not, naming it.
 //
 // The one thing not to break: a story fails on a rejection no `rejected` names and on an event no `then` names, so
 // nothing a command does goes unseen. Keep every accepted step followed by a `then` for each instance it touches.

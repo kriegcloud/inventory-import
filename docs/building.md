@@ -15,7 +15,7 @@ What the type-check and the laws refuse is in [laws](laws.md).
 Design in this order. Do not start from the UI.
 
 1. **Schema** in the context's contract package (`packages/catalog/contract/src/Item/Item.read.ts`,
-   `ItemQuery.command.ts`): the data and its rules, as Effect Schemas. Parse,
+   `ItemQuery.payload.ts`): the data and its rules, as Effect Schemas. Parse,
    don't validate: payloads, database rows and model output are decoded through a Schema. File cells are read by
    small functions that return a value or a reason naming the column and value: a Schema error is not a sentence
    for the person.
@@ -64,9 +64,9 @@ this repo, check it in `node_modules/effect/src/` or the guides in `node_modules
 ### The model's blocks: what Verify reads
 
 The review is also a model of `@alchemy.run/domain` (`packages/catalog/model`: `Import/Import.aggregate.ts`,
-`Row/Row.aggregate.ts`, `Group/Group.aggregate.ts`, the four `Review/*.decision.ts`, `Catalog.model.ts`). Verify proves
-its rules from the code of `decide` and `evolve`, so that code is written for two readers. Before changing one of
-those files, read [docs/verify.md](verify.md).
+`Row/Row.aggregate.ts`, `Group/Group.aggregate.ts`, the four `Review/*.decision.ts`, `Catalog.model.ts` and its Api,
+`Catalog.api.ts`). Verify proves its rules from the code of `decide` and `evolve`, so that code is written for two
+readers. Before changing one of those files, read [docs/verify.md](verify.md).
 
 - **`.make` everywhere, a `decide` included**: an event or a rejection is built with `X.make(...)` in `*.aggregate.ts`
   and `*.decision.ts` as in every other file, and no file turns a diagnostic off. The prover reads `X.make(...)` as the

@@ -248,6 +248,19 @@ describe("a model's call that failed before its handler answered", () => {
     expect(said(undecodable)).toEqual(unreadable)
   })
 
+  // A 5xx does not say whether a command was stored before its answer was lost, so its words never promise that
+  // nothing changed (Benjamin, 2026-11-27): they say to reload and look before pressing again.
+  it("never says nothing was changed for a server error, of the app's request or a model's call", () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined)
+    for (const error of [answered(500), answered(503), rpcOver(answered(502))]) {
+      const said = sayError(error, { fields: {} })
+      expect(said.sentence).not.toMatch(/nothing was changed/i)
+      expect(said.sentence).toBe(
+        "It may not have gone through. Reload the page to see what is stored before trying again."
+      )
+    }
+  })
+
   // The library sends a call's request with no check of its status, so without the kit's HTTP client a 503 reaches
   // the person as "Received empty HTTP response from RPC server": not asked again, and said as an unreadable answer.
   effectIt.live("over the kit's HTTP client, is asked again and said as today's for a 503, a 502 or a 429 served", () =>

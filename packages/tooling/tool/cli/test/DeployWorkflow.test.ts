@@ -3,13 +3,14 @@
 // It holds what starts the workflow, which job runs on which event, in which environment, with which secrets, and
 // every step of every job in order: each action with its version and what it is given, each command and each guard's
 // whole script word for word, and each step's own condition. A step added, moved, swapped or switched off in any job fails here. The three shell
-// guards in it (the refusal of every stage but a preview, staging's "only main's head", and production's "still the
+// guards in it, and the step that shows a deploy's plan (the refusal of every stage but a preview, staging's "only main's head", and production's "still the
 // release branch's head" after the approval) are run, not only read. What an action does is not read: its name and
 // version are.
 // No runner is started: `release verify-head`'s own tests hold the guard that the release-tag job runs.
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { expect, layer } from "@effect/vitest"
 import * as A from "effect/Array"
+import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
@@ -80,6 +81,14 @@ const ownPullRequest = "github.event.pull_request.head.repo.full_name == github.
 const greenMain =
   "github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository"
 const install = "bun install --frozen-lockfile"
+// Each deploy's plan, shown before it: the tool's answer is the step's, after what it printed is in the log.
+const showThePlan = (
+  stage: string
+) => `bunx alchemy deploy --stage ${stage} --dry-run --yes > "$RUNNER_TEMP/plan.txt" 2>&1 && said=0 || said=$?
+cat "$RUNNER_TEMP/plan.txt"
+exit "$said"
+`
+const planGuard = 'bun run beep infra plan-check "$RUNNER_TEMP/plan.txt"'
 
 // The three shell guards, word for word as the file has them: a line added to one (a second command after its last
 // `fi`, say) fails the step list below, whatever the script still exits with.
@@ -183,6 +192,7 @@ layer(here)("the deploy workflow", (it) => {
         expect(each(jobs, read)).toEqual({
           preview: [
             "secrets.CLOUDFLARE_API_TOKEN",
+            "secrets.PREVIEW_ACCESS",
             "secrets.PREVIEW_TEST_ACCOUNT_PASSWORD",
             "vars.CLOUDFLARE_ACCOUNT_ID"
           ],
@@ -191,15 +201,19 @@ layer(here)("the deploy workflow", (it) => {
             "secrets.CLOUDFLARE_API_TOKEN",
             "secrets.PREVIEW_TEST_ACCOUNT_PASSWORD",
             "secrets.SIGN_UP",
-            "vars.CLOUDFLARE_ACCOUNT_ID"
+            "secrets.TELEMETRY_COLLECTOR_AUTHORIZATION",
+            "vars.CLOUDFLARE_ACCOUNT_ID",
+            "vars.TELEMETRY_COLLECTOR_URL"
           ],
           "release-tag": [],
           production: [
             "secrets.CLOUDFLARE_API_TOKEN",
             "secrets.OPENROUTER_API_KEY",
             "secrets.SIGN_UP",
+            "secrets.TELEMETRY_COLLECTOR_AUTHORIZATION",
             "vars.CLOUDFLARE_ACCOUNT_ID",
-            "vars.DEPLOY_WITHOUT_MODEL_KEY"
+            "vars.DEPLOY_WITHOUT_MODEL_KEY",
+            "vars.TELEMETRY_COLLECTOR_URL"
           ]
         })
         // No secret is read anywhere else in the file: not in a command, not in a step's `with`.
@@ -221,11 +235,23 @@ layer(here)("the deploy workflow", (it) => {
             step.run === undefined ? [] : [step.name === undefined ? step.run : `(${step.name})`]
           )
         expect(each(jobs, commands)).toEqual({
-          preview: [install, "(Deploy the preview)"],
+          preview: [install, "(Show the plan)", "(Stop a plan that loses the database)", "(Deploy the preview)"],
           cleanup: ["(Refuse any stage but a preview)", install, "(Destroy the preview)"],
-          staging: ["(Deploy only the commit main is at)", install, "(Deploy staging)"],
+          staging: [
+            "(Deploy only the commit main is at)",
+            install,
+            "(Show the plan)",
+            "(Stop a plan that loses the database)",
+            "(Deploy staging)"
+          ],
           "release-tag": ["(Fetch the tags as pushed)", install, "(Refuse a release that is not one)"],
-          production: ["(Deploy only a release that is still its branch's head)", install, "(Deploy production)"]
+          production: [
+            "(Deploy only a release that is still its branch's head)",
+            install,
+            "(Show the plan)",
+            "(Stop a plan that loses the database)",
+            "(Deploy production)"
+          ]
         })
         const named = (job: string, name: string) =>
           O.getOrElse(
@@ -313,6 +339,8 @@ layer(here)("the deploy workflow", (it) => {
           "actions/setup-node@v4: steps.head.outputs.deploy == 'true'",
           "oven-sh/setup-bun@v2: steps.head.outputs.deploy == 'true'",
           `${install}: steps.head.outputs.deploy == 'true'`,
+          "Show the plan: steps.head.outputs.deploy == 'true'",
+          "Stop a plan that loses the database: steps.head.outputs.deploy == 'true'",
           "Deploy staging: steps.head.outputs.deploy == 'true'"
         ])
         expect(
@@ -344,7 +372,7 @@ layer(here)("the deploy workflow", (it) => {
           when
         })
         const checkout = (given: Record<string, unknown>) => uses("actions/checkout@v4", given)
-        const node = (when = "always") => uses("actions/setup-node@v4", { "node-version": 22 }, when)
+        const node = (when = "always") => uses("actions/setup-node@v4", { "node-version-file": ".tool-versions" }, when)
         const bun = (when = "always") => uses("oven-sh/setup-bun@v2", { "bun-version-file": ".bun-version" }, when)
         // What a step is told is part of what it does: a guard given another commit to compare checks nothing.
         const runs = (named: string, does: string, when = "always", told: Record<string, string> = {}) => ({
@@ -364,6 +392,8 @@ layer(here)("the deploy workflow", (it) => {
             node(),
             bun(),
             runs("", install),
+            runs("Show the plan", showThePlan('"$STAGE"')),
+            runs("Stop a plan that loses the database", planGuard),
             runs("Deploy the preview", 'bunx alchemy deploy --stage "$STAGE" --yes')
           ],
           cleanup: [
@@ -380,6 +410,8 @@ layer(here)("the deploy workflow", (it) => {
             node(onHead),
             bun(onHead),
             runs("", install, onHead),
+            runs("Show the plan", showThePlan("staging"), onHead),
+            runs("Stop a plan that loses the database", planGuard, onHead),
             runs("Deploy staging", "bunx alchemy deploy --stage staging --yes", onHead)
           ],
           "release-tag": [
@@ -404,12 +436,15 @@ layer(here)("the deploy workflow", (it) => {
             node(),
             bun(),
             runs("", install),
+            runs("Show the plan", showThePlan("prod")),
+            runs("Stop a plan that loses the database", planGuard),
             runs("Deploy production", "bunx alchemy deploy --stage prod --yes")
           ]
         })
-        // The only places the file names the deploy tool are those four commands: no script holds a fifth.
+        // The only places the file names the deploy tool are those four commands and the three plans before a
+        // deploy: no script holds an eighth.
         const source = yield* text("deploy.yml")
-        expect(A.length(Str.split("alchemy")(source)) - 1).toBe(4)
+        expect(A.length(Str.split("alchemy")(source)) - 1).toBe(7)
         // Each job's own variables, by name and by what is written for each: nothing is added to a job unseen.
         const account = {
           CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}",
@@ -417,16 +452,21 @@ layer(here)("the deploy workflow", (it) => {
         }
         const password = { PREVIEW_TEST_ACCOUNT_PASSWORD: "${{ secrets.PREVIEW_TEST_ACCOUNT_PASSWORD }}" }
         const stage = { STAGE: "pr-${{ github.event.pull_request.number }}" }
+        const telemetry = {
+          TELEMETRY_COLLECTOR_URL: "${{ vars.TELEMETRY_COLLECTOR_URL }}",
+          TELEMETRY_COLLECTOR_AUTHORIZATION: "${{ secrets.TELEMETRY_COLLECTOR_AUTHORIZATION }}"
+        }
         expect(each(jobs, (job) => job.env ?? {})).toEqual({
-          preview: { ...account, ...password, ...stage },
+          preview: { ...account, ...password, PREVIEW_ACCESS: "${{ secrets.PREVIEW_ACCESS }}", ...stage },
           cleanup: { ...account, ...stage },
-          staging: { ...account, ...password, SIGN_UP: "${{ secrets.SIGN_UP }}" },
+          staging: { ...account, ...password, SIGN_UP: "${{ secrets.SIGN_UP }}", ...telemetry },
           "release-tag": {},
           production: {
             ...account,
             OPENROUTER_API_KEY: "${{ secrets.OPENROUTER_API_KEY }}",
             DEPLOY_WITHOUT_MODEL_KEY: "${{ vars.DEPLOY_WITHOUT_MODEL_KEY }}",
-            SIGN_UP: "${{ secrets.SIGN_UP }}"
+            SIGN_UP: "${{ secrets.SIGN_UP }}",
+            ...telemetry
           }
         })
       })
@@ -472,7 +512,43 @@ const script = Effect.fn("script")(function* (job: string, name: string) {
   ).pipe(Effect.fromOption, Effect.orDie)
 })
 
-layer(here)("the deploy workflow's three shell guards, run", (it) => {
+layer(here)("the deploy workflow's three shell guards and its plan step, run", (it) => {
+  it.effect(
+    "the plan step puts what the tool printed in the log and in the file the guard reads, and ends as the tool did",
+    () =>
+      Effect.gen(function* () {
+        const step = yield* script("preview", "Show the plan")
+        // A stand-in for the tool: it prints what it was started with on both streams and ends with $TOOL_CODE.
+        const tool = '#!/bin/sh\necho "out: $*"\necho "err: $STAGE" >&2\nexit "$TOOL_CODE"\n'
+        const seen = yield* inTree(
+          { "bin/bunx": tool },
+          Effect.gen(function* () {
+            const repo = yield* Repo
+            yield* repo.run("chmod", ["+x", repo.join(repo.root, "bin/bunx")])
+            const path = yield* Effect.orDie(Config.String("PATH"))
+            const ran = Effect.fn("ran")(function* (code: string) {
+              const answer = yield* repo.run("bash", ["-e", "-c", step], {
+                env: {
+                  PATH: `${repo.join(repo.root, "bin")}:${path}`,
+                  RUNNER_TEMP: repo.root,
+                  STAGE: "pr-7",
+                  TOOL_CODE: code
+                }
+              })
+              const kept = yield* repo.text(repo.join(repo.root, "plan.txt"))
+              return { code: answer.code, log: Str.trim(answer.stdout), file: Str.trim(kept) }
+            })
+            return yield* Effect.all([ran("0"), ran("1")], { concurrency: 1 })
+          })
+        )
+        const printed = "out: alchemy deploy --stage pr-7 --dry-run --yes\nerr: pr-7"
+        expect(seen).toEqual([
+          { code: 0, log: printed, file: printed },
+          { code: 1, log: printed, file: printed }
+        ])
+      })
+  )
+
   it.effect("the cleanup's refusal lets a preview's stage through and stops every other name", () =>
     Effect.gen(function* () {
       const refusal = yield* script("cleanup", "Refuse any stage but a preview")

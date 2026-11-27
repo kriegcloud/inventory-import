@@ -1,0 +1,432 @@
+---
+type: Plan
+title: "Alchemy uptake, plan"
+description: The steps of the Alchemy uptake goal, their status, the current blocker, what each step must prove first, and what Benjamin does by hand.
+from: explorations/ideal-architecture
+---
+
+# Plan
+
+[SPEC](SPEC.md) holds the objective and acceptance. Status is one of `todo`, `doing`, `done`, `closed` (tried, did
+not hold up, with the reason). Nothing is built yet: this packet was written on 2026-11-26.
+
+Each step begins with its proof, because the report read every item from source and ran none. A proof that fails
+closes the step with what was seen; it does not get worked around.
+
+| # | Step | Needs first | Status |
+| --- | --- | --- | --- |
+| 1 | CLI inspection: `docs/operations.md` with plan, drift, logs and state for a stage; the plan and its guard before each deploy in `deploy.yml` | nothing | done |
+| 2 | Limits and placement: measure a sign-in and a confirm of a large file, then declare them | a deployed stage to measure on: his | waits for his measurement ("What Benjamin does by hand"); nothing declared |
+| 3 | D1 export: `beep infra export --dry-run` and the procedure in `docs/operations.md` | answered 2026-11-26: his workstation, by hand | built; the dump and the restore seen on a local database, never on a deployed one. A real run is his |
+| 4 | Stack tests: the harness in `scratchpad/` first (does it deploy this stack locally, where does its state go), then one test in `check:full` | npm's `@alchemy.run/test` 2.0.0-beta.87 (the registry never builds it) | done: `apps/inventory/test/stack/Stack.slow.test.ts` in `check:full`; not yet run on CI |
+| 5 | `alchemy dev` trial: `bun run dev:alchemy` beside `bun run dev`, compared and written up here | nothing | done: it runs; my recommendation is that the no-go stands ("The `alchemy dev` trial", below). His to decide |
+| 6 | Rate limiter: the binding in the stack and locally, the check in front of sign-in and the model | answered 2026-11-26: by address, 30 a minute, a failed binding lets the request on | done locally; not seen on a deployed stage |
+| 7 | Access on previews: the policy in `planFor` for `pr-<number>` | answered 2026-11-26: the emails in the preview environment's secret `PREVIEW_ACCESS` | built; waits for his three steps under "What Benjamin does by hand" |
+| 8 | Telemetry export: a destination per stage that names a collector | answered 2026-11-26: staging and prod read a collector from their environment; none is named yet | built; sends nothing until he names a collector ("What Benjamin does by hand"). Not seen against an account |
+
+The order is smallest and least blocked first: 1 and 5 need nothing from him; 4 needs one command of his; 2, 3, 6,
+7 and 8 each wait for one answer or one measurement.
+
+## Current blocker
+
+Nothing an agent can do is left. Step 2 waits for Benjamin, and steps 6, 7, 8 and 3 are built and unseen on a real
+account: each is under "What Benjamin does by hand" and "What waits for a real account". Step 4's stack test runs in
+`check:full` on this machine; it has not run on CI yet.
+
+## What each proof must show
+
+- **Step 1.** `alchemy plan --stage pr-1` cannot be run by an agent against a real account, so the workflow change
+  is proved by the test that already reads `deploy.yml` step by step (`packages/tooling/tool/cli/test/DeployWorkflow.test.ts`: the packet first said none existed, having looked only in `packages/infra`) and a run of the guard on printed plans. Whether `drift` reads
+  every resource of this stack is unknown: the report says it skips a provider that has no read.
+- **Step 2.** The local write-limit test proves SQL bounds, not Cloudflare's CPU. The number comes from a deployed
+  stage or the step stays `todo`. Placement can slow the routes that do not touch D1: measure both.
+- **Step 3.** `D1/ExportDatabase.ts` is not in Alchemy's documents and polls with no bound. The command wraps it
+  with a limit of its own. It is a dump, never called a backup.
+- **Step 4.** The harness defaults to `localState()`. The proof is a run in `scratchpad/` that deploys this stack
+  locally with the state store given, then a search of every file it wrote for the sign-in secret. If the local
+  providers cannot serve `Website.Vite` with its bindings, the step closes.
+- **Step 5.** The trial must open signed in as Dana Whitfield with no key and no `.dev.vars` made by hand, and say
+  where its minted secret is kept. The Vite config's Cloudflare plugin must be guarded against the one Alchemy adds.
+  `scripts/dev-https.mjs` stays either way.
+- **Step 6.** The binding's counters are approximate and per Cloudflare location. A test shows one refusal and one
+  pass through the Worker's own `fetch`; what the local emulator does with the binding is unknown until tried.
+- **Step 7.** Whether `Website.Vite` passes `access` through is read from source (`Workers/Worker.ts`), not run.
+  The policy and the service token are made in a real account: his.
+- **Step 8.** `ObservabilityDestination` needs a collector that answers a preflight POST over HTTPS. Joining
+  Effect's spans to Cloudflare's (`Cloudflare.Telemetry()`) needs the Worker as an Effect and is out of this goal.
+
+## What Benjamin does by hand
+
+Each is his alone: it reaches a real account, or moves the pin. In the order they unblock something.
+
+### Before this branch is merged: the previews' gate (step 7)
+
+Once this is on `main`, **every preview's deploy stops until `PREVIEW_ACCESS` is set** (`MissingPreviewAccess`:
+"has no list of who may open it"). Staging, production and test stages are not touched.
+
+1. In the previews' Cloudflare account, open Zero Trust once (it asks for a team name the first time; the free
+   plan is enough) and check Settings, Authentication, Login methods: "One-time PIN" is listed. That is the login
+   a preview will ask for: an email, then a code sent to it.
+2. Give the token previews deploy with (`PREVIEW_CLOUDFLARE_API_TOKEN`, the one you made in that account) the
+   account permission "Access: Apps and Policies, Edit". Not verified which permission the provider's calls need
+   beyond that: a missing one shows as a refused call that names it.
+3. In 1Password, make an item whose field holds the emails, on one line separated by commas. Make another item
+   for production's sign-up list (emails, or `closed`) if you don't already have one. Write both references into
+   `packages/infra/env/op.env.local` (git ignores it):
+
+   ```
+   PREVIEW_ACCESS="op://<vault>/<item>/<field>"
+   SIGN_UP="op://<vault>/<item>/<field>"
+   ```
+
+   Then deploy the repository's stack, which writes both to GitHub as secrets. It stops before step 1 without them:
+
+   ```bash
+   bun run beep infra setup --staging
+   ```
+
+4. Open or push to a pull request (or re-run its Preview job). Its plan should read `[Website/Access] create`. Open the preview's address in
+   a private window: Cloudflare asks for an email and sends a code; one of the named emails then reaches the
+   app's sign-in page, and any other is refused by Cloudflare. That is the first time the gate is seen at all.
+
+To take the gate off again: revert the `access` line of `PreviewPlan` and of `planFor`; the next deploy of each
+preview removes its Access application.
+
+### When there is a collector: where staging and production send telemetry (step 8)
+
+Nothing is sent until this is done, and nothing breaks while it is not.
+
+1. Have a collector that takes OpenTelemetry over HTTPS (Grafana Cloud, Honeycomb, one of your own). Cloudflare
+   sends it a test request when the destination is made and refuses one that does not answer.
+2. Give the deploying token the permission to write Workers Observability destinations. For staging that is the
+   token you made by hand; for production it is the token the repository's stack mints (`account(...)` in
+   `packages/infra/src/GitHub.stack.ts`, five permission groups today): the group is added there and that stack
+   deployed. **Not verified which group it is** ("Workers Observability Write" is my reading of the dashboard's
+   names): the first deploy's refused call names it.
+3. For each of `staging` and `production`, the address as a variable and the header as a secret, both typed at the
+   prompt:
+
+   ```bash
+   gh variable set TELEMETRY_COLLECTOR_URL --env staging --repo kriegcloud/inventory-import
+   ```
+
+   ```bash
+   gh secret set TELEMETRY_COLLECTOR_AUTHORIZATION --env staging --repo kriegcloud/inventory-import
+   ```
+
+4. The next deploy's plan should read `[TelemetryTraces] create`, `[TelemetryLogs] create` and `[Website] update`,
+   and the collector should then show the Worker's requests.
+
+### When a stage's rows are wanted: a dump (step 3)
+
+`bunx wrangler whoami` must show the stage's account (`bunx wrangler login` if it does not), then:
+
+```bash
+bun run beep infra export --stage staging
+```
+
+The first run settles the three unknowns under "What was proved on this machine", step 3. If it stops on the
+state record or on the table list, the sentence it prints says which, and nothing was written.
+
+### To measure the Worker's limits (step 2)
+
+Nothing is declared until this is measured: a guessed CPU limit cuts a confirm off half way.
+
+1. On a deployed stage that has the model key or not (it does not matter), follow the Worker's requests:
+
+   ```bash
+   bunx alchemy logs --stage staging --profile inventory-preview --tail
+   ```
+
+   and, for the CPU time of each request, the Worker's page in the Cloudflare dashboard (Workers, the Worker,
+   Observability, the request's "CPU time"). Whether `alchemy logs` prints CPU time is not known.
+2. Sign in once; upload `items_messy.csv` (200 rows) and confirm it; then the largest file you expect anyone to
+   load, and confirm it.
+3. Write down the CPU time of the sign-in (`POST /api/auth/sign-in/email`) and of each confirm, and the wall time
+   of one read (`GET /api/v1/items`) and one write.
+4. Tell an agent the numbers. It declares `limits.cpuMs` above the largest confirm with room, and tries
+   `placement: { mode: "smart" }` only if a read that touches D1 is slow from where you are: placement can slow
+   the routes that do not touch D1, so the same four requests are measured again with it on.
+
+### To test the stack itself (step 4)
+
+Done differently, 2026-11-26. The re-pin with `"@alchemy.run/test"` in `ROOTS` stopped: "the registry has no
+build of commit e1c3e6d". The registry never builds that package: the library's `.github/workflows/pkg.yml` packs a
+fixed list of folders, and `packages/alchemy-test` is not in it, at e1c3e6d or since. npm has `2.0.0-beta.87`,
+published 2026-11-12 from the tag `v2.0.0-beta.87` (771d058), 194 commits behind the pin; one commit has touched the
+harness since (126d8ca, "fail a plain test whose body returns an Effect"). Benjamin chose npm's build, tried in
+`scratchpad/` first; how it is kept for `check:full` is asked once the trial has shown whether it works. `ROOTS`
+is back to the five packages, so a re-pin runs again.
+
+## What was proved on this machine
+
+- **Step 4, the test** (2026-11-26, `apps/inventory/test/stack/Stack.slow.test.ts`, a slow test, so in
+  `check:full`). The harness deploys `InventoryDev` on the local providers for the stage `dev_stacktest`, with the
+  stack's own in-memory store (`localStackState`, now exported: a stack's own `state` wins over the one the harness
+  names, so a store given to the harness alone read empty). Over HTTP: the signed-out session offers the test
+  accounts, the first signs in, and the app's own typed client (`HttpApiClient.make(Api)`, the cookie and the
+  page's `origin` on every request) uploads `items_clean.csv` through the same helpers every slow test uses: 25
+  rows, 25 Ready; the confirm created 25 and the items list read 25. Then the secret is read from the state
+  (`SignInSecret`, 64 characters) and every file under the app's `.alchemy` is searched for it: none holds it. The
+  search must read the run's own database or the test fails (a first version read no file and passed: a relative
+  path and the harness's file system, whose `recursive` listing answers nothing, together). Turned around to look
+  for the test account's email, which is in the database, the test failed and named the database's write-ahead log.
+  When it ends it destroys the stack and removes the database files the run added under `.alchemy/local/d1`; after
+  a failed run too. Its first runs took 6 to 12 seconds. **Not seen:** the test on CI (`check:ci` runs the slow
+  tests), and the same against a deployed test stage (never: no account here).
+- **Step 4, the trial** (2026-11-26, `scratchpad/experiments/stack-harness`, graduated into the test above; its
+  line is in `scratchpad/LOG.md`).
+  npm's `@alchemy.run/test@2.0.0-beta.87`, installed into the scratchpad only (`--omit=peer`, so `alchemy`,
+  `effect` and vitest are the root's: the vendored build of e1c3e6d). Its source imports 26 `alchemy/...` modules
+  and every one is in the vendored build; it passes the scratchpad's type-checker with the Effect diagnostics. On
+  the scratchpad's vitest, on Node: `Test.make` from `@alchemy.run/test/Vitest` with `Cloudflare.providers()`,
+  `Alchemy.inMemoryState()`, `dev: true` and the stage `dev_trial`, `beforeAll(deploy(InventoryDev))`, then
+  `afterAll(destroy(InventoryDev))`. Six runs passed, 6.0 to 12.5 seconds each with the deploy: the signed-out
+  session offered the test accounts, the first one signed in at `/api/auth/sign-in/email`, the session read
+  `ready` with the cookie, and `/api/v1/system/status` answered 200 (401 before the sign-in, as under
+  `bun run dev`). **The sign-in secret was in no file**: every file the runs wrote was searched for 64 hexadecimal
+  characters, and the only ones are the migrations' hashes and the five test accounts' password hashes, inside the
+  local D1 database. **Two things a test in `check:full` must deal with**: the local runtime writes its data to
+  `.alchemy/local` under the folder vitest runs in (git-ignored), whatever `dotAlchemy` says; and every run leaves
+  its D1 database there, `destroy` included, holding the test accounts' password hashes and the run's sessions.
+  **Not tried:** the acceptance's import of `items_clean.csv`, and the harness at the pinned commit.
+- **Step 3** (2026-11-26). **The proof changed the design.** On a copy of the local development database (5 people,
+  168 items, 600 outcomes), in `.scratch/dump-trial`: `wrangler d1 export` of the whole database answered "cannot
+  export databases with Virtual Tables (fts5)", which the app has (`itemSearch`). With every other table named
+  (`--table`, `--no-schema`) it wrote 911 statements. Loaded into a second database that had only the migrations
+  (`wrangler d1 execute --file`), the file was refused whole, "statement too long: SQLITE_TOOBIG": three rows of
+  `importChunk` are 105,666 bytes each. Without those three lines it loaded, and both databases then counted the
+  same: 5 users, 6 members, 168 items, 168 rows in the search index, 23 activities, 600 outcomes, 6 sessions; a
+  search for `bolt*` found 4 in each; `PRAGMA foreign_key_check` found nothing. The refused load had written
+  nothing (the second load met no row already there).
+  `DatabaseDump.test.ts`, with stand-ins for both tools: the tables named are the app's own; a row over the limit
+  is counted by its table and one at the limit is not; a run asks first, reads the state with the stage's profile
+  (production's for `prod`), names `item` and `user` to wrangler and leaves `staging-<time>.sql` at mode 600 in a
+  folder at mode 700, then says where it is, what a restore leaves out and how to delete it; a no starts no tool
+  and makes no folder; a bad stage name, a state record or a table list it cannot read, and a table name that is no
+  plain name each stop with nothing written; an export that fails, or that is still running after 15 minutes, leaves
+  no file. Typed at a terminal: `bun run beep infra export --stage staging --dry-run` printed the six steps and
+  ended with 0; `--stage "Bad Stage"` ended with 1. Run once without `--dry-run` and with no terminal (my mistake:
+  the rule is `--dry-run` only): it asked its question, got no answer, said "No dump was taken" and started no tool.
+  **Not seen:** anything against an account. Unknown until his first run: whether the state record reads
+  `attr.databaseName` and `attr.accountId` (read from `D1/Database.ts`, not from a record), whether wrangler prints
+  only JSON for the table list on a remote database, and whether Cloudflare's own export takes named tables on a
+  database with a full-text index as the local one does (its documents say only that such a database is refused).
+- **Step 8** (2026-11-26). `StagePlan.test.ts`: of `prod`, `pr-42`, `staging`, `test_ben` and `dev_ben` only
+  staging's and production's plans name a collector (`TELEMETRY_COLLECTOR_URL`, `TELEMETRY_COLLECTOR_AUTHORIZATION`);
+  " https://otel.example.test/otlp/ " with a header becomes `…/otlp/v1/traces` and `…/otlp/v1/logs` with that
+  header; with no address there is no destination, header or not; a preview, a test stage and a personal one get
+  none whatever the variables hold; an `http:` address, one with a query, a bare host and `https://` stop the deploy
+  (`UnreadableCollector`). `DeployWorkflow.test.ts` holds the two names in the staging and production jobs and in
+  no other. The stack type-checks against the pinned library: two `Cloudflare.Workers.ObservabilityDestination`
+  (`opentelemetry-traces`, `opentelemetry-logs`) named in the Worker's `observability.traces` and `.logs`.
+  **Not seen:** a destination made anywhere, a plan that names one, or a record arriving at a collector. No
+  collector exists to try, and the local providers were not asked to make one (a personal stage sends nowhere).
+- **Step 7** (2026-11-26). `StagePlan.test.ts`: of `prod`, `pr-42`, `staging`, `test_ben` and `dev_ben` only
+  `pr-42`'s plan names an Access policy, read from `PREVIEW_ACCESS`; "Ben@Example.test, qa@example.test" becomes
+  the two emails in lower case; with nothing given, and with a list that has a piece that is no email (a trailing
+  comma, a semicolon, "everyone"), the deploy stops with a sentence that says how to set the secret and repeats
+  nothing it was given; a stage with no policy reads nothing whatever the variable holds. `DeployWorkflow.test.ts`
+  holds `PREVIEW_ACCESS` in the preview job's variables and in no other job's. Read from source, not run:
+  `Website.Vite` hands every property but four to `Worker` (`Website/Vite.ts`, `...props`), so `access` reaches
+  it, and the Worker then owns one Access application (`<Worker>/Access`) made and removed with it.
+  **Not seen:** any of it against an account. Nothing here made an Access application.
+- **Step 6** (2026-11-26). The binding is `ABUSE_LIMIT`, 30 in 60 seconds, declared in the stack and in
+  `wrangler.jsonc`; the check is one router middleware in front of every route (`src/server/AddressLimit.ts`).
+  `AddressLimit.test.ts`, through the Worker's own `fetch`: a stand-in counter lets two requests of an address to
+  `/api/v1/assistant/view` through and the third answers 429 `TooManyRequests` with `retry-after: 60` and the
+  security headers; another address goes on; a read, and a request with no visitor address, are not counted; a
+  binding that throws lets the request on. `AddressLimit.slow.test.ts`, on the app as the Worker builds it: a
+  refused sign-in with the right password answers 429 and sets no cookie, a refused sign-up answers 429, and another
+  address signs in. **What the local emulator does**, tried: the binding in local workerd (wrangler's platform
+  proxy on `wrangler.jsonc`) let 30 requests of one key through and refused the 31st, and another key passed. Under
+  `bun run dev:alchemy` the plan read `[Website/ABUSE_LIMIT] create`, and of 33 sign-in attempts sent with one
+  visitor address the 33rd answered `{"_tag":"TooManyRequests",...}` (the 11th to the 32nd were Better Auth's own
+  429, its exact limit). **Seen on screen** there: signed out, typed Dana Whitfield's email and the test password,
+  pressed Sign in from the address that was over the limit; the form read "Too many attempts. Wait a minute, then
+  try again." and nobody was signed in (the request was given the address header by the test browser: a local
+  request carries none, so the limit never counts a developer's own).
+  **Not seen:** the binding on a deployed stage, where Cloudflare counts per location and approximately. The three
+  model endpoints say "Too many requests at once. Wait a few seconds and try again." (`sayError`, by status): not
+  seen on screen.
+- **Step 5** (2026-11-26). The trial above. `InfraStage.test.ts` holds the local stack's guard: under `alchemy dev`
+  a `dev_<user>` stage gets the personal plan; a deploy, plan or destroy of it, and every deployed stage's name, is
+  stopped (`NotOnThisMachine`), because its state is in memory. The move of the stack's program into `inventory` is
+  a move only (`git diff -w` shows the wrapper and nothing inside it).
+- **Step 1** (2026-11-26). `DeployWorkflow.test.ts` holds the two new steps in each of the three deploy jobs word
+  for word, in order, with staging's waiting for "only main's head", and runs the plan step's script against a
+  stand-in for the tool: what it printed is in the log and in the file, and the step ends as the tool did (0 and 1).
+  `PlanCheck.test.ts` holds the guard on plans printed by Alchemy's own `formatPlanLines` at the pinned commit
+  (run once in Node, plain and coloured, and copied): a database made, changed in place or left alone passes;
+  `replace`, `delete` and `orphaned` are refused; another resource's deletion is not the database's; an empty text,
+  a failed command's text and a plan that names no resource are refused. Typed at a terminal:
+  `bun run beep infra plan-check` on a file reading `[Database] replace` printed "REFUSED the plan would replace
+  the database" and ended with 1; on `[Database] noop` it printed "OK" and ended with 0.
+  **Not seen:** a plan of a real stage, in a workflow or anywhere. Whether the dry run builds the screens a second
+  time in a job (and so nears its 20 minutes) is unknown until the first pull request after this lands.
+
+## The `alchemy dev` trial
+
+Run on 2026-11-26, on this machine, with no Cloudflare account, profile or token. `bun run dev:alchemy` is
+`alchemy dev` on `packages/infra/src/InventoryDev.stack.ts`: the app's own stack program (`inventory` in
+`Inventory.stack.ts`, the same database, minted secret and Worker a deploy declares) given the personal stage's
+plan, with its state in memory.
+
+**What started.** Stage `dev_<user>`; a plan of `3 to create`, each marked `(local)`; ready in 3.5 to 5 seconds at
+`http://localhost:1337` (Alchemy's port, the next free one when taken; not 5173). The local providers applied the
+eight migrations and both seed files, minted the sign-in secret and started Vite with Alchemy's own Cloudflare
+plugin; ours stands down (`servedByAlchemy` in `vite.config.ts`). Three processes: the CLI's supervisor (on Bun when
+it finds one), Vite on Node, and workerd. Ctrl+C ended all three within about eight seconds.
+
+**Seen on screen** (headless browser). On `bun run dev:alchemy`: the page opened signed in as Dana Whitfield, Admin
+of Example Works (test), with the Upload step and both sample buttons; `/api/v1/system/status` read `"database":
+{"ok":true}` and "AI suggestions are off: no AI key is set". On the probe that came before it (the same three
+resources written out by hand): pressed "Use items_messy.csv", Review read "Import 155, skip 45", the dialog
+"Import 155 items?", then the Result step read Imported 155, Not imported 45, Already there 0, All 200, and the
+Items page read "155 items". The full import was not repeated on the committed entry.
+
+**Where its secrets were kept.**
+
+| State | The minted secret | After a restart |
+| --- | --- | --- |
+| In memory (what `dev:alchemy` uses) | In no file: the run log, the runtime's registry file and its cache were searched for 64 hexadecimal characters, none found | A new, empty database and a new secret: the Items page read "0 items" after 155 were stored, and every session ended |
+| A local file, encrypted with a passphrase (`passphraseEncryption`, a throwaway passphrase) | `SignInSecret.json` and the Worker's `props.env` were sealed, but `Website.json` held it as 64 plain characters at `bindings[].data.bindings[].text` | `[Database] noop`, the 25 items of `items_clean.csv` were still there and no new sign-in was asked |
+| A local file, plain (`localState()`) | Not tried: the goal forbids it | |
+
+So keeping what was imported across a restart needs a state file, and a state file holds the sign-in secret in
+plain text at this commit even when encrypted. `bun run dev` keeps its secret in `.dev.vars` in plain text too
+(git-ignored, readable by the owner only), so this is no worse than today; it is also no better, and the passphrase
+would itself need a file or a prompt.
+
+**What of `scripts/` it would delete.** Only `migrate-local.mjs` (74 lines: local migrations, the two seeds, the
+secret written to `.dev.vars`), and only if `bun run dev` were replaced. `dev-accounts.mjs` still writes the seed
+the stack imports; `dev-https.mjs`, `telemetry.mjs` and the rest are untouched. `wrangler.jsonc` stays while the
+build and the tests read it.
+
+**What it could not do.**
+
+- Keep imported items, or a session, across a restart without the state file above.
+- Read `.dev.vars` or `wrangler.jsonc`: Alchemy's plugin leaves both out on purpose (`cloudflare-runtime`'s
+  `vite/PARITY.md`). A developer's own model key, `AI_ENABLED=false` and `OTEL_EXPORTER_OTLP_ENDPOINT` reach the
+  Worker only if the stack declares them, so "Running with AI turned off" and `bun run telemetry` have no
+  counterpart yet.
+- Serve on 5173: every document, `dev:portless`, `dev:https` and the second-server convention name that port.
+- Stay inside the repository: it wrote `~/.local/state/alchemy/registry/*.json` (the runtime's registry) beside
+  `.alchemy/` here. `ALCHEMY_TELEMETRY_DISABLED=1` in the script keeps its telemetry off; the CLI still asks npm
+  once a day whether a newer version exists.
+- One thing seen once: on the first start, pressing "Use items_messy.csv" was followed by Vite reloading the page
+  ("dependency optimized: effect/MutableList"), and the Upload step read "Stopped before it was saved. Continue
+  reads it again from this browser"; Continue went on to Review. It did not happen on later starts. Both commands
+  share `node_modules/.vite`, and switching between them re-optimizes it. Not checked whether a cold `bun run dev`
+  loses a first file the same way: `effect/MutableList` is not in `readerModules`.
+
+Not tried: HTTPS, hot reload of a screen or of the Worker, a second checkout at once, and anything with a model key.
+
+**Recommendation** (the decision is Benjamin's): the infra brief's no-go stands. `bun run dev` keeps what was
+imported across restarts and reads `.dev.vars`; `alchemy dev` does neither without a state file that holds the
+secret in the clear. It is worth another look when Alchemy seals a Worker's binding records in local state.
+`bun run dev:alchemy` stays as the way to try it; removing it is the script, `InventoryDev.stack.ts`,
+`InfraStage.personal` and the one setting in `vite.config.ts`.
+
+## What waits for a real account
+
+- **Step 1.** The first pull request's "Deploy" run after this lands: its "Show the plan" step should print a `Plan:`
+  line and one line for each of `Database`, `SignInSecret` and `Website`, and "Stop a plan that loses the database"
+  should print OK. If the guard says the text is not a plan, the tool prints something else in a workflow than its
+  formatter does here, and the guard's pattern is what changes.
+- **Step 6.** The limit on a deployed stage: 31 sign-in attempts in a minute from one address should end in the
+  app's own 429 (`{"_tag":"TooManyRequests"}`), and a preview's plan should read `[Website/ABUSE_LIMIT] create`
+  the first time. Cloudflare counts per location and approximately, so the 31st is "about the 31st".
+- **Step 7.** Everything: the Access application made by a preview's deploy, the login it shows, a named email
+  getting through and another being refused, and the application gone when the pull request closes. Two unknowns
+  the first run settles: whether the previews' token needs more than "Access: Apps and Policies, Edit", and whether
+  `alchemy destroy` in "Remove the preview" runs without `PREVIEW_ACCESS` as it is believed to without the
+  preview's password (`goals/infra/PLAN.md`, unknown 14); if it stops, the cleanup job needs both secrets.
+
+- **Step 3.** A dump of a deployed stage, and a load into a new one: the three unknowns of the command, the
+  100,000-byte limit on a deployed database, and whether a stage that already made its test accounts refuses the
+  load.
+- **Step 8.** Everything past the type-check: the two destinations made, Cloudflare's test request answered, and
+  the Worker's requests at the collector. Unknown until then: the token's permission group, and whether a
+  destination's name (Alchemy's physical name for it) is accepted as the Worker's `destinations` entry on the
+  first deploy, when both are made together.
+
+## Choices made
+
+- **wrangler takes the dump, not Alchemy's `D1/ExportDatabase.ts`** (step 3; the proof first said the command would
+  wrap that function). The function needs Alchemy's credentials built outside a stack, which nothing here could
+  run, and it has no bound; wrangler is installed, its export and its load were both tried locally, he watches it
+  and the command stops it after 15 minutes. The cost: wrangler's own login beside the Alchemy profile.
+- **Rows only, tables named** (step 3): forced by the full-text index. A whole-database export is refused.
+- **The dump keeps the rows that cannot be loaded back** (step 3) and says which tables have them: it is the record
+  of what was there. Leaving them out is a line he runs before a restore.
+- **The command reads no token and starts no login** (step 3): the account's id from the state record is all it
+  gives wrangler.
+- **The address is a variable and the header a secret** (step 8): his answer. The address shows in the workflow's
+  log as any variable does; an address with a query is refused, since a key in the address would be printed there.
+- **Traces and logs both, to one collector** (step 8), at `/v1/traces` and `/v1/logs` under the address given.
+  Sending logs turns on `invocationLogs` for that stage: Cloudflare's line for each request, which the stage did
+  not keep before. Reverse by dropping the `logs` half in `Inventory.stack.ts`.
+- **A bad address stops the deploy; no address sends nothing** (step 8). An unset variable is the ordinary state
+  today, and a typo in a set one would otherwise send nothing with nobody told.
+- **`deploy --dry-run --yes`, not `plan`, in the workflow** (step 1). `alchemy plan` has no `--yes`, and without it
+  a job stops when the state store is missing or a version behind (`State/Provisioning.ts`: "Run 'alchemy state
+  bootstrap' first, or pass --yes"). Every deploy job passes `--yes` today and brings the store up to date without
+  asking (`goals/infra/PLAN.md`, "What Benjamin does by hand", 3); `plan` in front would have stopped the first
+  deploy after a re-pin. The two commands are one code path (`planCommand`: "the same as deploy with dryRun always
+  set to true"). Reverse by writing `bunx alchemy plan --stage <name>` in the three steps and bootstrapping by hand
+  after a re-pin.
+- **The guard reads the printed plan, in the repository's CLI** (step 1). The plan has no machine-readable form on
+  standard output (`--log-format json` prints log records, and the plan's lines are not among them), so the guard
+  reads the plain lines and refuses what it cannot read. It names the database as the stack does, and its test reads
+  the stack.
+- **`orphaned` is a loss too** (step 1). A database dropped from the state is still in the account, but the next
+  deploy makes a new empty one and binds the Worker to it.
+- **Never `--detailed` in a workflow** (step 1): its log is public, and the plain plan names resources only.
+- **The repository's stack writes `PREVIEW_ACCESS` and production's `SIGN_UP`, from 1Password** (step 7; Benjamin,
+  2026-11-26: "Repository stack" and "Yes, both together"; the agent recommended both). This replaces the first
+  reading of his answer "read as `SIGN_UP` is", which had both lists set by hand with `gh secret set`. Each list is
+  a field of a 1Password item, and its reference is a line of `env/op.env.local` (`PREVIEW_ACCESS=op://…`,
+  `SIGN_UP=op://…`; the line named `SIGN_UP` is production's list). `GitHub.stack.ts` asks 1Password for both and
+  writes them as secrets of the `preview` and `production` environments. A list that is no list of emails stops
+  that stack, and a missing one stops it too, so a run again never closes production. Production's public variable
+  `SIGN_UP` and the setup command's `--sign-up` flag are gone, so no email is in GitHub in the clear. A preview
+  or production deployed from a workstation asks 1Password for its list itself. To change who may open a preview
+  or sign up: change the item's field, then run `bun run beep infra setup --staging`. Not moved: staging's own
+  `SIGN_UP` secret, which stays as he sets it by hand, and `TELEMETRY_COLLECTOR_AUTHORIZATION`, which is no
+  email list.
+- **A list with one bad piece is no list** (step 7): the deploy stops. Dropping the bad piece would gate a preview
+  on fewer people than were meant, and nobody would be told.
+- **The Worker's own Access application, not one shared by every preview** (step 7): it is made and removed with
+  the preview, so a closed pull request leaves nothing behind in Zero Trust.
+- **No way through for a smoke check** (step 7): the deploy workflow has none, so no service token is made. If one
+  is added later it needs a service token and a second policy.
+- **One middleware in front of every route, not a declared error on each endpoint** (step 6). Sign-in is Better
+  Auth's routes, outside the API's contract, so a check declared on the contract would have needed a second one in
+  the sign-in route's guard. The cost: `TooManyRequests` is not in the OpenAPI document. The browser reads a 429 by
+  its status in both places, so the screens needed no change.
+- **Counted under the request's host and the address** (step 6): a rate-limit namespace is one for the account, and
+  previews, test stages and staging share one. A request with no `cf-connecting-ip` is not counted: Cloudflare sets
+  that header on every request it carries, and a visitor cannot.
+- **The model endpoints are a list of three paths** (step 6), held against the API's own document by a test: a
+  fourth endpoint that asks a model is added to `countedPaths` by hand.
+- **The trial's state is in memory** (step 5). The only store that puts the sign-in secret in no file. The other
+  two were measured or forbidden (the table in "The `alchemy dev` trial").
+- **The trial reuses the deployed stack's program** (step 5), so it tries the stack and not a copy of it; the
+  entry that runs it refuses everything but `alchemy dev` for a `dev_<user>` stage.
+- **`node node_modules/alchemy/bin/cli.js`, not `bunx alchemy`, in the script** (step 5): the repository runs its
+  dev server on Node. The CLI still starts its own supervisor on Bun when one is on the path; Vite and workerd run
+  as they do under `bun run dev`.
+- **The harness comes from npm, tried in `scratchpad/` first** (step 4; Benjamin, 2026-11-26, the recommended
+  answer). Against it: packing `packages/alchemy-test` from the library's source at the pin (its types are in a
+  `lib/` only the library's build makes), waiting for the library to add it to `pkg.yml`, and a stack test with no
+  harness. npm's `2.0.0-beta.87` goes in the scratchpad's own `package.json`, never a workspace's.
+- **The harness is a devDependency, and the stack test is the app's** (step 4; Benjamin, 2026-11-26, the
+  recommended answers to two questions). `@alchemy.run/test` 2.0.0-beta.87, exact, in `apps/inventory`'s
+  devDependencies beside `@beep/infra`, the pinned `alchemy` and `@alchemy.run/cloudflare`; `.syncpackrc.json` holds
+  it with how to move it after a re-pin. Against it: a file in `vendor/alchemy` fetched from npm by the re-pin, and
+  keeping it in the scratchpad only. The test is in `apps/inventory/test/stack/`, because it needs the app's API,
+  its samples and its upload helpers; the boundaries law has one exception for it (`localStackEntry` in
+  `Laws/Boundaries.rules.ts`): an app may declare an infra package for its tests only, and a test of the app may
+  import its `InventoryDev` entry and nothing else of it. Against it: a test in `packages/infra` writing the upload's
+  JSON by hand, and a narrower acceptance with no import.

@@ -11,7 +11,7 @@ import { authOptions } from "@inventory/access-host/AuthOptions"
 
 // The breach check (Have I Been Pwned) is a setting, PWNED_PASSWORD_CHECK. Off, sign-up never calls the service. On
 // and unreachable, sign-up is refused: the check fails closed, as the README says. The real service is asked in
-// test/server/Pwned.slow.test.ts. Better Auth runs here with this app's options on its in-memory adapter: the check
+// test/server/Pwned.live.test.ts. Better Auth runs here with this app's options on its in-memory adapter: the check
 // sits in its password hashing, before anything is stored, so the database does not change what is tested.
 
 /** A password that has been in breaches many times: what the check exists to refuse. */

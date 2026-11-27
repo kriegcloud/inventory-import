@@ -1,6 +1,6 @@
 /**
- * The three refusals every part of the API shares: nobody is signed in, the role is too low, or a write came from
- * another site.
+ * The four refusals every part of the API shares: nobody is signed in, the role is too low, a write came from
+ * another site, or one address asked too often.
  *
  * @packageDocumentation
  */
@@ -58,5 +58,27 @@ export class CrossSiteRequest extends S.TaggedError<CrossSiteRequest, { readonly
   $I.annoteError<CrossSiteRequest>("CrossSiteRequest", {
     description: "A write that did not come from this app's own pages.",
     httpApiStatus: 403
+  })
+) {}
+
+/**
+ * One address sent more sign-ins, sign-ups and model requests in a minute than the coarse limit lets through.
+ * Refused before sign-in or the model is reached; the exact limits behind it (Better Auth's, the day's model calls)
+ * were not touched. The reason says how long to wait.
+ *
+ * @category errors
+ */
+export class TooManyRequests extends S.TaggedError<TooManyRequests, { readonly brand: unique symbol }>(
+  $I`TooManyRequests`
+)(
+  "TooManyRequests",
+  {
+    reason: Sentence.pipe(
+      S.annotateKey({ description: "What happened and how long to wait, in words for the person." })
+    )
+  },
+  $I.annoteError<TooManyRequests>("TooManyRequests", {
+    description: "One address asked too often within a minute.",
+    httpApiStatus: 429
   })
 ) {}

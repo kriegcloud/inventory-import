@@ -1,20 +1,25 @@
 /**
  * The repository's stack: what GitHub must hold so the deploy workflow can run. Three environments (`preview`,
  * `staging` and `production`), a Cloudflare token it makes for production's account and the owner's own token for
- * the previews' (staging runs there too, decision I4), production's model key and sign-up list (I5, I8), the rule that `main` takes a change only
+ * the previews' (staging runs there too, decision I4), production's model key and sign-up list (I5, I8), the emails
+ * that may open a preview (goals/alchemy-uptake, step 7), the rule that `main` takes a change only
  * through a pull request whose check passed, with an admin bypass (I7), and the release rules (decision "releases and
  * deploys"): only an admin creates, moves or deletes a `v*` tag, and a `release/*` branch is never rewritten. And one
- * setting of the repository itself: a pull request's branch is deleted once it merges.
+ * setting of the repository itself: a pull request's branch is deleted once it merges. And, once its three settings
+ * are given, the shared turbo cache: the Worker's address and team as variables, the read token as a repository
+ * secret, and the write token in an environment only main may use (goals/ci-speed, step 9; `TurboCache.rules.ts`).
  *
  * Deployed from a workstation only, by the repository's owner: `bunx alchemy deploy
- * packages/infra/src/GitHub.stack.ts --stage prod`. The model key, the previews' password and the previews'
- * token and account id are asked of 1Password by the stack itself, from the references in `env/op.env` and the
- * owner's own `env/op.env.local`, for that one run (`OpReferences.secrets.ts`). No workflow
+ * packages/infra/src/GitHub.stack.ts --stage prod`. The model key, the previews' password, the previews' token and
+ * account id, the emails that may open a preview and production's sign-up list are asked of 1Password by the stack
+ * itself, from the references in `env/op.env` and the owner's own `env/op.env.local`, for that one run
+ * (`OpReferences.secrets.ts`). No workflow
  * deploys it: a job that could rewrite its own approval rule would have none.
  *
  * Must not break: a preview job holds no model key, no sign-up list and no token for production's account; a staging
  * job holds no model key and no such token, and only the sign-up list Benjamin sets by hand as its environment's secret;
- * the previews' password is written as a secret and never printed; only a run whose ref is `main` may use
+ * the previews' password and both lists of emails are written as secrets and never printed, and no email is written
+ * as a variable (Benjamin, 2026-11-26: "Repository stack", "Yes, both together"); only a run whose ref is `main` may use
  * the `production` environment, and nothing reaches production without its reviewer approving that run.
  *
  * Known, and Benjamin's choice of 2026-11-22 ("Keep sharing, say so"): staging shares the previews' Cloudflare
@@ -46,25 +51,44 @@ import { InfraStage } from "./InfraStage.context.ts"
 import { secretNamesOf } from "./OpReferences.rules.ts"
 import { opEnvReferences } from "./OpReferences.secrets.ts"
 import {
+  givenPreviewAccess,
   givenPreviewToken,
+  givenSignUpList,
   givenTestPassword,
   modelKeyFor,
   planFor,
+  previewAccessVariable,
   previewAccountVariable,
   previewPasswordVariable,
   previewTokenVariable,
+  signUpVariable,
   withoutModelKeyFlag
 } from "./StagePlan.rules.ts"
+import {
+  cacheApiVariable,
+  cacheReadTokenVariable,
+  cacheSettingsOf,
+  cacheTeam,
+  cacheTeamVariable,
+  cacheWriteEnvironment,
+  cacheWriteTokenVariable
+} from "./TurboCache.rules.ts"
 
 /** The repository the deploy workflow runs in. */
 const repository = { owner: "kriegcloud", repository: "inventory-import" } as const
 
-/** The secrets this stack writes to GitHub, by variable: production's (its model key) and the previews' password. */
+/**
+ * The secrets this stack writes to GitHub, by variable: production's (its model key and sign-up list), the previews'
+ * password, their token and account, and the emails that may open a preview.
+ */
 const repositorySecrets: ReadonlyArray<string> = [
   ...Result.match(planFor("prod"), { onFailure: () => [], onSuccess: secretNamesOf }),
   previewPasswordVariable,
+  previewAccessVariable,
   previewTokenVariable,
-  previewAccountVariable
+  previewAccountVariable,
+  cacheReadTokenVariable,
+  cacheWriteTokenVariable
 ]
 
 /**
@@ -112,8 +136,9 @@ export default Alchemy.Stack(
   {
     providers: Layer.mergeAll(Cloudflare.providers(), GitHub.providers()),
     state: Cloudflare.state(),
-    // This stack writes production's model key and the previews' password to GitHub, so it asks 1Password for
-    // both, whichever of them `env/op.env` gives a reference for. A `.env` at the root is still read first.
+    // This stack writes production's model key and sign-up list, the previews' password and the emails that may
+    // open a preview to GitHub, so it asks 1Password for each that `env/op.env` or `env/op.env.local` gives a
+    // reference for. A `.env` at the root is still read first.
     secrets: [Secrets.DotEnv(), opEnvReferences(() => repositorySecrets)]
   },
   Effect.gen(function* () {
@@ -134,7 +159,16 @@ export default Alchemy.Stack(
       onSuccess: Effect.succeed
     })
     const approver = yield* Config.String("PRODUCTION_APPROVER")
-    const signUp = yield* Config.String("SIGN_UP").pipe(Config.withDefault("closed"))
+    // Production's sign-up list (decision I8), now from 1Password: never a default, so a run again that lost the
+    // line stops instead of closing production to everyone.
+    const givenSignUp = yield* Config.Redacted(signUpVariable).pipe(
+      Config.option,
+      Config.map(O.filter((value) => value.pipe(Redacted.value, S.is(NonBlankSecret))))
+    )
+    const signUp = yield* Result.match(givenSignUpList(givenSignUp), {
+      onFailure: Effect.die,
+      onSuccess: Effect.succeed
+    })
     // Production's plan says where its model key comes from. With none given this stack stops, as production's own
     // deploy would, unless the flag says a deploy without a model is meant; the flag is then handed on to it.
     const prod = yield* Result.match(planFor("prod"), { onFailure: Effect.die, onSuccess: Effect.succeed })
@@ -159,6 +193,13 @@ export default Alchemy.Stack(
       givenTestPassword({ stage: "pr-<number>", given: givenPreviewPassword }),
       { onFailure: Effect.die, onSuccess: Effect.succeed }
     )
+    // The emails that may open a preview (step 7). Checked here as a preview's deploy checks them, so a list that
+    // is no list of emails stops this stack, on the owner's workstation, and not every preview after it.
+    const givenAccess = yield* Config.Redacted(previewAccessVariable).pipe(Config.option)
+    const previewAccess = yield* Result.match(givenPreviewAccess(givenAccess), {
+      onFailure: Effect.die,
+      onSuccess: Effect.succeed
+    })
 
     // Production deploys after CI passed on a release branch whose head carries its tag (decisions "releases and
     // deploys"). The deploy workflow is started for that by CI's completed run, which GitHub runs from main: this
@@ -197,12 +238,12 @@ export default Alchemy.Stack(
       name: "CLOUDFLARE_ACCOUNT_ID",
       value: productionAccount
     })
-    // Kept for the setup command, which reads it back as the list a run again keeps; the deploy job reads the
-    // production environment's secret `SIGN_UP` instead, set by hand, so the public log never prints an email.
-    yield* GitHub.Variable("ProductionSignUp", {
+    // A secret, so no log and no page of the repository shows an email. It takes the place of the variable of the
+    // same name this stack wrote before, which the setup command read back; that variable is removed.
+    yield* GitHub.Secret("ProductionSignUpList", {
       ...repository,
       environment: production,
-      name: "SIGN_UP",
+      name: signUpVariable,
       value: signUp
     })
     yield* GitHub.Variable("ProductionWithoutModelKey", {
@@ -232,6 +273,12 @@ export default Alchemy.Stack(
       name: previewPasswordVariable,
       value: previewPassword
     })
+    yield* GitHub.Secret("PreviewAccess", {
+      ...repository,
+      environment: preview,
+      name: previewAccessVariable,
+      value: previewAccess
+    })
     yield* GitHub.Variable("PreviewCloudflareAccount", {
       ...repository,
       environment: preview,
@@ -258,6 +305,48 @@ export default Alchemy.Stack(
       name: "CLOUDFLARE_ACCOUNT_ID",
       value: previewAccount
     })
+
+    // The shared turbo cache (goals/ci-speed, step 9): all three settings or none. With none, the workflow finds no
+    // address and runs with turbo's local cache only, as before; a part stops the stack and names what is missing.
+    const cacheApi = yield* Config.String(cacheApiVariable).pipe(
+      Config.option,
+      Config.map(O.filter((value) => S.is(NonBlankSecret)(value)))
+    )
+    const cacheRead = yield* Config.Redacted(cacheReadTokenVariable).pipe(
+      Config.option,
+      Config.map(O.filter((value) => value.pipe(Redacted.value, S.is(NonBlankSecret))))
+    )
+    const cacheWriteToken = yield* Config.Redacted(cacheWriteTokenVariable).pipe(
+      Config.option,
+      Config.map(O.filter((value) => value.pipe(Redacted.value, S.is(NonBlankSecret))))
+    )
+    const cache = yield* Result.match(cacheSettingsOf({ api: cacheApi, read: cacheRead, write: cacheWriteToken }), {
+      onFailure: Effect.die,
+      onSuccess: Effect.succeed
+    })
+    if (O.isSome(cache)) {
+      yield* GitHub.Variable("TurboCacheApi", { ...repository, name: cacheApiVariable, value: cache.value.api })
+      yield* GitHub.Variable("TurboCacheTeam", { ...repository, name: cacheTeamVariable, value: cacheTeam })
+      // A repository secret: GitHub hands it to a run of this repository's own branches and never to a fork's.
+      yield* GitHub.Secret("TurboCacheReadToken", {
+        ...repository,
+        name: cacheReadTokenVariable,
+        value: cache.value.read
+      })
+      // The write token only here: a job takes this environment on a push to main alone, and the environment refuses
+      // any other ref, so a pull request's copy of the workflow cannot name it into its run.
+      const cacheWrite = yield* GitHub.Environment("TurboCacheWrite", {
+        ...repository,
+        name: cacheWriteEnvironment,
+        deploymentBranchPolicy: { customBranchPolicies: ["main"] }
+      })
+      yield* GitHub.Secret("TurboCacheWriteToken", {
+        ...repository,
+        environment: cacheWrite,
+        name: cacheWriteTokenVariable,
+        value: cache.value.write
+      })
+    }
 
     // Benjamin's ask of 2026-11-25: a pull request's branch is deleted once it merges. Only that one setting is
     // given, so every other one (visibility, description, merge methods) stays as GitHub holds it: a setting left out
@@ -313,7 +402,9 @@ export default Alchemy.Stack(
     return {
       environments: ["preview", "staging", "production"],
       modelKey: O.isSome(modelKey) ? "written to production" : "none, on purpose: production's rules answer",
-      signUp
+      signUp: "written to production as a secret",
+      previewAccess: "written to the previews as a secret",
+      turboCache: O.isSome(cache) ? `team ${cacheTeam}, written` : "none: CI keeps turbo's local cache"
     }
     // The stack is the entry point the CLI runs: this is where the plan of its stage is given.
   }).pipe(InfraStage.provided)

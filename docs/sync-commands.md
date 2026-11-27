@@ -99,7 +99,7 @@ what moves it; to release one, remove the group.
 | What | Its one source | The places that follow it |
 | --- | --- | --- |
 | bun | `.bun-version` | `packageManager` in the root's `package.json`; a `bun-version:` in a workflow; "Bun 1.4.4" in the standing documents |
-| Node | `engines.node` in the root's `package.json` (its major) | `node-version:` in every workflow; "Node 22 or newer" in the documents; the major of every `@types/node` (named, not written: the newest of a major is the registry's to say) |
+| Node | `engines.node` in the root's `package.json` (its major) | the major of the exact version `.tool-versions` pins (the one Node every workflow sets up, through `node-version-file`, and a version manager runs on a workstation); a `node-version:` in a workflow, if one is written; "Node 22 or newer" in the documents; the major of every `@types/node` (named, not written: the newest of a major is the registry's to say) |
 | A dependency of the catalog | its entry in the root's `catalog` | every `package.json` that asks for it: `"catalog:"`, never a version of its own |
 | Effect | the `effect` every `package.json` states (the root's `catalog`, when there is one) | every `@effect/*` package released with it; "Effect 4.1" and "effect 4.1.6" in the documents; the versions `vendor sync` writes into a vendored package |
 | `@effect/tsgo`, TypeScript, Better Auth | the one version the `package.json` files state | their name followed by a version in the documents |

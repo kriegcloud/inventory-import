@@ -772,3 +772,13 @@ has held an `Option` yet.
 Built in `packages/catalog/model/src/Catalog.model.ts`: `inForce` is the one place the model's invariants read the 0.
 The rules of `Group` and of the two decisions that record on it still compare `undoneAt` with 0 as written: the
 prover reads their code, and a helper there was not tried.
+
+### 2026-11-26 — Foldkit is not used
+
+Said by him, unasked, while the sweep for where the library's blocks replace hand-written code was being set up:
+"No need for foldkit". Question: is `@alchemy.run/domain/Foldkit` among the things the app uses? Answer: no. It is the
+one named exception to "make use of ever single thing" (2026-11-19). The brief's row gave it one admin page, "Model
+calls today", built as a Foldkit program at move 7; that page, if it is built, is a React screen on the app's atoms
+following `AllowanceToday`, as every other screen is ([the Foldkit page](research/concepts/foldkit.md) says what a
+client that is not Foldkit uses). No options were put to him and no recommendation was given. Reverse: a new decision
+by him.

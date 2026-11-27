@@ -5,17 +5,28 @@ import { assertTrue } from "@effect/vitest/utils"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as O from "effect/Option"
+import * as Redacted from "effect/Redacted"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import { StagePlan } from "@beep/infra/Stage"
 import {
+  accessEmailsFor,
+  givenPreviewAccess,
   givenPreviewToken,
+  givenSignUpList,
+  telemetryFor,
   givenTestPassword,
   kindOf,
   modelKeyFor,
   planFor,
   testPasswordOf
 } from "@beep/infra/StagePlan"
+
+const collector = {
+  to: "collector",
+  address: "TELEMETRY_COLLECTOR_URL",
+  authorization: "TELEMETRY_COLLECTOR_AUTHORIZATION"
+}
 
 const plan = (stage: string) => {
   const result = planFor(stage)
@@ -32,7 +43,169 @@ describe("the plan of a stage", () => {
       seeds: [],
       modelKey: { from: "environment", variable: "OPENROUTER_API_KEY" },
       signUp: { from: "environment", variable: "SIGN_UP" },
+      access: { from: "nowhere" },
+      telemetry: collector,
       deployed: true
+    })
+  })
+
+  it("only staging and production name a collector for Cloudflare's telemetry", () => {
+    expect(
+      A.map(["prod", "pr-42", "staging", "test_ben", "dev_ben"], (stage) => [stage, plan(stage).telemetry])
+    ).toEqual([
+      ["prod", collector],
+      ["pr-42", { to: "nowhere" }],
+      ["staging", collector],
+      ["test_ben", { to: "nowhere" }],
+      ["dev_ben", { to: "nowhere" }]
+    ])
+  })
+
+  describe("where a stage's telemetry goes", () => {
+    const staging = { stage: "staging", source: plan("staging").telemetry }
+
+    it("is the collector's two paths, with the header it was given", () => {
+      expect(
+        telemetryFor({
+          ...staging,
+          address: O.some(" https://otel.example.test/otlp/ "),
+          authorization: O.some("Basic abc")
+        })
+      ).toEqual(
+        Result.succeed(
+          O.some({
+            traces: "https://otel.example.test/otlp/v1/traces",
+            logs: "https://otel.example.test/otlp/v1/logs",
+            authorization: O.some("Basic abc")
+          })
+        )
+      )
+    })
+
+    it("is nowhere while no address is named, with or without a header", () => {
+      expect(telemetryFor({ ...staging, address: O.none(), authorization: O.some("Basic abc") })).toEqual(
+        Result.succeed(O.none())
+      )
+      expect(
+        telemetryFor({
+          stage: "prod",
+          source: plan("prod").telemetry,
+          address: O.none(),
+          authorization: O.none<string>()
+        })
+      ).toEqual(Result.succeed(O.none()))
+    })
+
+    it("is nowhere for a preview, a test stage and a personal one, whatever the variables hold", () => {
+      expect(
+        A.map(["pr-42", "test_ben", "dev_ben"], (stage) =>
+          telemetryFor({
+            stage,
+            source: plan(stage).telemetry,
+            address: O.some("https://otel.example.test"),
+            authorization: O.some("Basic abc")
+          })
+        )
+      ).toEqual([Result.succeed(O.none()), Result.succeed(O.none()), Result.succeed(O.none())])
+    })
+
+    it("stops on an address that is not https, has a query, or is no address", () => {
+      for (const address of [
+        "http://otel.example.test",
+        "https://otel.example.test/v1?key=abc",
+        "otel.example.test",
+        "https://"
+      ]) {
+        const stopped = telemetryFor({ ...staging, address: O.some(address), authorization: O.none<string>() })
+        assertTrue(Result.isFailure(stopped), `Expected "${address}" to be refused`)
+        expect(stopped.failure.message).toContain("TELEMETRY_COLLECTOR_URL is not an https address without a query")
+      }
+    })
+  })
+
+  it("only a preview is behind Cloudflare Access, and reads who may open it at deploy", () => {
+    expect(A.map(["prod", "pr-42", "staging", "test_ben", "dev_ben"], (stage) => [stage, plan(stage).access])).toEqual([
+      ["prod", { from: "nowhere" }],
+      ["pr-42", { from: "environment", variable: "PREVIEW_ACCESS" }],
+      ["staging", { from: "nowhere" }],
+      ["test_ben", { from: "nowhere" }],
+      ["dev_ben", { from: "nowhere" }]
+    ])
+  })
+
+  describe("who may open a preview", () => {
+    const preview = { stage: "pr-42", source: plan("pr-42").access }
+
+    it("is the emails it is given, lower case, without the spaces around them", () => {
+      expect(accessEmailsFor({ ...preview, given: O.some("Ben@Example.test, qa@example.test") })).toEqual(
+        Result.succeed(O.some(["ben@example.test", "qa@example.test"]))
+      )
+      expect(accessEmailsFor({ ...preview, given: O.some("one@example.test") })).toEqual(
+        Result.succeed(O.some(["one@example.test"]))
+      )
+    })
+
+    it("stops with none, and says how to set it without repeating anything", () => {
+      const stopped = accessEmailsFor({ ...preview, given: O.none() })
+      assertTrue(Result.isFailure(stopped), "Expected stopped to be a failure")
+      expect(stopped.failure.message).toBe(
+        'Stage "pr-42" has no list of who may open it: PREVIEW_ACCESS is not set, so the preview would answer anyone. ' +
+          "Make a 1Password item whose field holds the emails, separated by commas, write " +
+          'PREVIEW_ACCESS="op://<vault>/<item>/<field>" in packages/infra/env/op.env.local, and deploy the ' +
+          "repository's stack (bun run beep infra setup --staging), which writes it to the preview environment as a secret"
+      )
+    })
+
+    it("stops on a list with a piece that is no email, and never repeats what it was given", () => {
+      for (const given of [
+        "",
+        " ",
+        "ben@example.test,",
+        "ben@example.test; qa@example.test",
+        "everyone",
+        "@example.test"
+      ]) {
+        const stopped = accessEmailsFor({ ...preview, given: O.some(given) })
+        assertTrue(Result.isFailure(stopped), `Expected "${given}" to be refused`)
+        expect(stopped.failure.message).toContain("PREVIEW_ACCESS is not a list of emails separated by commas")
+        expect(stopped.failure.message).not.toContain("example.test")
+      }
+    })
+
+    it("a stage with no policy reads nothing, whatever the variable holds", () => {
+      expect(
+        A.map(["prod", "staging", "test_ben", "dev_ben"], (stage) =>
+          accessEmailsFor({ stage, source: plan(stage).access, given: O.some("ben@example.test") })
+        )
+      ).toEqual([
+        Result.succeed(O.none()),
+        Result.succeed(O.none()),
+        Result.succeed(O.none()),
+        Result.succeed(O.none())
+      ])
+    })
+  })
+
+  describe("the lists the repository's stack writes to GitHub", () => {
+    it("writes the previews' list as it was given, and only once it reads as emails", () => {
+      const given = Redacted.make("Ben@Example.test, qa@example.test")
+      expect(givenPreviewAccess(O.some(given))).toEqual(Result.succeed(given))
+      for (const text of ["", "ben@example.test,", "everyone"]) {
+        const stopped = Redacted.make(text).pipe(O.some, givenPreviewAccess)
+        assertTrue(Result.isFailure(stopped), `Expected "${text}" to be refused`)
+        expect(stopped.failure.message).toContain("PREVIEW_ACCESS is not a list of emails separated by commas")
+      }
+      const missing = givenPreviewAccess(O.none())
+      assertTrue(Result.isFailure(missing), "Expected a missing list to stop the stack")
+      expect(missing.failure.message).toContain("PREVIEW_ACCESS is not set")
+    })
+
+    it("stops without production's sign-up list, so a run again never closes production", () => {
+      expect(givenSignUpList(O.some("closed"))).toEqual(Result.succeed("closed"))
+      const stopped = givenSignUpList(O.none())
+      assertTrue(Result.isFailure(stopped), "Expected a missing list to stop the stack")
+      expect(stopped.failure.message).toContain("SIGN_UP is not set")
+      expect(stopped.failure.message).toContain("op.env.local")
     })
   })
 

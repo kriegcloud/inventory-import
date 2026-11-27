@@ -301,11 +301,12 @@ What each step does, and with which tool:
   that production's account was held against no previews' account. Every question that makes something (the state store, each deploy) then names the account by the id read
   from the profile; the repository's names both, production's for the token it makes and the previews' that previews
   and staging deploy into. The repair it names: `alchemy profile edit --profile <name> --reconfigure Cloudflare`.
-- **Who may sign up in production** is `--sign-up` when given. When it is not, the command reads what GitHub's
-  `production` environment already holds (`gh variable get SIGN_UP --env production --repo
-  kriegcloud/inventory-import`, the repository the stack writes to, never the one `gh` would pick) and keeps it, saying so; when
-  GitHub holds none it stops before step 1. It never picks a list, so running `--staging` again cannot close
-  production.
+- **Who may sign up in production** is a 1Password item since 2026-11-26 (goals/alchemy-uptake, "Choices made":
+  "Repository stack", "Yes, both together"). Its reference is the line `SIGN_UP` of his `op.env.local`, beside
+  `PREVIEW_ACCESS` (who may open a preview). The repository's stack asks 1Password for both and writes them to
+  GitHub as secrets; production's own stack asks for its list itself. A run without the references stops before
+  step 1 and names the lines to write, so running `--staging` again cannot close production. This replaced
+  `--sign-up` and the read of GitHub's `SIGN_UP` variable, which are gone.
 - **Each deploy** is `plan` on his terminal, then "Deploy ... as that plan says?", then `deploy --yes` only after a
   yes. A plan that fails, or a no, deploys nothing. No deploy is wrapped in `op run`: the stacks
   ask 1Password for their secrets themselves (below), so the 1Password app asks him to authorize once for the plan
@@ -437,7 +438,7 @@ token's Workers Scripts permission covers it; and that `--method stored` takes a
 takes the header on its input was checked once, against a listener on 127.0.0.1 with a made-up value, through the
 same `sh -c` line with `op-human` left out. And for the checks added after the review: that `alchemy profile show`, read through a
 pipe, prints `accountId:` under the profile's Cloudflare line as its source does; that `gh variable get SIGN_UP
---env production` answers the list and nothing else; and that a deploy of a test stage that changes nothing still
+--env production` answered the list and nothing else (a check of the read that was removed on 2026-11-26); and that a deploy of a test stage that changes nothing still
 prints its outputs, which is how he reads the password. An earlier version of this paragraph said `cf auth whoami`
 and `cf zones list` had been run to read the shape of their answers; no output of that run is kept, so it is not
 counted here: the shape of `cf auth whoami`'s answer is the stand-in's, not checked against a run or its source, and

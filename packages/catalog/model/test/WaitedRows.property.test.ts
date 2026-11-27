@@ -25,7 +25,7 @@ import * as R from "effect/Record"
 import * as Ref from "effect/Ref"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as S from "effect/Schema"
-import { as, dana, marcus, stage, stagedTableOf } from "./support.ts"
+import { as, dana, marcus, runsOf, stage, stagedTableOf } from "./support.ts"
 
 const App = Layer.mergeAll(catalogMemory, SecureRandom.layerWebCrypto)
 
@@ -305,8 +305,9 @@ describe("a row that waited, over any order of saves, lost answers, matches, ite
       [S.Array(Step).check(S.isMinLength(12), S.isMaxLength(30))],
       ([steps]) => played(steps),
       // 2,000 runs took 24 s alone on two pinned cores, the stand-in for CI's runner: 180 s leaves room for the rest of
-      // the check running beside it, and a hang still fails within the job's 15 minutes.
-      { timeout: 180_000, arbitrary: { runs: 2000 } }
+      // the check running beside it, and a hang still fails within the job's 15 minutes. A pull request's CI runs 500
+      // (`runsOf`); the push to main and the nightly run 2,000.
+      { timeout: 180_000, arbitrary: { runs: runsOf({ full: 2000, short: 500 }) } }
     )
   })
 })

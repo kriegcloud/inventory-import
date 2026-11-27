@@ -5,7 +5,7 @@ description: Everything @alchemy.run/domain and what plugs into it offers, read 
 status: active
 stage: shape
 next: decisions 1 to 40 of the brief are answered (2026-11-22; 9 fell away, 24 stands on infra I8, 37 is start empty) but for 21a, open in DECISIONS.md and asked when move 6 opens; edge cases among several people on one import are settled by his standing rule and listed for him to overrule; 42 to 56 and 60 to 62 are asked each when its move opens; the pin is on main, and the review's model of move 1 is built on it and merged into main (0c4c5e5)
-goals: []
+goals: [alchemy-domain-uptake]
 ---
 
 # Alchemy domain
@@ -40,6 +40,8 @@ under it:
 5. The concept pages, in [research/concepts/](research/concepts/), one file per concept under a stable name.
 6. [The coverage ledger](research/05-coverage-ledger.md) and [the export index](research/06-export-index.md): proof
    of what was read, and where every exported name is covered.
+7. [The library at e1c3e6d](research/08-the-library-at-e1c3e6d.md): every block as it is installed now, with its
+   signature, limits and source lines, and what moved since the concept pages. Newer than they are where they differ.
 
 ## What was read
 
@@ -254,3 +256,7 @@ pages whose "Where this was read" names a file that changed.
   a standing rule for several people on one import, "Keep it, stop asking me": a press from a screen that is behind is
   never silently dropped or applied, it is held and shown; the cases it settles are listed in DECISIONS.md for him to
   overrule.
+- 2026-11-26: the installed library read again at `e1c3e6d`, block by block, for the sweep of where a block replaces
+  hand-written code ([08](research/08-the-library-at-e1c3e6d.md)); the sub-agent `domain` (`.claude/agents/domain.md`)
+  written from it. Its sweep found 221 places a block replaces or adds to hand-written code, in the goal
+  [alchemy-domain-uptake](../../goals/alchemy-domain-uptake/SPEC.md); Foldkit is left out (his answer, the same day).

@@ -1,7 +1,13 @@
 /**
+ * `infra plan-check <file>`: the deploy workflow's guard between a stage's plan and its deploy; reads a file and
+ * reaches no account, so anyone may run it.
+ *
  * `infra setup`: what the repository's owner does before the first deploy, as one command he runs on his
  * workstation (`goals/infra/PLAN.md`, "What Benjamin does by hand"). No CI job runs it, and an agent runs it only
  * with `--dry-run`, which prints its steps (every size's when none is given) and starts nothing.
+ *
+ * `infra export --stage <name>`: a dump of a stage's database, taken by the owner at his workstation; an agent runs
+ * it only with `--dry-run` (`DatabaseDump.rules.ts`).
  *
  * @packageDocumentation
  */
@@ -9,10 +15,14 @@ import * as Config from "effect/Config"
 import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
+import * as Argument from "effect/cli/Argument"
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
 import { CheckFailed } from "../../Cli.errors.ts"
+import { emit } from "../../Report.schema.ts"
+import { databaseDump } from "./DatabaseDump.rules.ts"
 import { type SetupSize, setup } from "./InfraSetup.rules.ts"
+import { planCheck, planSentence } from "./PlanCheck.rules.ts"
 
 const size = (name: SetupSize, description: string) =>
   Flag.Boolean(name).pipe(Flag.withDescription(description), Flag.withDefault(false))
@@ -61,10 +71,6 @@ const flags = {
       "The GitHub login that approves a production deploy; the one gh is logged in as when left out"
     ),
     Flag.optional
-  ),
-  signUp: Flag.String("sign-up").pipe(
-    Flag.withDescription("Who may open an account in production: emails separated by commas, or closed"),
-    Flag.optional
   )
 }
 
@@ -86,8 +92,7 @@ export const infraSetupCommand = Command.make("setup", flags, (args) =>
       productionAccount: args.productionAccount,
       previewProfile: args.previewProfile,
       productionProfile: args.productionProfile,
-      approver: args.approver,
-      signUp: args.signUp
+      approver: args.approver
     })
   }).pipe(
     Effect.catchTags({
@@ -101,8 +106,57 @@ export const infraSetupCommand = Command.make("setup", flags, (args) =>
   )
 )
 
+const planFile = Argument.String("file").pipe(
+  Argument.withDescription("The file `alchemy deploy --dry-run` printed the stage's plan to")
+)
+
+/** `infra plan-check <file>`: refuses a printed plan that would leave the app on an empty database. */
+export const infraPlanCheckCommand = Command.make("plan-check", { file: planFile }, (args) =>
+  Effect.flatMap(planCheck(args.file), emit(planSentence))
+).pipe(
+  Command.withDescription(
+    "Whether a printed plan keeps the database's rows: a plan that deletes or replaces the database, or that cannot be read, is refused"
+  )
+)
+
+/**
+ * `infra export --stage <name>`: a dump of a stage's database into the owner's home folder. His to run; an agent
+ * runs it only with `--dry-run`.
+ */
+export const infraExportCommand = Command.make(
+  "export",
+  {
+    stage: Flag.String("stage").pipe(
+      Flag.withDescription("The stage whose database is dumped: prod, staging, pr-<number>, test_<user>")
+    ),
+    dryRun: Flag.Boolean("dry-run").pipe(
+      Flag.withDescription("Print the steps and the commands a run would start, and start nothing"),
+      Flag.withDefault(false)
+    ),
+    previewProfile: flags.previewProfile,
+    productionProfile: flags.productionProfile
+  },
+  (args) =>
+    Effect.gen(function* () {
+      const home = yield* Config.String("HOME")
+      return yield* databaseDump({ ...args, home })
+    }).pipe(
+      Effect.catchTags({
+        DumpStopped: (stopped) =>
+          Console.error(stopped.message).pipe(Effect.andThen(Effect.fail(CheckFailed.make({})))),
+        ConfigError: Effect.die
+      })
+    )
+).pipe(
+  Command.withDescription(
+    "A dump of one stage's database, on the owner's workstation, into ~/inventory-dumps readable by him alone. Never run by CI, and by an agent only with --dry-run"
+  )
+)
+
 /** The `infra` group. */
 export const infraCommand = Command.make("infra").pipe(
-  Command.withDescription("What is deployed: the owner's setup before a first deploy"),
-  Command.withSubcommands([infraSetupCommand])
+  Command.withDescription(
+    "What is deployed: the owner's setup before a first deploy, the guard on a plan, and a dump of a stage's database"
+  ),
+  Command.withSubcommands([infraSetupCommand, infraPlanCheckCommand, infraExportCommand])
 )

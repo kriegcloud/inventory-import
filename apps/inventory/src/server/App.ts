@@ -22,6 +22,7 @@ import { Handlers } from "./handlers.ts"
 import { CatalogLive } from "@inventory/catalog-host/Host"
 import * as Observability from "./Observability.ts"
 import { RequestTelemetry } from "./RequestTelemetry.ts"
+import { type AddressLimit, LimitedByAddress } from "./AddressLimit.ts"
 import { SameOriginLive } from "./SameOrigin.ts"
 import { unsecuredAnswer, withSecurityHeaders } from "./security.ts"
 import { HttpTracing, OtlpProxyRoute, RequestMetrics } from "./Telemetry.ts"
@@ -71,13 +72,19 @@ export const DocsRoute = import.meta.env.DEV
  * implementation: the caller chooses it (worker.ts passes `SessionIdentityLive`, which reads the session; the tests
  * pass the header identity, `IdentityLive`), so this file never pulls one into a build.
  */
-export const makeRoutes = <E, R>(options: { readonly docs: boolean; readonly identity: Layer.Layer<Identity, E, R> }) =>
+export const makeRoutes = <E, R>(options: {
+  readonly docs: boolean
+  readonly identity: Layer.Layer<Identity, E, R>
+  /** The coarse limit's counter (AddressLimit.ts): the Worker's binding, or none in a test that is not about it. */
+  readonly limit: Layer.Layer<AddressLimit>
+}) =>
   Layer.mergeAll(
     HttpApiBuilder.layer(Api, { openapiPath: openApiPath }),
     SignInRoute,
     options.docs ? DocsRoute : Layer.empty,
     OtlpProxyRoute,
-    RequestMetrics
+    RequestMetrics,
+    LimitedByAddress.pipe(Layer.provide(options.limit))
   ).pipe(
     Layer.provide(Handlers),
     Layer.provide(options.identity),
@@ -114,8 +121,10 @@ export const makeApp = <E, R, IE, IR, AE, AR>(options: {
   readonly docs: boolean
   /** How the app reaches other services (the collector): fetch in the Worker. */
   readonly http: Layer.Layer<HttpClient.HttpClient>
+  /** The coarse limit in front of sign-in and the model: the Worker's rate-limit binding (AddressLimit.ts). */
+  readonly limit: Layer.Layer<AddressLimit>
 }) =>
-  makeRoutes({ docs: options.docs, identity: options.identity }).pipe(
+  makeRoutes({ docs: options.docs, identity: options.identity, limit: options.limit }).pipe(
     Layer.provide(options.http),
     Layer.provide(servicesWith({ ai: ModelLive, production: options.production })),
     Layer.provide(options.auth),

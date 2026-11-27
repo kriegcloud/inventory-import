@@ -5,6 +5,7 @@ import * as ConfigProvider from "effect/ConfigProvider"
 import * as Effect from "effect/Effect"
 import * as FetchHttpClient from "effect/http/FetchHttpClient"
 import * as Layer from "effect/Layer"
+import { AddressLimit, CounterFailed } from "./AddressLimit.ts"
 import { makeApp, toTracedServe } from "./App.ts"
 import { RequestTelemetry } from "./RequestTelemetry.ts"
 import { SessionIdentityLive } from "@inventory/access-host/SessionIdentity"
@@ -34,6 +35,14 @@ const app = makeApp({
   }),
   production: import.meta.env.PROD,
   docs: import.meta.env.DEV,
+  // The coarse limit in front of sign-in and the model, on the rate-limit binding (30 a minute for each address).
+  // The binding answers with the platform's promise: taken in here, and a failure of it lets the request on.
+  limit: AddressLimit.counting((key) =>
+    Effect.tryPromise({
+      try: () => env.ABUSE_LIMIT.limit({ key }),
+      catch: (cause) => CounterFailed.make({ cause })
+    }).pipe(Effect.map((counted) => counted.success))
+  ),
   // The one place the Worker's fetch is chosen: the collector's exporters and the browser's batches go through it.
   http: FetchHttpClient.layer
 }).pipe(Layer.provide(settings))

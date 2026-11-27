@@ -21,7 +21,20 @@
       "Bash(python3:*)",
       "mcp__shadcn",
       "mcp__playwright",
-      "mcp__playwright-qa"
+      "mcp__playwright-qa",
+      "mcp__t3-code__t3_thread_read",
+      "mcp__t3-code__t3_thread_list",
+      "mcp__t3-code__t3_thread_search",
+      "mcp__t3-code__t3_background_wait",
+      "mcp__t3-code__list_scheduled_tasks",
+      "mcp__t3-code__orchestrator_capabilities",
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "mcp__claude-in-chrome__get_page_text",
+      "mcp__claude-in-chrome__find",
+      "mcp__claude-in-chrome__read_page",
+      "mcp__ccd_pr__get_status",
+      "mcp__ccd_session_mgmt__list_events",
+      "mcp__terminal__read_terminal"
     ],
     "ask": [
       "Bash(git push:*)"

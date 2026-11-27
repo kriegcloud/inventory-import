@@ -3,6 +3,8 @@
 // reads every setting through. Valid values for each are in .dev.vars.example.
 interface Env {
   readonly DB: D1Database
+  /** The coarse limit's counter: 30 in 60 seconds for each key (AddressLimit.ts). */
+  readonly ABUSE_LIMIT: RateLimit
   readonly AI_MODEL: string
   readonly AI_FALLBACK_MODELS?: string
   readonly AI_ENABLED?: string

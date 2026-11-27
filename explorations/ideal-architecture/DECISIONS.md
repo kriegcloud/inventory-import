@@ -427,6 +427,17 @@ This narrows I8 for staging only: an email I name may be stored there. Known: st
 who can push a branch here can reach that person's account on staging; today only I can push. Rejected: share a
 test account's login. Reverse: delete the secret, deploy staging again, and delete the invited account.
 
+### 2026-11-26 — the lists of emails are written by the repository's stack
+
+Question: who may open a preview (`PREVIEW_ACCESS`) and production's sign-up list (`SIGN_UP`) were set by hand
+with `gh secret set`, outside the code. Should the repository's stack write them? I chose "Repository stack" and
+"Yes, both together"; the agent recommended the same. Each list is a field of a 1Password item, referenced from
+my `packages/infra/env/op.env.local`. `GitHub.stack.ts` asks 1Password for both and writes them as secrets of the
+`preview` and `production` environments. It stops without either one, and on a preview list that is not a list of
+emails. This supersedes the entry below on one point: the stack no longer writes the variable `SIGN_UP`, and the
+setup command's `--sign-up` flag is gone, so no email is in GitHub in the clear. Staging's own `SIGN_UP` secret is
+still set by hand. Reverse: put the `GitHub.Variable` and the flag back, and set both secrets by hand.
+
 ### 2026-11-25 — production's sign-up list is a secret
 
 Question: production read its sign-up list from a GitHub variable, which the public deploy log prints. Mine: keep
@@ -2198,3 +2209,133 @@ Next: steps 4 to 7 and 9 of `goals/focus-and-friction` start; 6 waits on me; 3 w
 Reverse: 1, the pause ends early by a dated line here; 2, the session moves to a stage; 3 and 4, the text moves back
 or to the other place; 5, `CLAUDE.md` asks for `bun run check` before every commit again; 6, both settings off; 7,
 removal asks first.
+
+### 2026-11-26 — Alchemy uptake: the goal's edges
+
+After the sweep in [research 05](research/05-alchemy-unused.md) I asked for a goal that makes use of all of it:
+`goals/alchemy-uptake`. Four questions decided what it holds.
+
+1. **Is the Worker as an Alchemy Effect part of it?** I chose; the agent recommended the same. No: infra I1 stands,
+   and the host change stays with move 2 of `explorations/alchemy-domain`. Rejected: as the goal's last step; a
+   proof only.
+2. **`alchemy dev`, against the infra brief's no-go?** I chose; the agent recommended the same. A trial beside
+   `bun run dev` (`bun run dev:alchemy`), compared and written up; `bun run dev` stays until I decide from the
+   result. Rejected: replacing `bun run dev`; leaving it out.
+3. **An Access gate on previews?** I chose; the agent recommended the same. Yes, on `pr-<number>` stages only, with a
+   service token for the deploy workflow's smoke check. I8's rejection of Access was for public sign-up and stands.
+   Rejected: previews and `test_<user>` stages; no gate.
+4. **Where may the stack tests run?** I chose; the agent recommended the same. On Alchemy's local providers only, in
+   `bun run check:full`; no agent deploys anything. Rejected: local and live in CI; deciding after a trial.
+
+Open, each blocking one step of the goal: the limiter's rule, who may open a preview, where telemetry goes, and
+where a database dump is kept.
+
+Reverse: 1, the goal gains a last step and I1 is reversed; 2, the trial is dropped or `bun run dev` replaced; 3,
+the policy is taken off the preview plan; 4, a workflow job runs the suite against a throwaway stage.
+
+### 2026-11-26 — Alchemy uptake: the four open decisions
+
+Asked as the goal's first two steps finished (the plan before a deploy, and the trial of `alchemy dev`).
+
+1. **The coarse limiter's rule?** I chose; the agent recommended the same. One counter for each visitor address over
+   sign-in, sign-up and the model's endpoints: 30 in 60 seconds, then the app's own 429 sentence. Looser than Better
+   Auth's exact limits (10 sign-ins and 5 sign-ups a minute, in D1), which stay, as does the model's 40 calls a day;
+   when the binding itself fails the request goes on to them. Rejected: refusing when the binding fails; the account
+   as the model's key; no binding.
+2. **Who may open a preview?** I chose; the agent recommended the same. The emails in the preview environment's
+   secret `PREVIEW_ACCESS`, read as `SIGN_UP` is and never written in the repository, which is public. I make the
+   Access login in the previews' account by hand. Rejected: a domain; no gate.
+3. **Where does Cloudflare's own telemetry go?** I chose; the agent recommended the same. `staging` and `prod` read a
+   collector's address and its header from their environment; unset, nothing is declared and nothing is sent.
+   Previews and test stages never send. I name a collector later. Rejected: Grafana Cloud now; leaving it in the
+   dashboard only.
+4. **Where is a database dump kept?** I chose; the agent recommended the same. Only I take one, at my terminal, into
+   a file outside the repository that only I can read; nothing uploads it and nothing deletes it for me. Rejected:
+   an R2 bucket with a 30-day lifecycle; a 1Password document.
+
+Reverse: 1, the check and the binding come out of the Worker and the stack; 2, the policy comes off the preview's
+plan; 3, the two settings come out of the stack; 4, the command writes somewhere else.
+
+### 2026-11-26 — CI speed: the split, the seeds, the cache and the run counts
+
+Asked from the audit of `turbo.json`, the workflows, the tests and the checks
+([goals/ci-speed/AUDIT.md](../../goals/ci-speed/AUDIT.md)): a run is about 11 minutes, its check job replays nothing
+and carries everything on two slots.
+
+1. **The two required check names when the jobs are split?** I chose; the agent recommended the same. "Check, test and
+   build" and "Proofs and search of the model" stay as jobs that wait for their parts and fail when one does; the
+   ruleset and the GitHub stack are untouched, and a job can be added without a deploy. Rejected: requiring each part
+   by name in `GitHub.stack.ts`.
+2. **The 8 recorded seeds of `Draft.machine.test.ts`, each at 1,000 runs?** I chose; the agent recommended the same.
+   Each seed's failing ordering is recovered against the code before its fix and pinned beside the orderings already
+   pinned, and runs once. The 4 unseeded properties keep 1,000 runs. Rejected: keeping the seeds at 1,000 and only
+   splitting the file; the seeds at 1,000 nightly.
+3. **Where the check's turbo results are kept between runs?** I chose against the recommendation. beep-effect's cache
+   Worker from the start, this repository as a team of its own; pull requests read, only main writes. The agent
+   recommended `actions/cache` first, as the proofs job does, and the Worker later. Rejected: `actions/cache` only.
+4. **Property run counts on a pull request?** I chose; the agent recommended the same. One variable; fewer runs on a
+   pull request (500 for `WaitedRows.property`, 2,000 today), today's counts every night, and the variable named in
+   each task's `env` so a result made at one count never replays at another. Rejected: today's counts everywhere;
+   more than today's every night.
+
+Reverse: 1, the parts are named in the stack and I deploy it; 2, the seed loop comes back; 3, the `TURBO_*` settings
+come out of the workflow and a cache step takes their place; 4, the variable is removed and the counts are literals
+again.
+
+### 2026-11-26 — CI speed: property run counts once the cache is shared
+
+Asked from the review of the shared cache's branch: a pull request set `PROPERTY_RUNS=short`, which is in every `test`
+task's hash, while the cache's only writers, main's push and the workstation, leave it unset. No pull request could
+have replayed a `test` task.
+
+1. **Which counts does a pull request run once the cache is shared?** I chose; the agent recommended the same. Today's
+   counts: a pull request sets `short` only while no cache is shared, and after that hashes as main and the
+   workstation do, so one that touches only documents replays every test, and one that changes a test's inputs pays
+   about 30 s more. This changes entry 4 of "the split, the seeds, the cache and the run counts" from the day the
+   stack is deployed; the variable stays in each task's `env`. Rejected: keeping `short` and saying a pull request's
+   fast tests never replay; taking the variable out of the hash, so a result made at one count replays at another.
+
+Reverse: the step's condition loses `vars.TURBO_CACHE_API == ''`, and the plan says a pull request's tests never
+replay.
+
+### 2026-11-26 — CI speed: who writes to the cache, where its settings live, main's runs and the largest save
+
+The second round, after the cache Worker was chosen.
+
+1. **Who besides CI holds a token for this repository's team?** I chose against the recommendation. The workstation
+   writes too, as beep-effect's `dankstation` principal does there: what a local run made, CI may replay. The agent
+   recommended a read token only, because a local build stores `.dev.vars` in its output today and no environment is
+   hashed. Rejected: CI only. What this asks of the configuration before the token exists is the next entry.
+2. **Where the cache's settings live?** I chose; the agent recommended the same. In `packages/infra/src/GitHub.stack.ts`
+   beside the deploy environments: the variables, the read and write tokens from 1Password references, and an
+   environment for the write token limited to main. I copy the tokens into 1Password and deploy the stack. Rejected:
+   by hand in the repository's settings.
+3. **Does a push to main cancel a run in progress on main?** I chose; the agent recommended the same. No: every run
+   that starts finishes and writes its results. Looked at again only if bursts still queue after the split.
+   Rejected: cancelling on main.
+4. **Where `WriteLimits.slow.test.ts` runs?** I chose; the agent recommended the same. On every pull request, at
+   50,000 rows. Rejected: nightly only; 5,000 rows on a pull request.
+
+Reverse: 1, the workstation's principal is made read-only in beep-effect's policy and its token rotated; 2, the
+declarations come out of the stack; 3, `cancel-in-progress` is true for main; 4, the suite moves to the nightly.
+
+### 2026-11-26 — CI speed: what a shared cache asks, now that the workstation writes
+
+The third round: the conditions under which a result made on my machine may count on CI.
+
+1. **Where CI runs things for real, whatever the cache holds?** I chose; the agent recommended the same. A pull
+   request replays anything, my machine's results included. The push to main runs the check job's tasks (type-check,
+   lint, tests, slow tests, build) with `--force` and writes its own results over them, so a difference between my
+   machine and CI turns main red at the merge. The proofs replay on main too and are forced every night, as now.
+   Rejected: replaying everywhere; a second team so pull requests replay only what main's CI tested.
+2. **The environment?** I chose; the agent recommended the same. `envMode` strict: a task names in `env` what changes
+   its result, a pass-through list names what it needs and that changes nothing, and a variable nobody listed is not
+   seen by the task. This replaces the 2026 choice of loose mode made for workerd and wrangler; the list is found by
+   running `check:full` until it passes. Rejected: loose with `env` lists.
+3. **The proofs' results?** I chose; the agent recommended the same. On the Worker with everything else: the
+   `actions/cache` steps and the key step leave the proofs job, a proof I ran locally replays on the pull request,
+   and the nightly keeps `--force` and every mutant. The lock is unchanged. Rejected: `actions/cache` for the proofs
+   alone.
+
+Reverse: 1, `--force` comes off main's run; 2, `envMode` is loose again and the lists stay as documentation; 3, the
+cache steps return to the proofs job and its turbo call names a local cache folder.

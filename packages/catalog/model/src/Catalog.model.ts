@@ -11,7 +11,6 @@ import { Group, GroupState, GroupEvent } from "./Group/Group.aggregate.ts"
 import type { DecidedGroup } from "./Group/Group.aggregate.ts"
 import { Import, ImportState, ImportEvent } from "./Import/Import.aggregate.ts"
 import { Deciding } from "./Review/Deciding.decision.ts"
-import * as P from "effect/Predicate"
 import { DecidingGroup } from "./Review/DecidingGroup.decision.ts"
 import { Undoing } from "./Review/Undoing.decision.ts"
 import { UndoingGroup } from "./Review/UndoingGroup.decision.ts"
@@ -205,12 +204,7 @@ export class Catalog extends Domain.Model(
       AnImportCanBeTakenBack: (all) =>
         A.some(all.Import, (life) => A.some(life.events, ImportEvent.guards.ImportTakenBack)),
       AnImportCanBeReopened: (all) =>
-        A.some(
-          all.Import,
-          P.Struct({
-            events: A.some(ImportEvent.guards.ImportReopened)
-          })
-        ),
+        A.some(all.Import, (life) => A.some(life.events, ImportEvent.guards.ImportReopened)),
       AnImportCanBeRemoved: (all) =>
         A.some(all.Import, (life) => A.some(life.events, ImportEvent.guards.ImportRemoved)),
       ARowCanBeDecided: (all) => A.some(all.Row, (row) => A.some(row.events, RowEvent.guards.RowDecided)),

@@ -160,7 +160,9 @@ It exits 1 when a mutant is held by `neither`, when all that is known of one is 
 (above), when a mutant does not apply, when a run gave no result, or when the unchanged copy does not pass; each is
 printed with its change and what ran, and a `weaker` one with the rules no longer named. A mutant held by a rule
 where a story was kept is printed as an `improvement`, and is not a failure. The unchanged copy must pass with no test
-out of time, or nothing more is run. (The Python runner this replaced, `run.py`, stopped with exit 2 on a baseline
+out of time, a test passed in the proof and in each story file (skipped ones beside it are fine), and vitest ending
+with code 0, or nothing more is run. A file of the report counts only when its whole path in the copy is one the run
+asked for: vitest also runs any file whose path holds that one, and such a file is read for nothing. (The Python runner this replaced, `run.py`, stopped with exit 2 on a baseline
 that failed; the command exits 1, as every rule of the CLI does.)
 
 ## What it costs
@@ -231,7 +233,9 @@ an object to `mutants` in `mutants.json`:
 ```
 
 - `key`: `<command>-<what>` for the import (`confirm-sum`), `<row|undo|group|gundo>-<what>` for a decision, and
-  `<...>-<event>-<field>` for a field (`group-groupdecided-count`). Unique.
+  `<...>-<event>-<field>` for a field (`group-groupdecided-count`). Unique, and only letters, digits, `-` and `_`,
+  since its copy's folder is named after it. `file`, `proof` and each of `stories` are paths from the package's folder
+  with no `.` or `..` segment, so nothing is read or written outside a copy.
 - `target`: `import`, `DecideRow`, `UndoRowStep`, `DecideGroup` or `UndoGroup`. `kind`: `check`, `field` or
   `nothing`.
 - `anchors`: texts found in order; the change lands after the last. For the import, the handler

@@ -33,9 +33,17 @@ export interface VitestRun {
   readonly limit: number
 }
 
-/** What a run left: its report when it wrote one, whether it was stopped at its limit, and the end of its log. */
+/**
+ * What a run left: its report when it wrote one, the code it ended with, whether it was stopped at its limit, and the
+ * end of its log.
+ */
 export interface VitestAnswer {
   readonly report: O.Option<VitestReport>
+  /**
+   * The code vitest ended with; none when it was stopped. Not 0 when a test failed, and also when every test passed and
+   * an error was thrown outside them, which the report does not say.
+   */
+  readonly exit: O.Option<number>
   readonly stopped: boolean
   /** The last characters vitest printed, to say why there is no report. */
   readonly tail: string
@@ -100,6 +108,7 @@ export class Vitest extends Context.Service<
           : O.none<VitestReport>()
         return {
           report,
+          exit: O.map(answer, (ended) => ended.code),
           stopped: O.isNone(answer),
           tail: Str.slice(-400)(log)
         } satisfies VitestAnswer

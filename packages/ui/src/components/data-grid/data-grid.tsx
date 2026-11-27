@@ -191,7 +191,7 @@ function getIsScrollJumping(input: {
 
 function makeViewport<TData extends RowData>(registry: AtomRegistry.AtomRegistry): Viewport<TData> {
   const latest: RefObject<ViewportDraw<TData> | null> = { current: null }
-  const insets = Atom.make(EMPTY_VIEWPORT_INSETS).pipe(Atom.setIdleTTL(0))
+  const insets = Atom.make(EMPTY_VIEWPORT_INSETS).pipe(Atom.setIdleTTL("1 second"))
   const scroll: RefObject<CommittedScroll> = { current: { offset: 0, isJumping: false } }
   let observer: ResizeObserver | null = null
 
@@ -293,7 +293,11 @@ function makeViewport<TData extends RowData>(registry: AtomRegistry.AtomRegistry
   }
 }
 
-/** The viewport of one grid on screen, made for its `useId`, and let go the moment nothing reads it. */
+/**
+ * The viewport of one grid on screen, made for its `useId`, and let go a second after nothing reads it: long enough
+ * that the time between a draw and its commit never makes it anew, which would hand the virtualizers and the ref
+ * callbacks of a second viewport to the one drawn.
+ */
 const viewportOf = Atom.family((_instance: string) =>
   Atom.readable((get) => {
     const viewport: Viewport<any> = makeViewport<any>(get.registry)
@@ -305,7 +309,7 @@ const viewportOf = Atom.family((_instance: string) =>
       if (draw.columnVirtualizerRef.current === virtualizers.column) draw.columnVirtualizerRef.current = null
     })
     return viewport
-  }).pipe(Atom.setIdleTTL(0))
+  }).pipe(Atom.setIdleTTL("1 second"))
 )
 
 /**

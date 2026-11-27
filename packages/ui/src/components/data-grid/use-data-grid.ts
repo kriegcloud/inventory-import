@@ -2,9 +2,10 @@
 // One grid on screen is one instance, made for its `useId` (`gridInstance`): what upstream kept in refs (the table, the
 // two virtualizers, the rows by index, the focus waiting for a row, the pending edit) is that instance's own, and its
 // handlers are made once with it and read, when they run, the props of the last commit, as upstream's refs did. The
-// listeners upstream's effects added are added when the grid mounts (`gridListeners`, read with `useAtomMount`) and
-// removed by that atom's finalizer; what upstream ran after a commit runs after a commit of the table
-// (`afterEachCommit`, `afterCommitOf`).
+// listeners upstream's effects added are added when React gives the grid its element (`dataGridRef` starts them as
+// its node is set, `onScreenRef`) and removed when it takes the element back; what upstream ran after a commit runs
+// after a commit of the table (`afterEachCommit`, `afterCommitOf`); what upstream did on unmount is the finalizer of
+// `gridMounted`.
 //
 // The rule this file protects: the handlers handed to the rows and cells keep one identity for the grid's life (the
 // rows are `React.memo` with identity compares), and every value upstream memoized keeps its identity exactly while
@@ -57,7 +58,8 @@ import {
   afterEachCommit,
   getIsFirefox,
   type Keep,
-  keepOne
+  keepOne,
+  onScreenRef
 } from "@inventory/ui/components/data-grid/data-grid-state"
 import {
   getCellElement,
@@ -170,9 +172,11 @@ interface Grid<TData extends RowData> {
 }
 
 function makeGrid<TData extends RowData>(registry: AtomRegistry.AtomRegistry): Grid<TData> {
+  // The listeners start once React has drawn the grid's element and set it here, and stop when it takes it back.
+  let self: Grid<TData> | null = null
   const boxes = {
     registry,
-    dataGridRef: { current: null },
+    dataGridRef: onScreenRef((node) => (self === null ? () => undefined : startOnScreen(self, node))),
     headerRef: { current: null },
     footerRef: { current: null },
     rowMapRef: { current: new Map<number, HTMLDivElement>() },
@@ -182,9 +186,9 @@ function makeGrid<TData extends RowData>(registry: AtomRegistry.AtomRegistry): G
     pendingFocusRef: { current: null },
     rendered: { current: null },
     committed: { current: null },
-    pendingEdit: Atom.make<PendingEdit<TData> | null>(null).pipe(Atom.setIdleTTL(0))
+    pendingEdit: Atom.make<PendingEdit<TData> | null>(null).pipe(Atom.setIdleTTL("1 second"))
   } satisfies Omit<Grid<TData>, "handlers" | "keep">
-  return {
+  const grid: Grid<TData> = {
     ...boxes,
     handlers: gridHandlers(boxes),
     keep: {
@@ -197,19 +201,42 @@ function makeGrid<TData extends RowData>(registry: AtomRegistry.AtomRegistry): G
       result: keepOne()
     }
   }
+  self = grid
+  return grid
 }
 
-/** One grid on screen, made for its `useId`, and let go the moment nothing reads it. */
+/**
+ * One grid on screen, made for its `useId` (a new one for each mount), and let go a second after nothing reads it:
+ * long enough that the time between a draw and its commit never makes it anew, which would hand the rows a second
+ * instance's boxes.
+ */
 const gridInstance = Atom.family((_instance: string) =>
-  Atom.readable((get): Grid<any> => makeGrid<any>(get.registry)).pipe(Atom.setIdleTTL(0))
+  Atom.readable((get): Grid<any> => makeGrid<any>(get.registry)).pipe(Atom.setIdleTTL("1 second"))
 )
 
-/** The listeners one grid on screen adds while it is mounted, each removed by this atom's finalizer. */
-const gridListeners = Atom.family((instance: string) =>
+/** While the grid's owner is mounted; when it leaves, what is being edited is written and the files it made let go. */
+const gridMounted = Atom.family((instance: string) =>
   Atom.readable((get) => {
-    listenWhileMounted(get(gridInstance(instance)), (finalizer) => get.addFinalizer(finalizer))
+    const grid = get(gridInstance(instance))
+    get.addFinalizer(() => {
+      const table = grid.tableRef.current
+      if (table === null) return
+      table.commitCellUpdates()
+      revokeFileObjectUrls(table, grid.committed.current?.dataProp)
+    })
   }).pipe(Atom.setIdleTTL(0))
 )
+
+/** Starts what upstream's effects did on the grid's element and the page, and returns what stops it all. */
+function startOnScreen<TData extends RowData>(grid: Grid<TData>, container: HTMLDivElement): () => void {
+  const finalizers: (() => void)[] = []
+  listenOnScreen(grid, container, (finalizer) => {
+    finalizers.push(finalizer)
+  })
+  return () => {
+    for (const finalizer of finalizers) finalizer()
+  }
+}
 
 function addRowOf<TData extends RowData>(grid: Omit<Grid<TData>, "handlers" | "keep">, focusCell: FocusCell) {
   return async (trigger: CreateRowDetails, columnId: string | undefined) => {
@@ -1043,20 +1070,19 @@ function gridHandlers<TData extends RowData>(grid: Omit<Grid<TData>, "handlers" 
 }
 
 /**
- * What upstream's effects did while the grid was on screen, added at once when it mounts and each removed by
- * `addFinalizer` when it leaves. Each reads the table and the props as they are when it runs.
+ * What upstream's effects did while the grid was on screen, added at once when React gives the grid its element and
+ * each removed by `addFinalizer` when it takes the element back. Each reads the table and the props as they are when
+ * it runs. The table is set by the draw that handed this element its ref, so it is there.
  */
-function listenWhileMounted<TData extends RowData>(grid: Grid<TData>, addFinalizer: (finalizer: () => void) => void) {
+function listenOnScreen<TData extends RowData>(
+  grid: Grid<TData>,
+  container: HTMLDivElement,
+  addFinalizer: (finalizer: () => void) => void
+) {
   const { tableRef, dataGridRef, headerRef, rowMapRef, pendingFocusRef, handlers } = grid
   const { getFocusedCell, getNavigableColumnIds, revealCell, focusCellElement, focusCell, blurCell } = handlers
   const table = tableRef.current
   if (table === null) return
-
-  // What is being edited is written when the grid leaves the screen, and the files it made are let go.
-  addFinalizer(() => {
-    table.commitCellUpdates()
-    revokeFileObjectUrls(table, grid.committed.current?.dataProp)
-  })
 
   // What the handlers read is what the last commit drew, as upstream's refs held it.
   addFinalizer(
@@ -1065,11 +1091,8 @@ function listenWhileMounted<TData extends RowData>(grid: Grid<TData>, addFinaliz
     })
   )
 
-  const container = dataGridRef.current
-  if (container) {
-    container.addEventListener("keydown", handlers.onDataGridKeyDown)
-    addFinalizer(() => container.removeEventListener("keydown", handlers.onDataGridKeyDown))
-  }
+  container.addEventListener("keydown", handlers.onDataGridKeyDown)
+  addFinalizer(() => container.removeEventListener("keydown", handlers.onDataGridKeyDown))
 
   window.addEventListener("keydown", handlers.onGlobalKeyDown, true)
   addFinalizer(() => window.removeEventListener("keydown", handlers.onGlobalKeyDown, true))
@@ -1106,7 +1129,7 @@ function listenWhileMounted<TData extends RowData>(grid: Grid<TData>, addFinaliz
   )
   addFinalizer(() => cancelAnimationFrame(autoFocusFrame))
 
-  if (container) {
+  {
     let isPointerFocus = false
 
     function onPointerDown() {
@@ -1185,7 +1208,7 @@ function listenWhileMounted<TData extends RowData>(grid: Grid<TData>, addFinaliz
   document.addEventListener("focusin", onFocusIn)
   addFinalizer(() => document.removeEventListener("focusin", onFocusIn))
 
-  if (container) {
+  {
     let focusOutFrame = 0
 
     function onFocusOut(event: FocusEvent) {
@@ -1685,7 +1708,7 @@ function useDataGrid<TData extends RowData>({
     grid.tableRef.current = table
   }
 
-  useAtomMount(gridListeners(instance))
+  useAtomMount(gridMounted(instance))
 
   // The table is the same object across draws, so its columns and sizing state are what change the sizes.
   const columnSizeVars = grid.keep.sizes([tableColumns, table.state.columnResizing, table.state.columnSizing], () => {

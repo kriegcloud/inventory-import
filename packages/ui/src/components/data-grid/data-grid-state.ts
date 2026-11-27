@@ -7,6 +7,7 @@
 // where upstream's layout effects ran: in the commit of the component that called `useTable`, after the table has
 // published its state.
 import type { RowData, Table } from "@tanstack/react-table"
+import type { RefObject } from "react"
 
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
 
@@ -62,6 +63,31 @@ export function afterCommitOf<TData extends RowData>(
   })
   const subscription = values.subscribe(() => listener())
   return () => subscription.unsubscribe()
+}
+
+/**
+ * A ref box for an element that starts `start` when React sets its node and calls what `start` returned when the node
+ * is replaced or taken back: where upstream's mount effects added listeners to the element, and their cleanups. It
+ * runs in the commit that attaches the element, so nothing depends on when a store's subscribers are told.
+ */
+export function onScreenRef<T>(start: (node: T) => () => void): RefObject<T | null> {
+  let node: T | null = null
+  let stop: (() => void) | null = null
+  return {
+    get current() {
+      return node
+    },
+    set current(next: T | null) {
+      if (Object.is(next, node)) return
+      if (stop !== null) {
+        const previous = stop
+        stop = null
+        previous()
+      }
+      node = next
+      if (next !== null) stop = start(next)
+    }
+  }
 }
 
 /** Whether the page runs in Firefox, read once: the grid lays its pinned columns out another way there. */

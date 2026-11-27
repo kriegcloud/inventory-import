@@ -46,7 +46,16 @@
  * workspace whose `beep.layer` is `contract`, `model`, `host` or `web`, each file under `src` but those under
  * `internal/` has an ending that names a kind its layer holds: a file with no ending, an ending that is no kind, one
  * that says what another kind says (`.store.ts`, a port's) and a kind of another layer are each refused. A host's and
- * a web's files are asked their ending only, and their text is not read.
+ * a web's files are asked their ending and their imports only.
+ *
+ * A file whose ending is an event's or a command's is read as a namespace named for its stem (explorations/
+ * module-taxonomy, decision 2), so three things hold of it: its block's tag is the file's stem, the block is exported
+ * as `Event` or `Command`, and in a model `evolve` or `decide` is exported beside it; and no file of the four layers
+ * picks `Event` or `Command` by name out of such a file, a type included. A model's or a contract's `.event.ts` holds
+ * its event alone. A module's files of a kind that takes a folder (`commands/`, `events/`) sit beside the module's
+ * own while they are five or fewer and in that folder when they are more (decision 8a); the union that joins them is
+ * not counted. Until the models' events and commands have moved, an event or a command is still kept in its
+ * decider's file as well.
  *
  * The blocks are read from each file's syntax tree (`internal/blocksCode.ts`), never from its text, so a comment, a
  * string or a fixture that names one is not taken for it, and a callee is read through what only wraps it
@@ -71,7 +80,7 @@ import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo } from "../../Repo.service.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
-import { type BlockAt, readBlocks } from "./internal/blocksCode.ts"
+import { type BlockAt, type BlocksRead, readBlocks } from "./internal/blocksCode.ts"
 import { endingOf, kinds, Layer, place, Placement } from "./Kinds.schema.ts"
 
 const $I = $RepoCliId.create("commands/Laws/BlockFiles.rules")
@@ -104,8 +113,14 @@ export const BlockFilesFinding = S.TaggedUnion({
     file: S.String.pipe(S.annotateKey({ description: "The file, from the root" })),
     why: S.String.pipe(S.annotateKey({ description: "The parser's first complaint" }))
   },
-  Unkind: {
+  Unshaped: {
     file: S.String.pipe(S.annotateKey({ description: "The file, from the root" })),
+    line: S.Int.pipe(S.annotateKey({ description: "The line it is written on, from 1" })),
+    says: S.String.pipe(S.annotateKey({ description: "What is not as its kind's file is written" })),
+    write: S.String.pipe(S.annotateKey({ description: "What to write instead" }))
+  },
+  Unkind: {
+    file: S.String.pipe(S.annotateKey({ description: "The file or folder, from the root" })),
     says: S.String.pipe(S.annotateKey({ description: "What is wrong with its ending" })),
     write: S.String.pipe(S.annotateKey({ description: "What to do: the name to give it, or where it moves" }))
   }
@@ -140,6 +155,7 @@ export const blockFilesSentence: (finding: BlockFilesFinding) => Line = BlockFil
   Unfilled: ({ file, ending, block, write }) =>
     err(`  ${file} ends ${ending}, which is kept for ${block}, and declares none: ${write}`),
   Unread: ({ file, why }) => err(`  ${file} could not be read, so its blocks were not checked: ${why}`),
+  Unshaped: ({ file, line, says, write }) => err(`  ${file}:${line} ${says}: ${write}`),
   Unkind: ({ file, says, write }) => err(`  ${file} ${says}: ${write}`)
 })
 
@@ -162,11 +178,25 @@ const reserved: Readonly<Record<string, string>> = R.filter(alone, (_declarer, e
   O.exists(R.get(kinds, ending), (kind) => A.contains(kind.heldBy, "contract"))
 )
 
-/** What declares a block that no ending names yet, as a reader writes it. */
+/** What declares a block that no ending names, as a reader writes it. */
 const unplaced: Readonly<Record<string, string>> = {
-  event: "Domain.Event",
   relation: "Domain.Relation"
 }
+
+/**
+ * The two kinds whose file is read as a namespace named for its stem (decision 2), each with the name its block is
+ * exported under and what a model's file of it exports beside the block.
+ */
+const roles: Readonly<Record<string, { readonly block: string; readonly beside: string }>> = {
+  event: { block: "Event", beside: "evolve" },
+  command: { block: "Command", beside: "decide" }
+}
+
+/** More files of one kind than this in a module, and the kind takes a folder (decision 8a). */
+const flatAtMost = 5
+
+/** The kinds that take a folder, each with the folder's name. */
+const folders: Readonly<Record<string, string>> = R.getSomes(R.map(kinds, (kind) => kind.folder))
 
 /**
  * The endings of a model's block files, each with the kinds a file with it may hold whatever else it declares. A kind
@@ -245,6 +275,13 @@ const keptBy = (ending: O.Option<string>, kind: string, blocks: ReadonlyArray<Bl
 const nameOf = (file: string, block: BlockAt): string =>
   O.match(block.name, { onNone: () => stemOf(file), onSome: identity })
 
+/**
+ * The stem of the file a block moves to: its tag when its kind's file is named for one (an event's, a command's), and
+ * its own name otherwise.
+ */
+const stemFor = (file: string, block: BlockAt): string =>
+  R.has(roles, block.kind) ? O.getOrElse(block.tag, () => nameOf(file, block)) : nameOf(file, block)
+
 /** What a file whose reserved ending is taken by something else is renamed to: a port's ending, or a payload's. */
 const freed = (file: string, blocks: ReadonlyArray<BlockAt>): string => {
   const extension = extensionOf(file)
@@ -305,6 +342,115 @@ const unkind = (file: string, layer: Layer): O.Option<BlockFilesFinding> => {
   })
 }
 
+/**
+ * What decision 2 asks of a file whose ending is an event's or a command's and which declares one: the block's tag is
+ * the file's stem, the block is exported as `Event` or `Command`, and a model's file exports `evolve` or `decide`
+ * beside it. A contract's command has no `decide`: what decides it is in the model.
+ */
+const shaped = (file: string, read: BlocksRead, inModel: boolean): ReadonlyArray<BlockFilesFinding> => {
+  const stem = stemOf(file)
+  const extension = extensionOf(file)
+  return O.match(
+    O.flatMap(endingOf(file), (ending) => O.map(R.get(roles, ending), (role) => ({ ending, role }))),
+    {
+      onNone: () => A.empty<BlockFilesFinding>(),
+      onSome: ({ ending, role }) => {
+        const own = A.filter(read.found, (block) => block.kind === ending)
+        const refused = (line: number, says: string, write: string): BlockFilesFinding =>
+          BlockFilesFinding.cases.Unshaped.make({ file, line, says, write })
+        const perBlock = A.flatMap(own, (block) => {
+          const tag = O.getOrElse(block.tag, () => "")
+          const name = O.getOrElse(block.name, () => "")
+          const stemmed =
+            O.isSome(block.tag) && tag !== stem
+              ? [
+                  refused(
+                    block.line,
+                    `declares the ${ending} "${tag}" in a file named ${stem}`,
+                    `a file's stem is its ${ending}'s tag, and it holds one: move it to ${tag}.${ending}.${extension}`
+                  )
+                ]
+              : []
+          const called =
+            name === role.block
+              ? []
+              : [
+                  refused(
+                    block.line,
+                    `names its ${ending}'s class ${name}`,
+                    `export it as ${role.block}, read as ${stem}.${role.block} through \`import * as ${stem}\``
+                  )
+                ]
+          return A.appendAll(stemmed, called)
+        })
+        const beside =
+          inModel && A.isReadonlyArrayNonEmpty(own) && !A.contains(read.exported, role.beside)
+            ? [
+                refused(
+                  A.headNonEmpty(own).line,
+                  `exports no ${role.beside}`,
+                  `export \`${role.beside}\` beside ${role.block}, read as ${stem}.${role.beside}`
+                )
+              ]
+            : []
+        return A.appendAll(perBlock, beside)
+      }
+    }
+  )
+}
+
+/** An import that picks `Event` or `Command` out of an event's or a command's file, which nine files answer to. */
+const pickedByName = (file: string, read: BlocksRead): ReadonlyArray<BlockFilesFinding> =>
+  A.flatMap(read.picked, (pick) =>
+    O.match(
+      O.filter(endingOf(pick.from), (ending) => O.exists(R.get(roles, ending), (role) => role.block === pick.imported)),
+      {
+        onNone: () => A.empty<BlockFilesFinding>(),
+        onSome: () =>
+          A.of<BlockFilesFinding>(
+            BlockFilesFinding.cases.Unshaped.make({
+              file,
+              line: pick.line,
+              says: `imports ${pick.imported} by name from ${pick.from}`,
+              write: `import the file whole, \`import * as ${stemOf(pick.from)} from "${pick.from}"\`, and write ${stemOf(pick.from)}.${pick.imported}`
+            })
+          )
+      }
+    )
+  )
+
+/**
+ * What decision 8a asks of a package's folders: a module's files of a kind that takes a folder sit beside the module's
+ * own while they are five or fewer, and in a folder named for the kind when they are more.
+ */
+const foldered = (files: ReadonlyArray<string>, folderOf: (file: string) => string): ReadonlyArray<BlockFilesFinding> =>
+  A.flatMap(R.toEntries(folders), ([ending, folder]) => {
+    const ofKind = A.filter(files, (file) => O.contains(endingOf(file), ending))
+    const dirs = A.sort(A.dedupe(A.map(ofKind, folderOf)), Order.String)
+    return A.flatMap(dirs, (dir) => {
+      const count = A.filter(ofKind, (file) => folderOf(file) === dir).length
+      const inItsFolder = baseOf(dir) === folder
+      const many = plural(count, `${ending} file`, `${ending} files`)
+      return inItsFolder && count <= flatAtMost
+        ? [
+            BlockFilesFinding.cases.Unkind.make({
+              file: dir,
+              says: `holds ${many}, and a folder is for more than ${flatAtMost}`,
+              write: "move them up, beside their module's own files"
+            })
+          ]
+        : !inItsFolder && count > flatAtMost
+          ? [
+              BlockFilesFinding.cases.Unkind.make({
+                file: dir,
+                says: `holds ${many}, more than ${flatAtMost}`,
+                write: `move them into ${dir}/${folder}/, with the union that joins them`
+              })
+            ]
+          : []
+    })
+  })
+
 /** What one package's files show the law, read once: the package's one file that declares a model, when it has one. */
 interface Package {
   readonly model: O.Option<string>
@@ -322,14 +468,10 @@ const besideInModel = (
   const withItsCommand = O.map(
     commands.length === 1 ? A.head(commands) : O.none(),
     (command) =>
-      `move it to ${nameOf(file, command)}.command.${extension}, beside this file, with the command that records it`
+      `move it to ${stemFor(file, command)}.command.${extension}, beside this file, with the command that records it`
   )
   return block.kind === "event"
-    ? O.orElse(withItsCommand, () =>
-        O.some(
-          `move it to the .command.${extension}, .aggregate.${extension} or .decision.${extension} of the command that records it, or the .view.${extension} or .stream.${extension} that emits it`
-        )
-      )
+    ? O.none()
     : block.kind === "rejection"
       ? withItsCommand
       : block.kind === "relation"
@@ -363,13 +505,14 @@ const inModel = (
       name,
       block: declarerOf(block.kind),
       write: O.match(renamedTo, {
-        onSome: (word) => `rename the file to ${stemOf(file)}.${word}.${extension}`,
+        onSome: (word) =>
+          `rename the file to ${R.has(roles, word) ? stemFor(file, block) : stemOf(file)}.${word}.${extension}`,
         onNone: () =>
           O.match(besideInModel(file, block, blocks, pkg), {
             onSome: identity,
             onNone: () =>
               O.match(homeOf(block.kind), {
-                onSome: (word) => `move it to ${name}.${word}.${extension}, beside this file`,
+                onSome: (word) => `move it to ${stemFor(file, block)}.${word}.${extension}, beside this file`,
                 onNone: () => "move it out"
               })
           })
@@ -444,17 +587,17 @@ const inContract = (
       write: A.contains(ofTheContract, block.kind)
         ? O.match(renamedTo, {
             onSome: (word) => `rename the file to ${stemOf(file)}.${word}.${extension}`,
-            onNone: () => `move it to ${name}.${block.kind}.${extension}, beside this file`
+            onNone: () => `move it to ${stemFor(file, block)}.${block.kind}.${extension}, beside this file`
           })
         : A.contains(besideItsCommand, block.kind)
           ? O.match(command, {
               onSome: (one) =>
-                `move it to ${nameOf(file, one)}.command.${extension}, beside this file, with the command that records it`,
+                `move it to ${stemFor(file, one)}.command.${extension}, beside this file, with the command that records it`,
               onNone: () =>
                 `a contract declares a ${declarer} only beside its command, in .command.${extension}: move it to the file of the command that ${block.kind === "event" ? "records" : "refuses with"} it`
             })
           : O.match(homeOf(block.kind), {
-              onSome: (word) => inTheModel(`${name}.${word}.${extension}`),
+              onSome: (word) => inTheModel(`${stemFor(file, block)}.${word}.${extension}`),
               onNone: () =>
                 `a contract declares no ${declarer}: move it into the relations of the model's .model.${extension}`
             })
@@ -499,13 +642,13 @@ export const blockFiles = Effect.fn("BlockFiles.blockFiles")(function* () {
       const everything = yield* repo.files(src)
       // In the order of their paths, so the refusals come out the same on every machine.
       const files = A.sort(A.filter(everything, isCode), Order.String)
-      // A host's and a web's files declare no block of a model: their endings are asked, and their text is not read.
+      // A host's and a web's files declare no block of a model: their endings and their imports are asked.
       const declares = workspace.layer === "model" || workspace.layer === "contract"
       const read = yield* Effect.forEach(
         files,
         Effect.fnUntraced(function* (path) {
           const file = repo.relative(path, repo.root)
-          const source = declares ? yield* repo.text(path) : ""
+          const source = yield* repo.text(path)
           return { path, file, blocks: readBlocks({ file, source }) }
         }),
         { concurrency: 1 }
@@ -537,9 +680,16 @@ export const blockFiles = Effect.fn("BlockFiles.blockFiles")(function* () {
                   )
                 )
         })
-        return A.appendAll(O.toArray(unkind(file, workspace.layer)), declares ? declared : [])
+        return A.flatten([
+          O.toArray(unkind(file, workspace.layer)),
+          declares ? declared : [],
+          declares ? shaped(file, blocks, workspace.model) : [],
+          pickedByName(file, blocks)
+        ])
       })
-      return { files: files.length, findings: A.flatten(findings) }
+      const relative = A.map(read, (one) => one.file)
+      const folds = declares ? foldered(relative, (file) => repo.dirname(file)) : []
+      return { files: files.length, findings: A.appendAll(A.flatten(findings), folds) }
     }),
     { concurrency: 1 }
   )

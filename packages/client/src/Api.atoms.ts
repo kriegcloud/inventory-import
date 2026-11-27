@@ -200,7 +200,8 @@ const heldByQueries: Array<{ readonly forget: () => void; readonly members: () =
 /**
  * Lets go of every read held for anyone, at once: on sign-out the previous person's rows leave memory (Benjamin:
  * "Keyed reads, and drop them on sign-out"), and whoever signs in next starts from the skeleton. A switch of
- * organization does not call this: the person's reads for the organization they left are kept for `keepUnwatched`.
+ * organization does not call this: the person's queries for the organization they left are kept for `keepUnwatched`
+ * (a live read is not: it is closed the moment the page's member changes, `makeHolds`).
  */
 export const forgetReads = (): void => {
   invalidate(everyRead)
@@ -209,6 +210,79 @@ export const forgetReads = (): void => {
 
 /** The members some read is held for, across every query: for the tests that hold `forgetReads` to its word. */
 export const heldReadMembers = (): ReadonlyArray<string> => A.flatMap(heldByQueries, (query) => query.members())
+
+/** How a live read of a model is held while nobody looks at it, by member. */
+export interface Holds {
+  /**
+   * The member's read is no longer looked at. While that member is the page's, `held` is kept in `registry` for
+   * `keepUnwatched`, and the hold an earlier leave took is let go; once the page's member is another (or nobody),
+   * nothing is held and the read lets go of what it made for the member. When the time runs out, the hold ends and
+   * the read lets go of it too, so nothing is left of it for that member.
+   */
+  readonly left: (registry: AtomRegistry.AtomRegistry, member: string, held: Atom.Atom<unknown>) => void
+  /**
+   * The member's read is looked at again: the hold a leave took is let go, so its time runs only while nobody looks,
+   * and a read on screen is never let go under it.
+   */
+  readonly looked: (member: string) => void
+}
+
+/**
+ * The holds of a live read made outside `makeApiAtoms` (`watched`, `@inventory/client/Model`). Unlike a query's, a
+ * member's read nobody looks at is kept for `keepUnwatched` only while that member is the page's: the moment the
+ * page's member changes (another member, another organization, signed out) its hold ends and `leave` is called for
+ * it, so no socket stays open for an account the page left (Benjamin, 2026-11-26: "Member id in the socket's
+ * address", "One minute at most"). `leave` is called too when the time runs out. `forgetReads` lets every one go at
+ * once and calls `forget`, which lets go of what the read made for each member. `members` names the members it holds
+ * a read for, for `heldReadMembers`.
+ */
+export const makeHolds = (read: {
+  readonly forget: () => void
+  readonly leave: (member: string) => void
+  readonly members: () => ReadonlyArray<string>
+}): Holds => {
+  const kept = MutableHashMap.empty<string, Keep>()
+  const letGo = (member: string): void =>
+    O.match(MutableHashMap.get(kept, member), {
+      onNone: () => {},
+      onSome: (keep) => {
+        MutableHashMap.remove(kept, member)
+        keep.letGo()
+      }
+    })
+  heldByQueries.push({
+    forget: () => {
+      MutableHashMap.forEach(kept, (keep) => keep.letGo())
+      MutableHashMap.clear(kept)
+      read.forget()
+    },
+    members: read.members
+  })
+  return {
+    left: (registry, member, held) => {
+      letGo(member)
+      if (registry.get(memberKey) !== member) return read.leave(member)
+      // Ends the hold the moment the page's member is another, and when its time is up.
+      const stop = registry.subscribe(memberKey, (now) => {
+        if (now === member) return
+        letGo(member)
+        read.leave(member)
+      })
+      const keep = keepFor(registry, held, "unwatched", () => {
+        stop()
+        MutableHashMap.remove(kept, member)
+        read.leave(member)
+      })
+      MutableHashMap.set(kept, member, {
+        letGo: () => {
+          stop()
+          keep.letGo()
+        }
+      })
+    },
+    looked: letGo
+  }
+}
 
 /** How a read behaves beyond its request. */
 export interface QueryOptions {

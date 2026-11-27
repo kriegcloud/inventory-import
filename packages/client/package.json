@@ -13,6 +13,7 @@
     "./Early": "./src/Early.runtime.ts",
     "./SayError": "./src/SayError.controller.ts",
     "./Api": "./src/Api.atoms.ts",
+    "./Model": "./src/Model.atoms.ts",
     "./OptimisticAtoms": "./src/Optimistic.atoms.ts",
     "./MemberAtoms": "./src/Member.atoms.ts",
     "./ConnectionAtoms": "./src/Connection.atoms.ts",
@@ -31,9 +32,12 @@
     "sonner": "catalog:"
   },
   "devDependencies": {
+    "@alchemy.run/domain": "2.0.0-beta.87-e1c3e6d",
+    "@effect/platform-node": "catalog:",
     "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
+    "alchemy": "2.0.0-beta.87-e1c3e6d",
     "vitest": "catalog:"
   },
   "peerDependencies": {

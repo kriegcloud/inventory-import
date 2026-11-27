@@ -8,6 +8,18 @@ import * as A from "effect/Array"
 import * as S from "effect/Schema"
 import { describe, expect, it, vi } from "vitest"
 import { installTroubleSentences, isTransient, sayError } from "@inventory/client/SayError"
+import { CounterIds, CountingApi, CountingHost, judging } from "./Counting.fixture"
+import { it as effectIt } from "@effect/vitest"
+import * as Cause from "effect/Cause"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
+import * as RpcClientError from "effect/rpc/RpcClientError"
+import * as Socket from "effect/socket/Socket"
+import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer"
+import * as HttpServer from "effect/http/HttpServer"
+import * as HttpServerResponse from "effect/http/HttpServerResponse"
+import { modelHttpClient } from "@inventory/client/Http"
 
 // The catalog's model failure, as this package meets it: an error of another package, read by its tag alone. A stand-in
 // with its own constructor, since this package holds no contract.
@@ -164,4 +176,111 @@ it("keeps nonblank reasons on arrays and callable failures without trimming thei
   expect(sayError(array, { fields: {} }).sentence).toBe(reason)
   expect(sayError(callable, { fields: {} }).sentence).toBe(reason)
   expect(sayError({ reason: " \t\n" }, { fields: {} }).title).toBe("Something went wrong")
+})
+
+// A model's call (`@alchemy.run/domain`'s Api client, over Effect RPC) fails before its handler answers with the RPC
+// client's error, whose reason says what failed. It is said, and asked again, as the same failure of an HTTP request
+// is, in today's words: no new sentence.
+const rpcOver = (reason: HttpClientError.HttpClientError) =>
+  RpcClientError.RpcClientError.make({ reason: HttpClientError.HttpClientErrorSchema.fromHttpClientError(reason) })
+const rpcUnreached = rpcOver(
+  new HttpClientError.HttpClientError({
+    reason: new HttpClientError.TransportError({ request, cause: new TypeError("Failed to fetch") })
+  })
+)
+const rpcSocket = RpcClientError.RpcClientError.make({
+  reason: Socket.SocketReadError.make({ cause: new Error("ECONNRESET") })
+})
+const rpcDefect = (message: string) =>
+  RpcClientError.RpcClientError.make({ reason: RpcClientError.RpcClientDefect.make({ message, cause: undefined }) })
+// The library's own words for a live read that could not reconnect (Api.ts, `protocolWebSocket`).
+const lostLiveRead = rpcDefect("Live read CounterTotal.watch lost its connection")
+const undecodable = rpcDefect("Error decoding HTTP response")
+const noExpiry = O.none<never>()
+
+/**
+ * What a model's call fails with when its server answers every request with `status` (a deploy's 503 from the edge,
+ * a proxy's 502, a rate limit's 429), sent as the app sends it: over the kit's HTTP client for a model.
+ */
+const servedAnswer = Effect.fn("servedAnswer")(function* (status: number) {
+  const server = yield* Layer.build(NodeHttpServer.layerTest)
+  const answer = HttpServerResponse.text("error code: 1101", { status })
+  yield* HttpServer.serveEffect()(answer.pipe(Effect.succeed)).pipe(Effect.provideContext(server))
+  const url = yield* HttpServer.addressFormattedWith(Effect.succeed).pipe(Effect.provideContext(server))
+  const client = yield* Layer.build(
+    CountingApi.layerClientWebSocket(url).pipe(
+      Layer.provide(Layer.merge(modelHttpClient, Socket.layerWebSocketConstructorGlobal))
+    )
+  )
+  const api = yield* Effect.service(CountingApi.Client).pipe(Effect.provideContext(client))
+  return yield* api.Bump({ counterId: CounterIds.press, by: 1 }).pipe(Effect.flip)
+})
+
+describe("a model's call that failed before its handler answered", () => {
+  it("is asked again for its request's network, server error or too many requests, and for a socket's failure", () => {
+    expect(isTransient(rpcUnreached)).toBe(true)
+    expect(isTransient(rpcOver(answered(503)))).toBe(true)
+    expect(isTransient(rpcOver(answered(429)))).toBe(true)
+    expect(isTransient(rpcSocket)).toBe(true)
+  })
+
+  it("is not asked again for a refused request, a protocol defect or a live read that lost its connection", () => {
+    expect(isTransient(rpcOver(answered(400)))).toBe(false)
+    expect(isTransient(undecodable)).toBe(false)
+    expect(isTransient(lostLiveRead)).toBe(false)
+  })
+
+  it("says today's sentences: not reached, our side, could not be read", () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined)
+    const unreached = sayError(
+      new HttpClientError.HttpClientError({
+        reason: new HttpClientError.TransportError({ request, cause: new TypeError("Failed to fetch") })
+      }),
+      { fields: {} }
+    )
+    const ourSide = sayError(answered(500), { fields: {} })
+    const unreadable = sayError(answered(418), { fields: {} })
+    const said = (error: unknown) => sayError(error, { fields: {} })
+    expect(said(rpcUnreached)).toEqual(unreached)
+    expect(said(rpcSocket)).toEqual(unreached)
+    expect(said(lostLiveRead)).toEqual(unreached)
+    expect(said(rpcOver(answered(502)))).toEqual(ourSide)
+    expect(said(undecodable)).toEqual(unreadable)
+  })
+
+  // The library sends a call's request with no check of its status, so without the kit's HTTP client a 503 reaches
+  // the person as "Received empty HTTP response from RPC server": not asked again, and said as an unreadable answer.
+  effectIt.live("over the kit's HTTP client, is asked again and said as today's for a 503, a 502 or a 429 served", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        vi.spyOn(console, "error").mockImplementation(() => undefined)
+        const ourSide = sayError(answered(500), { fields: {} })
+        const tooMany = sayError(answered(429), { fields: {} })
+        const seen: Array<readonly [number, boolean, unknown]> = []
+        for (const status of [503, 502, 429]) {
+          const failure = yield* servedAnswer(status)
+          seen.push([status, isTransient(failure), sayError(failure, { fields: {} })])
+        }
+        expect(seen).toEqual([
+          [503, true, ourSide],
+          [502, true, ourSide],
+          [429, true, tooMany]
+        ])
+      })
+    )
+  )
+
+  effectIt.live("says a failure its Api does not declare as the server's own, from what the client receives", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        vi.spyOn(console, "error").mockImplementation(() => undefined)
+        const host = yield* Layer.build(Layer.merge(CountingHost, noExpiry.pipe(judging).layer))
+        const api = yield* CountingApi.clientInProcess.pipe(Effect.provideContext(host))
+        const cause = yield* api.Break({ counterId: CounterIds.press }).pipe(Effect.sandbox, Effect.flip)
+        const failure = cause.pipe(Cause.squash)
+        expect(sayError(failure, { fields: {} })).toEqual(sayError(answered(500), { fields: {} }))
+        expect(isTransient(failure)).toBe(false)
+      })
+    )
+  )
 })

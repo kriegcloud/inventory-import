@@ -318,7 +318,9 @@ a finding with "The brief: not in the brief" and "Blocked by: a new decision by 
 ## What is already here
 
 `packages/catalog/model` holds the review as a model, in memory only; nothing a person sees uses it and nothing is
-stored through it. `Import/Import.aggregate.ts`, `Row/Row.aggregate.ts`, `Group/Group.aggregate.ts`; the four
+stored through it. The `Import/` module with one block to a file of its kind (`Import.aggregate.ts` lists them;
+`commands/<Tag>.command.ts` holds a command and its `decide`, `events/<Tag>.event.ts` an event and its `evolve`, each
+read as a namespace: `StageImport.Command`, `ImportStaged.Event`), `Row/Row.aggregate.ts`, `Group/Group.aggregate.ts`; the four
 decisions in `Review/` (`Deciding`, `Undoing`, `DecidingGroup`, `UndoingGroup`); `Catalog.model.ts` with the model,
 two relations, the model's invariants and `sometimes` rules; `Catalog.api.ts` with `CatalogApi`;
 `Actor/Actor.context.ts`, the RequestContext, and `Actor/Session.middleware.ts`, the middleware that provides it. Tests: `test/*.story.test.ts`, `test/*.prove.test.ts`, `test/Catalog.verify.test.ts` with

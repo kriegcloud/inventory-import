@@ -11,21 +11,20 @@ import * as S from "effect/Schema"
 import { CurrentActor } from "../Actor/Actor.context.ts"
 import { Session } from "../Actor/Session.middleware.ts"
 import { Group, GroupDecided, GroupSize, GroupState } from "../Group/Group.aggregate.ts"
+import * as GroupCounted from "../Import/events/GroupCounted.event.ts"
+import { ImportEvent } from "../Import/events/ImportEvent.union.ts"
+import { Import } from "../Import/Import.aggregate.ts"
 import {
   ConfirmedSince,
-  GroupCounted,
-  Import,
-  ImportState,
-  MatchedSince,
-  NotOpen,
   ImportNotFound,
+  MatchedSince,
   NoImportThere,
+  NotOpen,
   NotPermitted,
-  ReviewMovedOn,
-  ImportEvent
-} from "../Import/Import.aggregate.ts"
-import { Change, ImportKey, Patch, Rows, Step } from "./Change.schema.ts"
-import { Label } from "./Deciding.decision.ts"
+  ReviewMovedOn
+} from "../Import/Import.rejection.ts"
+import * as ImportState from "../Import/Import.state.ts"
+import { Change, ImportKey, Label, Patch, Rows, Step } from "./Change.schema.ts"
 
 /** A group was already decided under this step: a step decides one group, once. */
 export class StepTaken extends Domain.Rejection(
@@ -54,7 +53,7 @@ export class DecideGroup extends Domain.Command(
       count: GroupSize,
       label: Label
     },
-    events: [GroupDecided, GroupCounted],
+    events: [GroupDecided, GroupCounted.Event],
     rejects: [NotPermitted, ImportNotFound, NotOpen, StepTaken, ConfirmedSince, ReviewMovedOn, MatchedSince]
   },
   { description: "Decide a group of rows as one act, from a screen that has every change of the import" }
@@ -95,7 +94,7 @@ export class DecidingGroup extends Domain.Decision(
           })
         ),
         life.record(
-          GroupCounted.make({
+          GroupCounted.Event.make({
             change,
             step: cmd.step,
             rows: cmd.count,

@@ -93,3 +93,8 @@ export const Patch = S.String.check(S.isMaxLength(10_000)).annotate({
 })
 /** The decoded value of `Patch`. */
 export type Patch = typeof Patch.Type
+
+/** What an act is called on screen, kept with the act for the history: at most 200 characters. */
+export const Label = S.String.check(S.isMaxLength(200)).annotate({ description: "What an act is called on screen" })
+/** The decoded value of `Label`: a text of at most 200 characters. */
+export type Label = typeof Label.Type

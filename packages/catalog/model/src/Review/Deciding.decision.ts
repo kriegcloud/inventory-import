@@ -21,18 +21,18 @@ import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 import { CurrentActor } from "../Actor/Actor.context.ts"
 import { Session } from "../Actor/Session.middleware.ts"
+import * as ActCounted from "../Import/events/ActCounted.event.ts"
+import { ImportEvent } from "../Import/events/ImportEvent.union.ts"
+import { Import } from "../Import/Import.aggregate.ts"
 import {
-  ActCounted,
   ConfirmedSince,
-  Import,
-  ImportState,
-  MatchedSince,
-  NotOpen,
   ImportNotFound,
+  MatchedSince,
   NoImportThere,
-  NotPermitted,
-  ImportEvent
-} from "../Import/Import.aggregate.ts"
+  NotOpen,
+  NotPermitted
+} from "../Import/Import.rejection.ts"
+import * as ImportState from "../Import/Import.state.ts"
 import {
   CUT,
   leavesAsItIs,
@@ -44,7 +44,7 @@ import {
   seal,
   RowState
 } from "../Row/Row.aggregate.ts"
-import { Change, Flags, ImportKey, RowKey, Step } from "./Change.schema.ts"
+import { Change, Flags, ImportKey, Label, RowKey, Step } from "./Change.schema.ts"
 
 /** The row holds a decision its sender did not see: whose it is and the change that recorded it. */
 export class DecidedSince extends Domain.Rejection(
@@ -99,9 +99,6 @@ export class GroupedAfter extends Domain.Rejection(
   { description: "A later act on a group is still in force: the number of the import's last group in force" }
 ) {}
 
-/** What an act is called on screen, kept with it for the history. */
-export const Label = S.String.check(S.isMaxLength(200)).annotate({ description: "What an act is called on screen" })
-
 /**
  * Decide one row. `sawGroup`: the import's last act on a group as the sender's screen has it. `covered`: a group in
  * force on this row was decided after the row's own decision, so the row is not as its own instance has it.
@@ -129,7 +126,7 @@ export class DecideRow extends Domain.Command(
       madeOn: S.Int,
       label: Label
     },
-    events: [RowDecided, ActCounted],
+    events: [RowDecided, ActCounted.Event],
     rejects: [
       NotPermitted,
       ImportNotFound,
@@ -308,7 +305,7 @@ export class Deciding extends Domain.Decision(
           })
         ),
         life.record(
-          ActCounted.make({
+          ActCounted.Event.make({
             change,
             step: cmd.step,
             row: cmd.row,

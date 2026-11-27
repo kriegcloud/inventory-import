@@ -230,8 +230,8 @@ Each is one line. Make the edit, run the command, read what it prints, and put t
 ### 1. Nothing is confirmed that was not on screen
 
 A confirm names the last change its sender's screen received, and is refused when the import has moved on
-(`AConfirmNamesEveryChange`). In `packages/catalog/model/src/Import/Import.aggregate.ts`, in the `decide` of
-`ConfirmImport`, delete this line:
+(`AConfirmNamesEveryChange`). In `packages/catalog/model/src/Import/commands/ConfirmImport.command.ts`, in its
+`decide`, delete this line:
 
 ```ts
 if (cmd.seen !== s.changes) return yield* ReviewMovedOn.make({ last: s.changes })

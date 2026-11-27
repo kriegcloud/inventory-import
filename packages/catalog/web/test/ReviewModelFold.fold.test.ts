@@ -28,7 +28,11 @@ import {
 } from "@inventory/catalog-model/Deciding"
 import { DecideGroup } from "@inventory/catalog-model/DecidingGroup"
 import { Group, GroupDecided, GroupUndone, GroupState } from "@inventory/catalog-model/GroupAggregate"
-import { ActCounted, GroupCounted, Import, ImportStaged, ReviewMovedOn } from "@inventory/catalog-model/ImportAggregate"
+import * as ActCounted from "@inventory/catalog-model/ActCounted"
+import * as GroupCounted from "@inventory/catalog-model/GroupCounted"
+import { Import } from "@inventory/catalog-model/ImportAggregate"
+import { ReviewMovedOn } from "@inventory/catalog-model/ImportRejection"
+import * as ImportStaged from "@inventory/catalog-model/ImportStaged"
 import { Catalog } from "@inventory/catalog-model/Model"
 import { firstDecisions, itemsOfRow, noHistory, recheckRow, review, ruleFixes } from "@inventory/catalog-model/Review"
 import {
@@ -498,7 +502,7 @@ const modelSide = (input: { readonly rows: number; readonly rowIds: ReadonlyArra
   const steps: Array<Step> = [
     Story.given(
       life,
-      ImportStaged.make({
+      ImportStaged.Event.make({
         organizationId: input.first.organizationId,
         rows: input.rows,
         columns: "by heading",
@@ -771,10 +775,10 @@ const modelSide = (input: { readonly rows: number; readonly rowIds: ReadonlyArra
       ),
       Story.then(
         life,
-        ActCounted.make({
+        ActCounted.Event.make({
           change,
           step,
-          row,
+          row: RowId.make(row),
           label: "act",
           holds: change,
           by: actor.memberId,
@@ -893,10 +897,10 @@ const modelSide = (input: { readonly rows: number; readonly rowIds: ReadonlyArra
       Story.then(Row.ref(`${importId}/${row}`), StepUndone.make({ next, below, undo, step, by: actor.memberId })),
       Story.then(
         life,
-        ActCounted.make({
+        ActCounted.Event.make({
           change: changes,
           step,
-          row,
+          row: RowId.make(row),
           label: "undo",
           holds: level.change,
           by: level.by,
@@ -958,7 +962,7 @@ const modelSide = (input: { readonly rows: number; readonly rowIds: ReadonlyArra
       ),
       Story.then(
         life,
-        GroupCounted.make({ change, step, rows: count, label: "group", by: actor.memberId, top: change })
+        GroupCounted.Event.make({ change, step, rows: count, label: "group", by: actor.memberId, top: change })
       )
     )
     groups = A.append(groups, { step, change, by: actor.memberId, under: topGroup, undoneAt: 0, count, parts })
@@ -1011,7 +1015,7 @@ const modelSide = (input: { readonly rows: number; readonly rowIds: ReadonlyArra
             Story.then(Group.ref(`${importId}/${step}`), GroupUndone.make({ change })),
             Story.then(
               life,
-              GroupCounted.make({
+              GroupCounted.Event.make({
                 change,
                 step,
                 rows: group.count,

@@ -12,18 +12,18 @@ import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 import { CurrentActor } from "../Actor/Actor.context.ts"
 import { Session } from "../Actor/Session.middleware.ts"
+import * as ActCounted from "../Import/events/ActCounted.event.ts"
+import { ImportEvent } from "../Import/events/ImportEvent.union.ts"
+import { Import } from "../Import/Import.aggregate.ts"
 import {
-  ActCounted,
   ConfirmedSince,
-  Import,
-  ImportState,
-  MatchedSince,
-  NotOpen,
   ImportNotFound,
+  MatchedSince,
   NoImportThere,
-  NotPermitted,
-  ImportEvent
-} from "../Import/Import.aggregate.ts"
+  NotOpen,
+  NotPermitted
+} from "../Import/Import.rejection.ts"
+import * as ImportState from "../Import/Import.state.ts"
 import {
   CUT,
   letGo,
@@ -89,7 +89,7 @@ export class UndoRowStep extends Domain.Command(
       // A history is sealed only while it is at most `MOST_BELOW` long, so no true `below` is longer.
       below: S.String.check(S.isMaxLength(MOST_BELOW))
     },
-    events: [StepUndone, ActCounted],
+    events: [StepUndone, ActCounted.Event],
     rejects: [
       NotPermitted,
       ImportNotFound,
@@ -186,7 +186,7 @@ export class Undoing extends Domain.Decision(
           StepUndone.make({ next, below: kept ? cmd.below : "", undo: cmd.undo, step: cmd.step, by: actor.memberId })
         ),
         life.record(
-          ActCounted.make({
+          ActCounted.Event.make({
             change: life.state.changes + 1,
             step: cmd.step,
             row: cmd.row,

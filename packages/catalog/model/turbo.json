@@ -14,7 +14,8 @@
     },
     // The proofs of the review's model. A proof reads the model's own blocks (the aggregates, the decisions, who is
     // asking, the middleware that provides it, and the schemas they share), named by their endings: every file ending
-    // `.context.ts`, `.middleware.ts` or `.schema.ts` is read. `bun run beep laws model-inputs` walks the relative
+    // `.context.ts`, `.middleware.ts` or `.schema.ts` is read, and every file a block is split into (`.command.ts`,
+    // `.event.ts`, `.state.ts`, `.transition.ts`, `.union.ts`, `.rejection.ts`). `bun run beep laws model-inputs` walks the relative
     // imports of every aggregate and decision, and of every code file of the package these inputs read (the proofs,
     // `test/proving.ts`, `vitest.config.ts`), and fails on a file no input here reads. A proof also reads the kernel
     // those blocks import from, how the code is compiled, and the pinned library; turbo adds the versions the lockfile
@@ -24,7 +25,7 @@
     // replayed until one of them changes, or the limits and retries its vitest config takes from the root: an edit to
     // a handler, a store or a rule (`.rules.ts`) of this package does not run the proofs again. That holds because no
     // file with one of those endings imports a rule: a handler's own default is a `.reference.ts`
-    // (`Review/ItemsOfRow.reference.ts`), never a `.context.ts` (Benjamin, 2026-11-26).
+    // (`Review/ItemsOfRow.reference.ts`), never a `.context.ts` (Benjamin, 2026-11-26, and again on 2026-11-27).
     "prove": {
       "dependsOn": ["//#patches:installed", "@inventory/kernel#transit"],
       "inputs": [
@@ -34,6 +35,7 @@
         "vitest.config.ts",
         "src/**/*.aggregate.ts",
         "src/**/*.decision.ts",
+        "src/**/*.{command,event,state,transition,union,rejection}.ts",
         "src/**/*.context.ts",
         "src/**/*.middleware.ts",
         "src/**/*.schema.ts",
@@ -69,6 +71,7 @@
         "vitest.config.ts",
         "src/**/*.aggregate.ts",
         "src/**/*.decision.ts",
+        "src/**/*.{command,event,state,transition,union,rejection}.ts",
         "src/**/*.model.ts",
         "src/**/*.{view,query,projection,stream,policy,saga,external,api,middleware,context,rewrite,compaction,schema}.ts",
         "src/Actor/**",
@@ -105,6 +108,7 @@
         "vitest.config.ts",
         "src/**/*.aggregate.ts",
         "src/**/*.decision.ts",
+        "src/**/*.{command,event,state,transition,union,rejection}.ts",
         "src/**/*.{view,query,projection,stream,policy,saga,external,api,middleware,context,rewrite,compaction,schema}.ts",
         "src/Actor/**",
         "src/Review/Change.schema.ts",
@@ -140,6 +144,7 @@
         "vitest.config.ts",
         "src/**/*.aggregate.ts",
         "src/**/*.decision.ts",
+        "src/**/*.{command,event,state,transition,union,rejection}.ts",
         "src/**/*.{view,query,projection,stream,policy,saga,external,api,middleware,context,rewrite,compaction,schema}.ts",
         "src/Actor/**",
         "src/Review/Change.schema.ts",

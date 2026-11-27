@@ -57,8 +57,8 @@ Scope, not time. In:
   `.toolkit.ts`, `.mcp.ts`), and the model's mutants that name a moved line written again (60 name
   `Import.aggregate.ts`).
 - The four files that had no ending and the three endings used once, as he answered (decisions 6 and 7): `Host.ts`
-  in both hosts, `Auth.config.ts` for access's `Config.ts`, `Adapters.ts` folded into `Host.ts`; `.state.ts` and
-  `.route.ts` kinds, `ItemsOfRow.reference.ts` renamed `ItemsOfRow.context.ts`.
+  in both hosts, `Auth.config.ts` for access's `Config.ts`, `Adapters.ts` folded into the host file; `.state.ts`,
+  `.route.ts` and `.reference.ts` kinds (decision 7 as corrected: `ItemsOfRow.reference.ts` keeps its name).
 - A model's merged Live in `<Model>.model.ts` (decision 13).
 
 Out:

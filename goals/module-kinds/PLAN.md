@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: "Module kinds, plan"
-description: "The steps of the module kinds goal in the order the brief's Map gives, each with what it is built on, what gates it and its status; steps 8 and 9 wait on Benjamin's word about the order with alchemy-domain-uptake."
+description: "The steps of the module kinds goal in the order the brief's Map gives, each with what it is built on, what gates it and its status, and the choices made in each step built."
 from: explorations/module-taxonomy
 ---
 
@@ -10,7 +10,7 @@ from: explorations/module-taxonomy
 [SPEC](SPEC.md) holds the objective and acceptance. A step is one part of
 [the brief's](../../explorations/module-taxonomy/BRIEF.md) Map. Status is one of `todo`, `doing`, `done`, `closed`
 (tried, did not hold up, with the reason). The packet was written on 2026-11-27; steps 1 to 3 were built the same
-day, and steps 5 and 6 after them.
+day, and steps 5, 6, 7 and 8 after them.
 
 | # | Step | Built on | Needs first | Status |
 | --- | --- | --- | --- | --- |
@@ -20,16 +20,15 @@ day, and steps 5 and 6 after them.
 | 4 | `boundaries` asks the registry the kind of each import | `Boundaries.rules.ts`; `scratchpad/experiments/kind-registry/KindRegistry.test.ts` | steps 1 to 3 merged | todo |
 | 5 | `.event.ts`, `.state.ts`, `.transition.ts` and `.union.ts` as kinds; decision 2's three checks; decision 8's count | `Kinds.registry.ts`, `BlockFiles.rules.ts` | step 2 | done |
 | 6 | The kinds of decisions 6, 7 and 9 to 11 in the registry (`.config.ts`, `.route.ts`, `.sealed.ts`, `.host.ts`, `.cron.ts`, `.singleton.ts`, a surface's four); `.handler.ts` and `.live.ts` retired; a model's merged Live in `<Model>.model.ts` | `Kinds.registry.ts`; the brief's placement table | step 2; before `alchemy-domain-uptake` builds the first of them | done |
-| 7 | `Host.ts` to `<Model>.host.ts` in both hosts, `Config.ts` to `Auth.config.ts`, `Adapters.ts` into the host file, `ItemsOfRow.reference.ts` to `.context.ts` | `packages/access/host/src`, `packages/catalog/model/src/Review` | step 6 | todo |
-| 8 | Every block of `Import` in a file of its kind, read as a namespace; the 60 mutants written again | `Import.aggregate.ts`; `scratchpad/experiments/catalog-model/model/Import` | step 5; **Benjamin's**: the order with `alchemy-domain-uptake` | todo |
+| 7 | `Host.ts` to `<Model>.host.ts` in both hosts, `Config.ts` to `Auth.config.ts`, `Adapters.ts` into the host file; `.reference.ts` kept as a kind | `packages/access/host/src`, `packages/catalog/host/src` | step 6 | done |
+| 8 | Every block of `Import` in a file of its kind, read as a namespace; the 60 mutants written again | `Import.aggregate.ts`; `scratchpad/experiments/catalog-model/model/Import` | step 5; his word on the order, given 2026-11-27 | done |
 | 9 | The same for `Row`, `Group` and the four decisions | `Row.aggregate.ts`, `Group.aggregate.ts`, `Review/*.decision.ts`; `catalog-model/model` | step 8 | todo |
 
 ## First slice
 
 Steps 1 to 3, one pull request. It changes no code a proof reads, and `bun run check` holds it. Sixteen of the two
 contexts' 173 files are refused by the experiment's registry today: the nine ports, the four with no ending and the
-three endings used once. Step 3 clears nine; steps 6 and 7 clear the rest, so until step 7 the registry lists the
-seven by name as known exceptions.
+three endings used once. Step 3 cleared nine and steps 6 and 7 the rest.
 
 ## Choices made in the first slice
 
@@ -76,11 +75,37 @@ seven by name as known exceptions.
   `Import/commands/` of seven and `Import/events/` of nine.
 - **Tests are not read**, as before: a test that picks `Event` by name is not refused.
 
+## Choices made in step 7
+
+- **`ItemsOfRow.reference.ts` keeps its name**, his call on 2026-11-27 against the rename decision 7 first gave:
+  the model's proofs read every `.context.ts`, and the file imports a rule. The registry has a `reference` row,
+  fifty-one kinds in all.
+- **The registry names no file by its path any more.** The list of files that waited is gone with its last line.
+- **Access's `./Adapters` export key is dropped.** Nothing imported it, and its file is now part of
+  `Access.host.ts`, which `./Host` names. Decision 5 leaves keys as they are; this one had nothing left to name.
+- **`./Host` and `./Config` keep their keys** and name the renamed files.
+
+## Choices made in step 8
+
+- **`Import` is the experiment's module, with what main gained since put back in.** The package had moved after the
+  experiment's copy: `NotPermitted` names the role it needs, `ImportNotFound` answers another organization's id, and
+  each `decide` asks the role, then the organization, then the state. Each is in the new files as main has it.
+- **Six field types are the experiment's, not the old file's**: `ActCounted`'s `row` is `RowKey` and its `label` is
+  `Label`; an open import's `changes`, `confirmedAt`, `lastGroup` and `topGroup` are `Change`. Each already held of
+  every value the commands let in. `Label` moved to `Review/Change.schema.ts` so an event can read it.
+- **The four decisions keep their one file each** and read the import through its new files; step 9 splits them.
+- **Four export entries are new**, for the one file of another package that builds these values
+  (`catalog/web`'s `ReviewModelFold.fold.test.ts`): `./ImportRejection`, `./ActCounted`, `./GroupCounted`,
+  `./ImportStaged`. No key changed.
+- **82 mutants name a command's file now**, not 60: the role and not-found change had added 22. Thirty of the
+  decisions' mutants changed too, where their text builds `ActCounted` or `GroupCounted`.
+- **The proofs' and Verify's inputs** in `packages/catalog/model/turbo.json` read the six new endings.
+
 ## Benjamin's
 
-- **Before step 8: which goal moves `packages/catalog/model` first.** `alchemy-domain-uptake` is open on that
-  package (its move 3 writes the import's commands). Moving the files first means its briefs are written against
-  the new homes; moving them after means every block it adds is moved once more. Steps 1 to 7 do not wait on this.
+Nothing is waiting on him. On 2026-11-27 he answered the order for steps 8 and 9: "module-kinds first". The catalog
+model's blocks move now; `alchemy-domain-uptake` writes its later briefs against the new homes, and a branch of it
+open on those files is rebased over the move.
 
 ## What the experiment left unchecked
 

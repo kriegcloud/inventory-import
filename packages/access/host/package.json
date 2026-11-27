@@ -8,10 +8,9 @@
   "sideEffects": [],
   "exports": {
     "./package.json": "./package.json",
-    "./Host": "./src/Host.ts",
-    "./Adapters": "./src/Adapters.ts",
+    "./Host": "./src/Access.host.ts",
     "./Http": "./src/Access.http.ts",
-    "./Config": "./src/Config.ts",
+    "./Config": "./src/Auth.config.ts",
     "./SignIn": "./src/SignIn.route.ts",
     "./SessionIdentity": "./src/SessionIdentity.adapter.ts",
     "./SessionLookup": "./src/SessionLookup.adapter.ts",

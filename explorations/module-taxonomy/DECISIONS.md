@@ -66,6 +66,11 @@ each. Nothing in a package was renamed for them here; the uptake does that.
   Rejected: "All three are kinds" (two kinds for values read from context) and "Only state is a kind" (the route
   folded into `Access.http.ts`, which grows by about 100 lines).
 - Reverse: rename `ItemsOfRow.context.ts` back and add `.reference` to the registry; fold or rename the route.
+- Corrected the same day, by him, when the goal reached the rename: `.reference.ts` is a kind too, and
+  `ItemsOfRow.reference.ts` keeps its name ("Keep `.reference.ts`, as a kind"). On 2026-11-26 he had ruled it "never
+  a `.context.ts`": the catalog model's proofs read every `.context.ts`, and this file imports `Review.rules.ts`, so
+  the rename would have made every edit to a rule run the proofs again. The agent's recommendation above was made
+  without that ruling in view. All three endings are kinds; no file is renamed for decision 7.
 
 **13. The Layer that merges every Live of a model.**
 

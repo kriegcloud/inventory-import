@@ -11,9 +11,8 @@ import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Actor } from "../src/Actor/Actor.context.ts"
 import { GroupState } from "../src/Group/Group.aggregate.ts"
-import { ImportState } from "../src/Import/Import.aggregate.ts"
-import { Change, Columns, Flags, Patch, Rows, Step } from "../src/Review/Change.schema.ts"
-import { Label } from "../src/Review/Deciding.decision.ts"
+import * as ImportState from "../src/Import/Import.state.ts"
+import { Change, Columns, Flags, Label, Patch, Rows, Step } from "../src/Review/Change.schema.ts"
 import { Level, RowState } from "../src/Row/Row.aggregate.ts"
 
 describe("generates only valid values", () => {
@@ -50,8 +49,8 @@ describe("generates only valid values", () => {
   it.prop("GroupState", [Arbitrary.schema(GroupState)], ([value]) => {
     expect(S.is(GroupState)(value)).toBe(true)
   })
-  it.prop("ImportState", [Arbitrary.schema(ImportState)], ([value]) => {
-    expect(S.is(ImportState)(value)).toBe(true)
+  it.prop("ImportState", [Arbitrary.schema(ImportState.State)], ([value]) => {
+    expect(S.is(ImportState.State)(value)).toBe(true)
   })
 })
 

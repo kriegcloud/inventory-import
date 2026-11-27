@@ -14,18 +14,18 @@ import * as S from "effect/Schema"
 import { CurrentActor } from "../Actor/Actor.context.ts"
 import { Session } from "../Actor/Session.middleware.ts"
 import { Group, GroupUndone, GroupState } from "../Group/Group.aggregate.ts"
+import * as GroupCounted from "../Import/events/GroupCounted.event.ts"
+import { ImportEvent } from "../Import/events/ImportEvent.union.ts"
+import { Import } from "../Import/Import.aggregate.ts"
 import {
   ConfirmedSince,
-  GroupCounted,
-  Import,
-  ImportState,
-  NotOpen,
   ImportNotFound,
   NoImportThere,
+  NotOpen,
   NotPermitted,
-  ReviewMovedOn,
-  ImportEvent
-} from "../Import/Import.aggregate.ts"
+  ReviewMovedOn
+} from "../Import/Import.rejection.ts"
+import * as ImportState from "../Import/Import.state.ts"
 import { Change, ImportKey, Step } from "./Change.schema.ts"
 import { GroupedAfter } from "./Deciding.decision.ts"
 import { DecidedBeforeTheConfirm, NotYourStep } from "./Undoing.decision.ts"
@@ -40,7 +40,7 @@ export class UndoGroup extends Domain.Command(
   {
     middleware: [Session],
     input: { importId: ImportKey, step: Step, undo: Change, opening: S.Int, seen: Change },
-    events: [GroupUndone, GroupCounted],
+    events: [GroupUndone, GroupCounted.Event],
     rejects: [
       NotPermitted,
       ImportNotFound,
@@ -91,7 +91,7 @@ export class UndoingGroup extends Domain.Decision(
       return [
         group.record(GroupUndone.make({ change })),
         life.record(
-          GroupCounted.make({
+          GroupCounted.Event.make({
             change,
             step: cmd.step,
             rows: group.state.count,

@@ -74,10 +74,10 @@ Steps 2 and 3 rest on no exploration; it rests on the product rule in `CLAUDE.md
       recorded.
 - [ ] `wc -l CLAUDE.md` is at most the length Benjamin chose in step 4, `bun run docs:check` passes, and every rule
       that left the file is found word for word under `docs/` (a check in the step's pull request lists them).
-- [ ] Breaking one law in a scratch commit (`??` in a model file), then running `bun run check`, ends with a summary
+- [x] Breaking one law in a scratch commit (`??` in a model file), then running `bun run check`, ends with a summary
       that names `defaults`, the file and line, and what to write. A test of the summary command feeds it two laws'
       failures.
-- [ ] `bun run check:changed` on a one-file change in one package finishes in the time PLAN records as the target, and
+- [x] `bun run check:changed` on a one-file change in one package finishes in the time PLAN records as the target, and
       fails on the same scratch commit as above.
 - [ ] `gh api repos/kriegcloud/inventory-import --jq .allow_auto_merge` prints `true`, if Benjamin turns it on, and
       a pull request merged that way is named in PLAN.

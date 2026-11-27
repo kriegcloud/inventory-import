@@ -24,6 +24,18 @@ review loop closed.
 
 ## Answered
 
+### 2026-11-27: graduation
+
+- Question: with every decision answered and pull request 57 open, what next?
+- Answer: "Graduate to an uptake goal". The brief stands as the design of the goal
+  [module-kinds](../../goals/module-kinds/SPEC.md).
+- Rationale: the brief has its five parts, no open question blocks the first slice, and the Map names the goal and
+  its slice. Deferred, with the reason: the three module groups the brief marks "to name" (named by whoever builds
+  their blocks) and the order with `alchemy-domain-uptake` on `packages/catalog/model` (asked before the goal's
+  step 8, which is the first to need it). Rejected: watching the pull request, taking the review's three notes, and
+  stopping.
+- Reverse: set the goal's status to `dropped` and this packet back to `active`, stage `shape`.
+
 ### 2026-11-27: decisions 6, 7 and 13, the files with no ending, the endings used once and the merged Live
 
 Asked together once the experiment's review loop closed with no required finding. He chose the recommended option in

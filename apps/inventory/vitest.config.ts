@@ -36,7 +36,12 @@ export default defineConfig({
       // The slow tests' own limits: sign-in hashes passwords, a busy machine slows workerd down, and a save of
       // 50,000 rows took 34 s on two cores (../../vitest.shared.ts).
       { extends: true, test: { name: "slow", include: slow, ...slowLimits } },
-      { extends: true, test: { name: "live", include: live, ...slowLimits } }
+      // The slow limits, with a module cache of its own: turbo starts `test:slow` and `test:live` side by side, and
+      // each would empty the other's folder (../../vitest.shared.ts says why).
+      {
+        extends: true,
+        test: { name: "live", include: live, ...slowLimits, fsModuleCachePath: "node_modules/.vitest-cache/live" }
+      }
     ]
   }
 })

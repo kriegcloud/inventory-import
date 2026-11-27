@@ -145,6 +145,43 @@ describe("laws model-inputs", () => {
     })
   )
 
+  // Before, a task with no inputs passed whatever its walks reached. Turbo then reads the package's own files and no
+  // other: a story's helper outside the package, or a file of a workspace it depends on reached by a path, can change
+  // and replay an old pass. Its dependency's files come into the hash only through a task it depends on, never
+  // because the package declares it.
+  it.effect("reads a task with no inputs as the package's own files, and refuses what its walks reach outside", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        {
+          "packages/shop/package.json": json({
+            name: "@x/shop",
+            beep: { layer: "model" },
+            dependencies: { "@x/lib": "workspace:*" }
+          }),
+          "packages/shop/turbo.json": json({ tasks: { verify: { outputs: [] }, mutants: {} } }),
+          "packages/shop/src/Shop.model.ts": 'import { a } from "./A.ts"\nimport { b } from "../../lib/src/B.ts"\n',
+          "packages/shop/src/A.ts": "export const a = 1\n",
+          "packages/shop/test/Shop.test.ts": 'import { t } from "../../helpers/T.ts"\n',
+          "packages/shop/test/Pay.story.test.ts": 'import { s } from "../../helpers/Story.ts"\n',
+          "packages/shop/mutants/mutants.json": json({ stories: ["test/Pay.story.test.ts"], sample: [], mutants: [] }),
+          "packages/lib/package.json": json({ name: "@x/lib" }),
+          "packages/lib/src/B.ts": "export const b = 1\n",
+          "packages/helpers/T.ts": "export const t = 1\n",
+          "packages/helpers/Story.ts": "export const s = 1\n"
+        },
+        Effect.map(modelInputs(), render(modelInputsSentence))
+      )
+      expect(printed(report).slice(1)).toEqual([
+        'err:   packages/lib/src/B.ts, which packages/shop/src/Shop.model.ts imports, is outside packages/shop, and verify in packages/shop/turbo.json names no inputs, so it reads only the package\'s own files: write its inputs as "$TURBO_DEFAULT$" and "$TURBO_ROOT$/packages/lib/src/B.ts"',
+        'err:   packages/helpers/Story.ts, which packages/shop/test/Pay.story.test.ts imports, is outside packages/shop, and verify in packages/shop/turbo.json names no inputs, so it reads only the package\'s own files: write its inputs as "$TURBO_DEFAULT$" and "$TURBO_ROOT$/packages/helpers/Story.ts"',
+        'err:   packages/helpers/T.ts, which packages/shop/test/Shop.test.ts imports, is outside packages/shop, and verify in packages/shop/turbo.json names no inputs, so it reads only the package\'s own files: write its inputs as "$TURBO_DEFAULT$" and "$TURBO_ROOT$/packages/helpers/T.ts"',
+        'err:   packages/lib/src/B.ts, which packages/shop/src/Shop.model.ts imports, is outside packages/shop, and mutants in packages/shop/turbo.json names no inputs, so it reads only the package\'s own files: write its inputs as "$TURBO_DEFAULT$" and "$TURBO_ROOT$/packages/lib/src/B.ts"',
+        'err:   packages/helpers/Story.ts, which packages/shop/test/Pay.story.test.ts imports, is outside packages/shop, and mutants in packages/shop/turbo.json names no inputs, so it reads only the package\'s own files: write its inputs as "$TURBO_DEFAULT$" and "$TURBO_ROOT$/packages/helpers/Story.ts"',
+        'err:   packages/helpers/T.ts, which packages/shop/test/Shop.test.ts imports, is outside packages/shop, and mutants in packages/shop/turbo.json names no inputs, so it reads only the package\'s own files: write its inputs as "$TURBO_DEFAULT$" and "$TURBO_ROOT$/packages/helpers/T.ts"'
+      ])
+    })
+  )
+
   it.effect("walks from every code file a task's inputs read: a proof, a helper, a mutant", () =>
     Effect.gen(function* () {
       const report = yield* inTree(

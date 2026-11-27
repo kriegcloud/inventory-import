@@ -21,9 +21,13 @@
  * under `$TURBO_ROOT$/` relative to the root, `$TURBO_DEFAULT$` as every file inside the package (none reached through
  * `../`), a `!` glob as one taken out; `**`, `*`, `?` and `{a,b}`. Turbo's `$TURBO_DEFAULT$` leaves out what git
  * ignores; this does not tell a git-ignored file inside the package apart, and takes it as read. A task with no
- * `inputs` reads every file, and passes. A relative import is found as the bundler finds it: its `?query` or `#hash`
- * cut off (`./a.csv?raw` names `./a.csv`), then as written, a `.js`, `.jsx`, `.mjs` or `.cjs` written for its `.ts`,
- * `.tsx`, `.mts` or `.cts`, with `.ts` or `.tsx` added, or a folder's `index.ts`. What it does not follow: an import of
+ * `inputs` reads what turbo reads then, `$TURBO_DEFAULT$`: its walks start from every code file of the package, and a
+ * file one reaches outside the package is refused, naming the inputs to write. A workspace the package declares does
+ * not bring its files: turbo folds another package's files into a task's hash only through a task it depends on
+ * (`transit`), and this does not read `dependsOn`, so such a file is named under `$TURBO_ROOT$/` too. A relative
+ * import is found as the bundler finds it: its `?query` or `#hash` cut off (`./a.csv?raw` names `./a.csv`), then as
+ * written, a `.js`, `.jsx`, `.mjs` or `.cjs` written for its `.ts`, `.tsx`, `.mts` or `.cts`, with `.ts` or `.tsx`
+ * added, or a folder's `index.ts`. What it does not follow: an import of
  * a package by its name (the kernel, the contract: their folders are listed whole, by hand), and an import whose path
  * is built at run time (a template with nothing put into it, `import(\`./x.ts\`)`, is followed). Type-only imports
  * are followed, the type `import("./x.ts")` included: what a block's types read is what its proofs read.
@@ -33,6 +37,7 @@
 import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import { identity } from "effect/Function"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
 import * as S from "effect/Schema"
@@ -84,6 +89,15 @@ export const ModelInputsFinding = S.TaggedUnion({
     turbo: S.String.pipe(S.annotateKey({ description: "The turbo.json that declares the task" })),
     glob: S.String.pipe(S.annotateKey({ description: "The input to add, by the file's ending" }))
   },
+  Outside: {
+    task: S.String.pipe(S.annotateKey({ description: "The task that names no inputs, so reads its package's files" })),
+    file: S.String.pipe(S.annotateKey({ description: "The file reached outside the package, from the root" })),
+    from: S.String.pipe(S.annotateKey({ description: "The file the walk that reaches it started from" })),
+    by: ReachedBy.pipe(S.annotateKey({ description: "Whether that file imports it or names it" })),
+    turbo: S.String.pipe(S.annotateKey({ description: "The turbo.json that declares the task" })),
+    dir: S.String.pipe(S.annotateKey({ description: "The package's folder, from the root" })),
+    glob: S.String.pipe(S.annotateKey({ description: "The input to write beside $TURBO_DEFAULT$" }))
+  },
   TakenOut: {
     task: S.String.pipe(S.annotateKey({ description: "The task whose inputs take the file out" })),
     file: S.String.pipe(S.annotateKey({ description: "The file reached, from the root" })),
@@ -114,6 +128,9 @@ export const ModelInputsFinding = S.TaggedUnion({
  */
 export type ModelInputsFinding = typeof ModelInputsFinding.Type
 
+/** Every file inside the package, as turbo reads it: what a task with no `inputs` reads. */
+const turboDefault = "$TURBO_DEFAULT$"
+
 /** A count and its noun, one or many. */
 const plural = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`
 
@@ -134,6 +151,10 @@ export const modelInputsSentence: (finding: ModelInputsFinding) => Line = ModelI
   Unmatched: ({ task, file, from, by, turbo, glob }) =>
     err(
       `  ${file}${file === from ? "" : `, which ${from} ${by},`} is in no input of ${task} in ${turbo}: add "${glob}" to its inputs`
+    ),
+  Outside: ({ task, file, from, by, turbo, dir, glob }) =>
+    err(
+      `  ${file}${file === from ? "" : `, which ${from} ${by},`} is outside ${dir}, and ${task} in ${turbo} names no inputs, so it reads only the package's own files: write its inputs as "${turboDefault}" and "${glob}"`
     ),
   TakenOut: ({ task, file, from, by, turbo, glob }) =>
     err(
@@ -223,7 +244,7 @@ interface Reading {
  */
 const readingOf = (inputs: ReadonlyArray<string>, fromPackage: string, fromRoot: string): Reading => {
   const fits = (glob: string): boolean =>
-    glob === "$TURBO_DEFAULT$"
+    glob === turboDefault
       ? !Str.startsWith("../")(fromPackage)
       : Str.startsWith("$TURBO_ROOT$/")(glob)
         ? globFits(Str.slice("$TURBO_ROOT$/".length)(glob))(fromRoot)
@@ -455,17 +476,17 @@ export const modelInputs = Effect.fn("ModelInputs.modelInputs")(function* () {
       const code = A.sort(ownFiles, Order.String)
       const readingFor = (globs: ReadonlyArray<string>, file: string): Reading =>
         readingOf(globs, repo.relative(file, workspace.dir), repo.relative(file, repo.root))
-      // Each task's starts: the blocks of its side first, then every code file of the package its inputs read.
+      // Each task's starts: the blocks of its side first, then every code file of the package its inputs read. A task
+      // with no inputs reads what turbo reads then: every file of its package.
       const planned = A.map(held, ({ task, side, runsMutants: mutantsTask, declared }) => {
         const globs = O.flatMap(declared, (one) => one.inputs)
-        const own = O.match(globs, {
-          onNone: () => A.empty<string>(),
-          onSome: (inputs) => A.filter(code, (file) => reads(readingFor(inputs, file)))
-        })
+        const inputs = O.match(globs, { onNone: () => A.of(turboDefault), onSome: identity })
+        const own = A.filter(code, (file) => reads(readingFor(inputs, file)))
         const extra = mutantsTask ? mutantsStarts : A.empty<string>()
         return {
           task,
-          globs,
+          inputs,
+          written: O.isSome(globs),
           mutantsTask,
           starts: A.dedupe([...A.filter(everything, startsOf[side]), ...own, ...extra])
         }
@@ -496,32 +517,34 @@ export const modelInputs = Effect.fn("ModelInputs.modelInputs")(function* () {
         )
         return A.dedupeWith(files, (a, b) => a.file === b.file)
       }
-      const unmatched = A.flatMap(planned, ({ task, globs, starts, mutantsTask }) =>
-        O.match(globs, {
-          // A task with no inputs reads every file of its package.
-          onNone: () => A.empty<ModelInputsFinding>(),
-          onSome: (inputs) =>
-            A.flatMap(reachedFrom(starts, mutantsTask), ({ file, from, by }) => {
-              const reading = readingFor(inputs, file)
-              const fromPackage = repo.relative(file, workspace.dir)
-              const fromRoot = repo.relative(file, repo.root)
-              const where = {
-                task,
-                file: fromRoot,
-                from: repo.relative(from, repo.root),
-                by,
-                turbo: repo.relative(turboFile, repo.root)
-              }
-              return O.match(reading.takenBy, {
-                onSome: (glob) => A.of<ModelInputsFinding>(ModelInputsFinding.cases.TakenOut.make({ ...where, glob })),
-                onNone: () =>
-                  reading.kept
-                    ? A.empty<ModelInputsFinding>()
-                    : A.of<ModelInputsFinding>(
-                        ModelInputsFinding.cases.Unmatched.make({ ...where, glob: globFor(fromPackage, fromRoot) })
-                      )
-              })
-            })
+      const unmatched = A.flatMap(planned, ({ task, inputs, written, starts, mutantsTask }) =>
+        A.flatMap(reachedFrom(starts, mutantsTask), ({ file, from, by }) => {
+          const reading = readingFor(inputs, file)
+          const fromPackage = repo.relative(file, workspace.dir)
+          const fromRoot = repo.relative(file, repo.root)
+          const where = {
+            task,
+            file: fromRoot,
+            from: repo.relative(from, repo.root),
+            by,
+            turbo: repo.relative(turboFile, repo.root)
+          }
+          const toAdd = globFor(fromPackage, fromRoot)
+          return O.match(reading.takenBy, {
+            onSome: (glob) => A.of<ModelInputsFinding>(ModelInputsFinding.cases.TakenOut.make({ ...where, glob })),
+            onNone: () =>
+              reading.kept
+                ? A.empty<ModelInputsFinding>()
+                : A.of<ModelInputsFinding>(
+                    written
+                      ? ModelInputsFinding.cases.Unmatched.make({ ...where, glob: toAdd })
+                      : ModelInputsFinding.cases.Outside.make({
+                          ...where,
+                          dir: repo.relative(workspace.dir, repo.root),
+                          glob: toAdd
+                        })
+                  )
+          })
         })
       )
       return {

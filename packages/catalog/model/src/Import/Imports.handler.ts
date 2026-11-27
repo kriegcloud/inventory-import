@@ -31,7 +31,7 @@ import { ActivityId } from "@inventory/kernel/Ids"
 import { ConfirmId as ConfirmIdSchema, ItemId } from "@inventory/catalog-contract/Ids"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as DateTime from "effect/DateTime"
-import { ItemsOfRow } from "../Review/ItemsOfRow.context.ts"
+import { ItemsOfRow } from "../Review/ItemsOfRow.reference.ts"
 import { Member } from "@inventory/kernel/Member"
 import {
   StagedTable,

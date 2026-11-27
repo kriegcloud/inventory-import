@@ -8,9 +8,11 @@
 // Every maker the library's index exports a block by is read (`Model`, `Aggregate`, `Decision`, `Command`, `Event`,
 // `Rejection`, `RequestContext`, `Relation` and the eleven the block-files law places); `Sealed` makes a field, not a
 // block, and is not. A pattern over the text would also take the words out of a comment, a string or a test's fixture
-// text, so the tree is read. What it cannot see: a maker passed through a variable of the file's own
-// (`const V = Domain.View`), or reached through a module that re-exports it; a type-only import makes nothing and is
-// not read. The walk keeps its own list, so no file nests it past the stack.
+// text, so the tree is read. It also says whether the file holds anything besides its blocks: a statement at its top
+// that is not an import, a declaration of types only, or one that declares a block. What it cannot see: a maker
+// passed through a variable of the file's own (`const V = Domain.View`), or reached through a module that re-exports
+// it; a type-only import makes nothing and is not read. The walk keeps its own list, so no file nests it past the
+// stack.
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
@@ -62,9 +64,18 @@ export interface BlockAt {
   readonly line: number
 }
 
-/** What reading one file gives: its blocks, or the parser's first complaint when it could not read the file. */
+/**
+ * What reading one file gives: its blocks, whether they are all it holds, or the parser's first complaint when it
+ * could not read the file.
+ */
 export interface BlocksRead {
   readonly found: ReadonlyArray<BlockAt>
+  /**
+   * Whether every statement at the file's top is an import, a declaration of types only (a type, an interface, a
+   * `declare namespace`), a list of names it exports, or one that declares a block: a file that holds nothing else
+   * may be renamed to its block's ending, and one with other code beside its blocks keeps its name.
+   */
+  readonly alone: boolean
   readonly unread: O.Option<string>
 }
 
@@ -245,6 +256,19 @@ const declaredName = (node: Node): O.Option<string> =>
     ? nameOf(node, "id")
     : O.none()
 
+/** Statements that bring names in or declare types only: they hold no code beside a file's blocks. */
+const typesOnly = ["ImportDeclaration", "TSTypeAliasDeclaration", "TSInterfaceDeclaration", "EmptyStatement"]
+
+/** Whether a statement at a file's top holds no code: an import, types only, or `export { names }`. */
+const holdsNoCode = (statement: Node): boolean =>
+  A.contains(typesOnly, statement.type) ||
+  (statement.type === "TSModuleDeclaration" && statement["declare"] === true) ||
+  (statement.type === "ExportNamedDeclaration" &&
+    O.match(child(statement, "declaration"), {
+      onNone: () => O.isNone(child(statement, "source")),
+      onSome: holdsNoCode
+    }))
+
 /**
  * Every block `source` declares, in the order written, or why it could not be read.
  *
@@ -254,13 +278,11 @@ export const readBlocks = (input: { readonly file: string; readonly source: stri
   const parsed = parseSync(input.file, input.source)
   const complaint = A.head(A.map(parsed.errors, (error) => error.message))
   if (O.isSome(complaint) || !isNode(parsed.program)) {
-    return { found: [], unread: O.orElse(complaint, () => O.some("it is not a module")) }
+    return { found: [], alone: false, unread: O.orElse(complaint, () => O.some("it is not a module")) }
   }
   const program = parsed.program
-  const declarations = A.filter(
-    A.filter(A.isArray(program["body"]) ? program["body"] : [], isNode),
-    (statement) => statement.type === "ImportDeclaration"
-  )
+  const body = A.filter(A.isArray(program["body"]) ? program["body"] : [], isNode)
+  const declarations = A.filter(body, (statement) => statement.type === "ImportDeclaration")
   const bound = A.map(declarations, bindingsOf)
   const bindings: Bindings = {
     namespaces: A.reduce(bound, R.empty<string, Readonly<Record<string, BlockKind>>>(), (all, one) => ({
@@ -271,6 +293,8 @@ export const readBlocks = (input: { readonly file: string; readonly source: stri
   }
   const line = linesOf(input.source)
   const found: Array<BlockAt> = []
+  // Where each block's call starts, to tell a statement that declares a block from one that holds other code.
+  const starts: Array<number> = []
   // Which class or constant has given its name to a block: the first block under it takes its name, and a block
   // written inside another (a view inside a model's `views`) takes the name it gives itself.
   const named: Array<number> = []
@@ -290,6 +314,7 @@ export const readBlocks = (input: { readonly file: string; readonly source: stri
     if (node.type === "CallExpression") {
       const kind = kindOfCall(node, bindings)
       if (O.isSome(kind)) {
+        starts.push(node.start)
         const first = O.isSome(here) && !A.contains(named, scope)
         if (first) named.push(scope)
         found.push({
@@ -301,5 +326,10 @@ export const readBlocks = (input: { readonly file: string; readonly source: stri
     }
     for (const next of A.reverse(children(node))) left.push({ node: next, name: here, scope })
   }
-  return { found, unread: O.none() }
+  const alone = A.every(
+    body,
+    (statement) =>
+      holdsNoCode(statement) || A.some(starts, (start) => start >= statement.start && start < statement.end)
+  )
+  return { found, alone, unread: O.none() }
 }

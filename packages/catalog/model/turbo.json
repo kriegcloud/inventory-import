@@ -13,19 +13,18 @@
       ]
     },
     // The proofs of the review's model. A proof reads the model's own blocks (the aggregates, the decisions, who is
-    // asking, the middleware that provides it, and the schemas they share), named by their endings: so every file
-    // ending `.context.ts`, `.middleware.ts` or `.schema.ts` is read, a handler's own (`Review/ItemsOfRow.context.ts`)
-    // as well as what a `decide` reaches. `bun run beep laws model-inputs` walks the relative imports of every
-    // aggregate and decision, and of every code file of the package these inputs read (the proofs, `test/proving.ts`,
-    // `vitest.config.ts`, a handler's `.context.ts`), and fails on a file no input here reads: so every `.rules.ts` is
-    // read too, since `Review/ItemsOfRow.context.ts` reaches the review's rules (`Review/Review.rules.ts` and the rule
-    // files it imports, `Words.rules.ts` among them). A proof also reads the kernel those blocks import from, how the
-    // code is compiled, and the pinned library; turbo adds the versions the lockfile resolves for this package (Effect,
-    // the solver, the parser). The vendored kit the kernel is built on comes with the kernel's `transit`, which folds
-    // the source of every package the kernel depends on into this task's hash: nothing else brings it, and without
-    // that edge an edit to `@beep/schema` would replay an old proof. It is replayed until one of them changes, or the
-    // limits and retries its vitest config takes from the root: an edit to a handler or a store of this package does
-    // not run the proofs again, unless its file has one of those endings; an edit to any rule (`.rules.ts`) does.
+    // asking, the middleware that provides it, and the schemas they share), named by their endings: every file ending
+    // `.context.ts`, `.middleware.ts` or `.schema.ts` is read. `bun run beep laws model-inputs` walks the relative
+    // imports of every aggregate and decision, and of every code file of the package these inputs read (the proofs,
+    // `test/proving.ts`, `vitest.config.ts`), and fails on a file no input here reads. A proof also reads the kernel
+    // those blocks import from, how the code is compiled, and the pinned library; turbo adds the versions the lockfile
+    // resolves for this package (Effect, the solver, the parser). The vendored kit the kernel is built on comes with
+    // the kernel's `transit`, which folds the source of every package the kernel depends on into this task's hash:
+    // nothing else brings it, and without that edge an edit to `@beep/schema` would replay an old proof. It is
+    // replayed until one of them changes, or the limits and retries its vitest config takes from the root: an edit to
+    // a handler, a store or a rule (`.rules.ts`) of this package does not run the proofs again. That holds because no
+    // file with one of those endings imports a rule: a handler's own default is a `.reference.ts`
+    // (`Review/ItemsOfRow.reference.ts`), never a `.context.ts` (Benjamin, 2026-11-26).
     "prove": {
       "dependsOn": ["//#patches:installed", "@inventory/kernel#transit"],
       "inputs": [
@@ -39,7 +38,6 @@
         "src/**/*.middleware.ts",
         "src/**/*.schema.ts",
         "src/Actor/**",
-        "src/**/*.rules.ts",
         "src/Review/Change.schema.ts",
         "test/**/*.prove.test.ts",
         "test/proving.ts",
@@ -54,12 +52,10 @@
     },
     // The search of the whole model: the same blocks and the model that joins them, every other block it can come to
     // import, named by its ending (views, queries, projections, streams, policies, sagas, external systems, Apis,
-    // middleware, request contexts, rewrites, compactions and the schemas they share: every file with one of those
-    // endings, a handler's `.context.ts` too), its own test, and the lock file that keeps the rules as written.
-    // `bun run beep laws model-inputs` walks the relative imports of the model and its Api, and of every code file of
-    // the package these inputs read (its own test, a handler's `.context.ts`), and fails on a file no input here
-    // reads, so this list cannot fall behind the model: every `.rules.ts` is read, as the proofs read it, since
-    // `Review/ItemsOfRow.context.ts` reaches the review's rules.
+    // middleware, request contexts, rewrites, compactions and the schemas they share), its own test, and the lock file
+    // that keeps the rules as written. `bun run beep laws model-inputs` walks the relative imports of the model and
+    // its Api, and of every code file of the package these inputs read (its own test), and fails on a file no input
+    // here reads, so this list cannot fall behind the model.
     "verify": {
       // Verify reads these two: under CI it writes no lock and refuses a rule the lock does not list, and with
       // UPDATE_VERIFY_LOCK=1 it locks every rule as written and passes. Both are in the hash, so a run under one is
@@ -76,7 +72,6 @@
         "src/**/*.model.ts",
         "src/**/*.{view,query,projection,stream,policy,saga,external,api,middleware,context,rewrite,compaction,schema}.ts",
         "src/Actor/**",
-        "src/**/*.rules.ts",
         "src/Review/Change.schema.ts",
         "test/**/*.verify.test.ts",
         "test/**/*.lock.json",
@@ -105,7 +100,6 @@
         "src/**/*.decision.ts",
         "src/**/*.{view,query,projection,stream,policy,saga,external,api,middleware,context,rewrite,compaction,schema}.ts",
         "src/Actor/**",
-        "src/**/*.rules.ts",
         "src/Review/Change.schema.ts",
         "test/proving.ts",
         "$TURBO_ROOT$/packages/kernel/package.json",
@@ -134,7 +128,6 @@
         "src/**/*.decision.ts",
         "src/**/*.{view,query,projection,stream,policy,saga,external,api,middleware,context,rewrite,compaction,schema}.ts",
         "src/Actor/**",
-        "src/**/*.rules.ts",
         "src/Review/Change.schema.ts",
         "test/proving.ts",
         "$TURBO_ROOT$/packages/kernel/package.json",

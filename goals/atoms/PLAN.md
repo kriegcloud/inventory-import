@@ -20,7 +20,7 @@ from: explorations/ideal-architecture
 | 6 | `@inventory/catalog-web`: the upload, the Items page and its editor, the assistant, the import's steps | done |
 | 7 | `@inventory/review`: the region's state with undo, saved progress, the grid, the queue; the A6 remodel | done |
 | 8 | TanStack Query removed (A2); the lint everywhere; the documents the move made false | done |
-| 9 | The kit, batch 2: the data grid ("The kit on atoms") | doing |
+| 9 | The kit, batch 2: the data grid ("The kit on atoms") | done |
 | 10 | The kit, batch 3: the frame and the form pieces | todo |
 | 11 | The kit, batch 4: the pieces no screen uses today | todo |
 
@@ -1048,7 +1048,7 @@ has left; two changes in one tick both landing in the table's own atoms. Each bu
 line of the code changed (the page kept on a sort, a 200 ms pause, no write of the waiting filter, the page kept on a
 filter, no finalizer on the timer, a repeated sort written).
 
-### Batch 2, the data grid (begun 2026-11-26)
+### Batch 2, the data grid (2026-11-26)
 
 Benjamin: "Move it to atoms (Recommended)", over deleting it (the exploration's DECISIONS, 2026-11-26). No screen of
 the product draws the grid: the development page `/gallery/grid` and `bun run grid:keys` are what show it, so the
@@ -1082,6 +1082,45 @@ Three lanes, one owner each: the grid's core (`use-data-grid.ts`, `data-grid.tsx
 the chrome (`data-grid-row.tsx`, `data-grid-column-header.tsx`, `data-grid-context-menu.tsx`,
 `data-grid-paste-dialog.tsx`, `data-grid-search.tsx`, `data-grid-select-column.tsx`, `use-badge-overflow.ts`).
 `packages/ui/.oxlintrc.kit.json` gets the files when all three are in.
+
+**What it came to.** Over the 13 files, 199 hook calls became 32: `useId` 17 (the key each instance's atoms are
+made for), `useRef` 14 (each a DOM node: the cells' containers and editors, the paste dialog's radio) and
+`useContext` 1, and no state or effect hook. `packages/ui/.oxlintrc.kit.json` reads every grid file (a `useState`
+planted in the row was refused). One new file, `data-grid-state.ts`: `keepOne` (a value kept while its inputs are),
+`afterEachCommit` and `afterCommitOf` (what upstream ran after a commit, off TanStack's own commit signal),
+`onScreenRef` (starts the grid's listeners when React hands it its element, stops them when it takes it back). The
+readonly ledger fell by 7 places, and `use-data-grid.ts` left the assertion ban's lists.
+
+**`useContext` stays once** (`DataGridRowContext` in `data-grid-row.tsx`, read past the lint by one
+`oxlint-disable-next-line`): it carries what the grid was drawn with down to its rows, the case of batch 1's five.
+Benjamin was told; his to overrule with those.
+
+**Seen on `/gallery/grid`** (headless Chromium, a dev server of this branch): the grid drawn, 6 rows of 8 columns, no
+console error or warning; a click on r1 Number and a shift-click on r3 Long text selected 9 cells with the focus kept
+on "12"; ArrowDown from r1 Text put the focus on r2 Text; Delete on that range read `r1.number` null, `r2.url` "",
+`r3.long` "" in the list under the grid, `r4.number` and `r1.text` untouched, and Ctrl+Z gave back 12,
+`https://a.example` and ab; a right-click opened Copy, Cut and Clear at the pointer with the selection kept, and Clear
+then Ctrl+Z did the same. `bun run grid:keys`: 96 of 96.
+
+**A regression found on screen and fixed.** The first hand-back passed the check and `grid:keys` and still had no
+keyboard: ArrowDown, Delete and Ctrl+Z did nothing (the same page on `main`'s grid files gave the values back). The
+grid's own atom was made in the draw and let go at once (idle time 0), so the store made a second one at the mount,
+whose table was never set, and the listeners went on nothing. The instance and the viewport now outlive a second with
+nobody reading them, and the listeners start from a ref callback on the grid's element. `grid:keys` could not see it:
+typing is the cells' own.
+
+**Differences from upstream that a person should not notice**, from the lanes' hand-backs: an editor focuses and
+selects in React's layout pass, a moment earlier; the pending edit is written and file URLs let go a scheduler task
+after the grid leaves the screen, and not at all on StrictMode's practice unmount; the focus, edge, editing and search
+subscriptions are made once for the grid's life where upstream made them again on a new table object; the last
+scroll position is recorded from the row virtualizer's own change; until something is typed in the search, "No
+results" or "Type to search" reads the table's current query.
+
+**Not seen:** the paste dialog, a column resized by dragging, a grid long enough to scroll (the gallery has 6 rows),
+the select column and a row added (the gallery turns on neither), search on the gallery (it does not turn it on; the
+core lane turned it on for one run: Ctrl+F opened "Find in table...", `https` read "1 of 12"). One thing to know:
+`afterEachCommit` follows TanStack Table's internal `table._reactivity`, which a TanStack update could change without a
+type error.
 
 ## Hand-written discriminators in the web packages
 

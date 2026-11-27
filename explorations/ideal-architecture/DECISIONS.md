@@ -2339,3 +2339,13 @@ The third round: the conditions under which a result made on my machine may coun
 
 Reverse: 1, `--force` comes off main's run; 2, `envMode` is loose again and the lists stay as documentation; 3, the
 cache steps return to the proofs job and its turbo call names a local cache folder.
+
+### 2026-11-26 — atoms, the kit's data grid: moved, not deleted
+
+Question: no screen of the product uses the vendored `DataGrid` (only the development page `/gallery/grid` and the
+`grid:keys` browser check; the review has its own grid), and batch 2 moves about 11,000 lines with 199 hook calls to
+atoms. Move it, or delete it? Answer: "Move it to atoms (Recommended)". I chose; the agent recommended the same. It
+stays the kit's spreadsheet for editing in bulk (`docs/kit.md`), for a screen that may want one, under "atoms A1, the
+kit too". Rejected: deleting it with its gallery page, `grid:keys` and its CI step; doing batch 3 first. Reverse:
+delete `packages/ui/src/components/data-grid`, the page, the script and the CI step, and take it again from tablecn
+when a screen wants it.

@@ -20,7 +20,7 @@ from: explorations/ideal-architecture
 | 6 | `@inventory/catalog-web`: the upload, the Items page and its editor, the assistant, the import's steps | done |
 | 7 | `@inventory/review`: the region's state with undo, saved progress, the grid, the queue; the A6 remodel | done |
 | 8 | TanStack Query removed (A2); the lint everywhere; the documents the move made false | done |
-| 9 | The kit, batch 2: the data grid ("The kit on atoms") | todo |
+| 9 | The kit, batch 2: the data grid ("The kit on atoms") | doing |
 | 10 | The kit, batch 3: the frame and the form pieces | todo |
 | 11 | The kit, batch 4: the pieces no screen uses today | todo |
 
@@ -1047,6 +1047,41 @@ change of page writing a waiting filter first (`?name=wash&page=2`); a waiting f
 has left; two changes in one tick both landing in the table's own atoms. Each but the last was seen to fail with one
 line of the code changed (the page kept on a sort, a 200 ms pause, no write of the waiting filter, the page kept on a
 filter, no finalizer on the timer, a repeated sort written).
+
+### Batch 2, the data grid (begun 2026-11-26)
+
+Benjamin: "Move it to atoms (Recommended)", over deleting it (the exploration's DECISIONS, 2026-11-26). No screen of
+the product draws the grid: the development page `/gallery/grid` and `bun run grid:keys` are what show it, so the
+batch's proof is those two and the package's tests, not the review (which has its own grid). The table's row above
+said "the review typed into on screen"; that was wrong.
+
+Counted on `main` at `5aa253aa` over the 13 files with a hook (every hook by name, `useRef`, `useId` and
+`useContext` included): 199 calls, 176 of them state and effect hooks. `useCallback` is 114 of them.
+
+The design, before any file moves:
+
+- **One grid on screen is one instance**, made for its `useId` as batch 1's table is (`Atom.family`, let go when
+  nothing reads it). What upstream kept in refs that are not DOM nodes (the table, the two virtualizers, the row
+  elements by index, the focus waiting for a row, the pending edit) is that instance's own, not a ref.
+- **The handlers are made once per instance** and read the instance's state when they run, as the review region's
+  actions are: the rows and cells are `React.memo` with compare functions that hold their handlers by identity, so a
+  handler made anew in each draw would draw every row again.
+- **The table's store is followed by an atom**: what upstream read with `useSyncExternalStore` (a cell's value through
+  `table.subscribeCell`, the store's state) is an atom that subscribes and lets go with `get.addFinalizer`, as the
+  review follows its table's column visibility.
+- **An effect becomes what it was for**: a listener on the window or the document is an atom with a finalizer; a
+  measure or a focus on a node is a ref callback that stays the same across draws; following a value after the draw
+  is `useAtomSubscribe`; a timer is `oneTimer` (batch 1).
+- **Nothing a person sees or types changes**, and every file keeps its exports and its props. Each changed file says
+  so on its first line, as batch 1's do.
+- **`hooks/use-value-as-ref.ts` stays** until batch 4: `action-bar.tsx`, `file-upload.tsx`, `stepper.tsx` and
+  `tour.tsx` still read it. Batch 2 takes the grid off it.
+
+Three lanes, one owner each: the grid's core (`use-data-grid.ts`, `data-grid.tsx`), the cells
+(`data-grid-cell.tsx`, `data-grid-data-cell.tsx`, `data-grid-cell-variants.tsx`, `data-grid-cell-preview.tsx`), and
+the chrome (`data-grid-row.tsx`, `data-grid-column-header.tsx`, `data-grid-context-menu.tsx`,
+`data-grid-paste-dialog.tsx`, `data-grid-search.tsx`, `data-grid-select-column.tsx`, `use-badge-overflow.ts`).
+`packages/ui/.oxlintrc.kit.json` gets the files when all three are in.
 
 ## Hand-written discriminators in the web packages
 

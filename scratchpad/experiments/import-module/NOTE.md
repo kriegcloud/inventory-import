@@ -66,6 +66,20 @@ is `../command-file/full-ns`.
   (`../command-file/prover-static-member.patch`): with them the static form proves as the baseline does.
 - **Only the `decide`s cost mutants**: all 60 that name `Import.aggregate.ts` change a line of a `decide`.
 
+Three things he proposed for `Import.state.ts`, each tried on a copy of this module (not kept) and none applied here:
+
+- **Each case of the state under its own name** (`export const Open = S.Struct({...})`, the union made of the five
+  names, `Open.make({ status: "Open", ... })`): proves as the package's file does, with nothing changed in the
+  prover. The discriminator stays `status`: `_tag` would change every rule that reads it and what is stored.
+- **Defaults on the state's fields** (`S.withConstructorDefault(Effect.succeed(0))` on each count, and
+  `ImportStaged`'s `evolve` naming only what the event gives): type-checks, and every rule is `Misread` for
+  `StageImport`. The prover reads a `make` as the object written, without the defaults. It would need to be taught
+  them.
+- **`State` for the schema, the file read as `ImportState`** (`import * as ImportState`, `ImportState.State`,
+  `ImportState.Open`, each invariant `ImportState.Name`, and `export const { guards, cases, isAnyOf } = State`):
+  proves as the package's file does, and every transition reads `ImportState.guards.Open(before)` as it did, letter
+  for letter, so the lock would hold. The namespace cannot be the stem: four files share `Import`.
+
 Not done: `laws block-files` has no `.state.ts` and no `.event.ts`, and was not run on these files; the stories were
 not run; what the library or a tool prints from a class's own name, now `Event` nine times, was not looked for; the
 events of `Row` and `Group` and the four decisions' own commands were left as they are.

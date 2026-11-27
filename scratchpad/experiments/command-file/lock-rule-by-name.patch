@@ -1,0 +1,69 @@
+--- a/lib/Prove/internal/Lock.js
++++ b/lib/Prove/internal/Lock.js
+@@ -94,6 +94,31 @@
+     return made;
+ });
+ /**
++ * A rule's text. One written as a name (`{ Rule }`, `Rule: Rule`) is the text of what that name is declared as, in the
++ * file that declares it, through the imports that give it: a rule moved to a file of its own is the rule it was.
++ */
++const ruleText = (modules, definition, node) => {
++    let module = definition.module;
++    let name = node.type === "Identifier" ? node.name : undefined;
++    for (let hops = 0; name !== undefined && hops < 16; hops++) {
++        const declaration = module.declarations.get(name);
++        if (declaration?._tag === "Const" && declaration.init)
++            return module.source.slice(declaration.init.start, declaration.init.end);
++        if (declaration)
++            break;
++        const imported = module.imports.get(name);
++        if (!imported || imported.imported === "*")
++            break;
++        const file = module.resolved.get(imported.specifier);
++        const next = modules.find((m) => m.path === file);
++        if (!next)
++            break;
++        module = next;
++        name = imported.imported;
++    }
++    return Paths.textOf(definition, node);
++};
++/**
+  * Read the rules of a model, or of one aggregate, from the files that declare
+  * them, and compare each invariant in `changed` with the text it was locked as.
+  */
+@@ -112,7 +137,7 @@
+         for (const key of ["invariants", "transitions"])
+             for (const [rule, node] of Paths.written(definition, key)) {
+                 const name = options.qualified ? `${aggregate.aggregateName}.${rule}` : rule;
+-                const source = Paths.textOf(definition, node);
++                const source = ruleText(modules, definition, node);
+                 sources.set(name, { kind: key === "invariants" ? "invariant" : "transition", source });
+                 const locked = options.locked.get(name);
+                 if (key === "invariants" && locked !== undefined && normal(locked) !== normal(source))
+@@ -127,7 +152,7 @@
+         for (const [rule, node] of Paths.written(definition, "transitions"))
+             sources.set(`${decision.decisionName}.${rule}`, {
+                 kind: "transition",
+-                source: Paths.textOf(definition, node),
++                source: ruleText(modules, definition, node),
+             });
+     }
+     if (options.model !== undefined) {
+@@ -143,14 +168,14 @@
+                 for (const [rule, node] of Paths.written(definition, key))
+                     sources.set(`${options.model}.${rule}`, {
+                         kind: key === "invariants" ? "model invariant" : key,
+-                        source: Paths.textOf(definition, node),
++                        source: ruleText(modules, definition, node),
+                     });
+             for (const rule of Paths.relationNames(definition)) {
+                 const node = Paths.relationNode(definition, rule);
+                 if (node)
+                     sources.set(`${options.model}.${rule}`, {
+                         kind: "relation",
+-                        source: Paths.textOf(definition, node),
++                        source: ruleText(modules, definition, node),
+                     });
+             }
+         }

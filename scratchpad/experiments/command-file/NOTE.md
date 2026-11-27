@@ -11,6 +11,24 @@ Does the prover still prove every rule of Import when one command, its event and
 
 Asked by [explorations/module-taxonomy](../../../explorations/module-taxonomy/README.md), experiment 1.
 
+## What is here now
+
+Removed on 2026-11-27, at his word that the copies had become hard to tell apart: `baseline`, `split`,
+`split-decide`, `split-evolve`, `split-evolve-const`, `full`, `full-shorthand`, `model-split`,
+`model-split-command`, `model-full`, `model-ns`, and the four tests that proved them (`CommandFile`, `EventStatics`,
+`FullShape`, `Namespace`). They are in the repository's history at `52b53e36`. What follows still tells what each
+found. Left:
+
+| Path | What it is |
+| --- | --- |
+| `model-baseline/` | the package's twelve files, copied unchanged: the control |
+| `model-role/` | the chosen shape under the whole model: an event and a command each in a file, read as a namespace |
+| `WholeModel.test.ts` | Verify on those two, each against a copy of the package's lock |
+| `full-ns/` | the earlier namespace form (`StageImport.ImportStaged`); kept because it holds an edit of his not yet committed; no test runs it |
+| `prover-static-member.patch`, `lock-rule-by-name.patch` | two changes to the library, each tried on a copy and not applied |
+
+The one module to read is [import-module](../import-module/NOTE.md).
+
 ## What was tried
 
 Three copies of the `Import` aggregate with the three files it imports, each proved with `Prove.report` on its own
@@ -110,6 +128,25 @@ sorted lines.
   nine events is `<Tag>.event.ts` exporting `Event` and `evolve`, each command's file exports `Command` and
   `decide`, and the four decisions record `ActCounted.Event` and `GroupCounted.Event`. The whole model verified
   against the unchanged lock. The `Import` folder there is the one in [import-module](../import-module/NOTE.md).
+
+- **The lock can follow a rule's name to where it is declared, in about 25 lines** (`lock-rule-by-name.patch`,
+  against the library's built `lib/Prove/internal/Lock.js`). The lock keeps the text written at the rule's place in
+  the aggregate. For a rule listed by name that text is the name: a moved transition is refused, and a listed
+  invariant, once relocked, is held by its name and no longer by its body (read in `Verify.ts` and `Lock.ts`, not
+  run). With the change, the text of a rule written as a name is the text of what the name is declared as, through
+  the imports that give it. Tried on a copy of the library and of `model-role` with all 23 transitions in
+  `Import/Import.transition.ts`, each `export const Name: Rule = <the rule as it was>`, the two unions in
+  `Import/Import.union.ts`, and the aggregate listing them by name (138 lines): the whole model verified against
+  the unchanged lock. With `after.matching === before.matching + 1` made `>=` in the moved file, the run failed on
+  that one rule: "Import.AMatchIsTheNextOne changed from the rule locked". The copies are not kept. A rule's
+  declaration must carry its type on the name and not on its parameters, or its text is not the locked text. Not
+  tried: the same change to `src/`, a rule read through a namespace (`Transition.Name`), a decision's transitions
+  moved.
+- **A transition written with `effect/Predicate` is not read.** `P.or(P.Struct({ before: P.not(guard) }),
+  P.Struct({ after: guard }))` in place of one rule does not type-check (`P.Struct`'s input is exactly its keys, so
+  the two sides of `P.or` differ), and with it the prover translates no rule of the import for any command (203
+  lines `NotTranslated`). `P.Struct` is every field at once; a transition is one thing or another, and most compare
+  `after` with `before`.
 
 Not tried here: the stories; `laws block-files` and `laws model-inputs` on the new files. The model's mutants name a file, an
 anchor and the exact text of a line with its indentation (60 of the 192 name `src/Import/Import.aggregate.ts`), so

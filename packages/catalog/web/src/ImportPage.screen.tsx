@@ -120,8 +120,7 @@ const noImport = Atom.make(AsyncResult.initial<never, never>())
 export function ImportPage() {
   const { params } = useAtomValue(location)
   const { id: importId, malformed } = importInAddress(params)
-  const signedIn = useAtomValue(member)
-  const actor = signedIn
+  const actor = useAtomValue(member)
   // The server enforces this. The screen mirrors it so nobody is offered a button that will be refused.
   const canImport = O.exists(actor, (who) => hasRole(who.role, "editor"))
   // Found removed: what the person's tabs kept for it is let go and named, above the page.

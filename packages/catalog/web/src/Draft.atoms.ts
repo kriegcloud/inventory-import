@@ -12,7 +12,7 @@ import { browserWindow, requestAvailable, storageText } from "@inventory/client/
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Eq from "effect/Equal"
-import { identity, pipe } from "effect/Function"
+import { dual, identity, pipe } from "effect/Function"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
@@ -57,8 +57,10 @@ export interface Owner {
   readonly id: string
 }
 
-const sameMember = (one: Owner, other: Owner): boolean =>
-  one.id === other.id && one.organizationId === other.organizationId
+const sameMember: {
+  (one: Owner, other: Owner): boolean
+  (other: Owner): (one: Owner) => boolean
+} = dual(2, (one: Owner, other: Owner): boolean => one.id === other.id && one.organizationId === other.organizationId)
 
 /**
  * The member one import's draft belongs to: whoever was signed in when the step opened, a row was decided or a held
@@ -130,21 +132,52 @@ const waitingAt = Atom.family((key: string) =>
 )
 
 /** The scope one import's waiting rows are kept under for one member, in one organization: every tab's begins so. */
-const scopeOf = (actor: Owner, id: ImportId) => ({
-  organizationId: actor.organizationId,
-  memberId: actor.id,
-  screen: `import:${id}:waiting`
-})
+const scopeOf: {
+  (
+    actor: Owner,
+    id: ImportId
+  ): {
+    readonly organizationId: string
+    readonly memberId: string
+    readonly screen: string
+  }
+  (id: ImportId): (actor: Owner) => {
+    readonly organizationId: string
+    readonly memberId: string
+    readonly screen: string
+  }
+} = dual(
+  2,
+  (
+    actor: Owner,
+    id: ImportId
+  ): {
+    readonly organizationId: string
+    readonly memberId: string
+    readonly screen: string
+  } => ({
+    organizationId: actor.organizationId,
+    memberId: actor.id,
+    screen: `import:${id}:waiting`
+  })
+)
 
 /** The key one import's waiting rows are kept under for one member, in one organization, by one tab. */
-const keyOf = (actor: Owner, id: ImportId, tab: string): string =>
+const keyOf: {
+  (actor: Owner, id: ImportId, tab: string): string
+  (id: ImportId, tab: string): (actor: Owner) => string
+} = dual(3, (actor: Owner, id: ImportId, tab: string): string =>
   progressKey({ ...scopeOf(actor, id), screen: `import:${id}:waiting:${tab}` })
+)
 
 /**
  * The entries kept for one import by the member's other tabs, by key, with the tab each belongs to: the one an older
  * page kept for every tab (no tab in its key) counts as a tab that is gone.
  */
-const otherTabs = (actor: Owner, id: ImportId, tab: string): ReadonlyArray<Entry> => {
+const otherTabs: {
+  (actor: Owner, id: ImportId, tab: string): ReadonlyArray<Entry>
+  (id: ImportId, tab: string): (actor: Owner) => ReadonlyArray<Entry>
+} = dual(3, (actor: Owner, id: ImportId, tab: string): ReadonlyArray<Entry> => {
   // Where the browser refuses to list its storage (some private windows), no other tab kept anything.
   const keys = sharedStorage.keys()
   if (O.isNone(keys)) return []
@@ -158,7 +191,7 @@ const otherTabs = (actor: Owner, id: ImportId, tab: string): ReadonlyArray<Entry
     else if (Str.startsWith(prefix)(key)) found.push({ key, tab: O.some(Str.slice(Str.length(prefix))(key)) })
   }
   return found
-}
+})
 
 /** One entry kept by another of the member's tabs: an older page's names no tab. */
 interface Entry {
@@ -173,7 +206,10 @@ const claimOf = (entry: Entry): string => `inventory-kept:${entry.key}`
  * Reads one entry from the browser's storage as it is now, erases it there at once, and hands it over: inside the
  * claim, so another tab that claims it next finds it gone (the atom's own write could land after the claim ends).
  */
-const takeEntry = (registry: AtomRegistry.AtomRegistry, key: string, take: (stored: StoredWaiting) => void): void => {
+const takeEntry: {
+  (registry: AtomRegistry.AtomRegistry, key: string, take: (stored: StoredWaiting) => void): void
+  (key: string, take: (stored: StoredWaiting) => void): (registry: AtomRegistry.AtomRegistry) => void
+} = dual(3, (registry: AtomRegistry.AtomRegistry, key: string, take: (stored: StoredWaiting) => void): void => {
   // Read and erased as one: where the browser refuses either, it is not taken.
   const text = sharedStorage.attempt((storage) => {
     const found = storageText(key)(storage)
@@ -183,7 +219,7 @@ const takeEntry = (registry: AtomRegistry.AtomRegistry, key: string, take: (stor
   if (O.isNone(text)) return
   registry.set(waitingAt(key), O.none())
   take(text.pipe(O.flatten, storedFromText))
-}
+})
 
 /**
  * The waiting rows the member's tabs that are gone (closed, crashed, discarded by the browser or not loaded yet) kept

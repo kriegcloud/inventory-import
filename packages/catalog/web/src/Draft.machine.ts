@@ -642,8 +642,12 @@ const partsNamed = (taken: ReadonlyArray<StaleAccept>): ((rowId: string) => (par
 }
 
 /** The revision one part of a decision was made on. */
-const dateOf = (side: Side, part: string): number =>
+const dateOf: {
+  (side: Side, part: string): number
+  (part: string): (side: Side) => number
+} = dual(2, (side: Side, part: string): number =>
   O.match(R.get(side.dates, part), { onNone: () => side.madeOn, onSome: identity })
+)
 
 /** The revision of each part of a decision. */
 const datesIn = (side: Side): ReadonlyArray<number> => A.map(partsOf(side.decision), (part) => dateOf(side, part))
@@ -653,24 +657,34 @@ const oldestOf = (side: Side): number =>
   A.match(datesIn(side), { onEmpty: () => side.madeOn, onNonEmpty: (dates) => Math.min(...dates) })
 
 /** The first match that came between the parts of a decision: none where all were made before it, or all after. */
-const matchWithin = (draft: Draft, side: Side): O.Option<number> => {
+const matchWithin: {
+  (draft: Draft, side: Side): O.Option<number>
+  (side: Side): (draft: Draft) => O.Option<number>
+} = dual(2, (draft: Draft, side: Side): O.Option<number> => {
   const dates = datesIn(side)
   const oldest = oldestOf(side)
   return A.match(
     A.filter(draft.matches, (match) => match > oldest && A.some(dates, (date) => date >= match)),
     { onEmpty: O.none, onNonEmpty: (matches) => O.some(Math.min(...matches)) }
   )
-}
+})
 
 /** What is sent of a decision now: its parts from before the first match within it, or all of it where there is none. */
-const firstSent = (draft: Draft, side: Side): Side =>
+const firstSent: {
+  (draft: Draft, side: Side): Side
+  (side: Side): (draft: Draft) => Side
+} = dual(2, (draft: Draft, side: Side): Side =>
   O.match(matchWithin(draft, side), {
     onNone: () => side,
     onSome: (match) => ({ ...side, decision: withParts(side.decision, (part) => dateOf(side, part) < match) })
   })
+)
 
 /** When each part of a new decision was made: a part the earlier one had keeps its revision, a new one is of now. */
-const datesOf = (earlier: O.Option<Side>, decision: O.Option<RowDecision>, at: number): Side["dates"] =>
+const datesOf: {
+  (earlier: O.Option<Side>, decision: O.Option<RowDecision>, at: number): Side["dates"]
+  (decision: O.Option<RowDecision>, at: number): (earlier: O.Option<Side>) => Side["dates"]
+} = dual(3, (earlier: O.Option<Side>, decision: O.Option<RowDecision>, at: number): Side["dates"] =>
   O.match(earlier, {
     onNone: () => ({}),
     onSome: (side) => {
@@ -679,6 +693,7 @@ const datesOf = (earlier: O.Option<Side>, decision: O.Option<RowDecision>, at: n
       return decision.pipe(partsOf, A.map(dated), R.fromEntries, R.getSomes)
     }
   })
+)
 
 // -- What the draft holds --------------------------------------------------------------------------------------------
 
@@ -707,11 +722,18 @@ const heldDecisions = (draft: Draft): SavedDecisions =>
 const known = (draft: Draft): SavedDecisions => over(heldDecisions(draft), landedRows(draft))
 
 /** What the server is known to hold of one row. */
-const knownOf = (draft: Draft, rowId: string): O.Option<RowDecision> =>
+const knownOf: {
+  (draft: Draft, rowId: string): O.Option<RowDecision>
+  (rowId: string): (draft: Draft) => O.Option<RowDecision>
+} = dual(2, (draft: Draft, rowId: string): O.Option<RowDecision> =>
   O.match(R.get(landedRows(draft), rowId), { onNone: () => R.get(heldDecisions(draft), rowId), onSome: identity })
+)
 
 /** The revision what is known of a row was said at: by an answer since the picture held, or by that picture. */
-const rowSaidAt = (draft: Draft, rowId: string): number =>
+const rowSaidAt: {
+  (draft: Draft, rowId: string): number
+  (rowId: string): (draft: Draft) => number
+} = dual(2, (draft: Draft, rowId: string): number =>
   O.match(draft.landed, {
     onNone: () => heldAt(draft),
     onSome: (landed) =>
@@ -719,6 +741,7 @@ const rowSaidAt = (draft: Draft, rowId: string): number =>
         ? O.match(R.get(landed.said, rowId), { onNone: () => landed.at, onSome: identity })
         : heldAt(draft)
   })
+)
 
 /** True when what is known of a row is no older than the picture the decision was made on. */
 const knows = (draft: Draft, rowId: string, side: Side): boolean => side.madeOn <= rowSaidAt(draft, rowId)
@@ -926,7 +949,10 @@ export const startAgain = (draft: Draft): Draft => ({
 })
 
 /** She decided these rows again: a stray's answer owes nothing of them any more, whatever became of that decision. */
-const decidedAgain = (draft: Draft, rows: ReadonlyArray<string>): Draft =>
+const decidedAgain: {
+  (draft: Draft, rows: ReadonlyArray<string>): Draft
+  (rows: ReadonlyArray<string>): (draft: Draft) => Draft
+} = dual(2, (draft: Draft, rows: ReadonlyArray<string>): Draft =>
   R.isEmptyReadonlyRecord(draft.strays)
     ? draft
     : {
@@ -936,6 +962,7 @@ const decidedAgain = (draft: Draft, rows: ReadonlyArray<string>): Draft =>
           owed: A.filter(stray.owed, (rowId) => !A.contains(rows, rowId))
         }))
       }
+)
 
 // -- The lines -------------------------------------------------------------------------------------------------------
 
@@ -961,14 +988,21 @@ const together = (one: Side, other: Side): Side => {
  * Sides with more of them: two closed tabs' same decision as one. A closed tab's beside this tab's same one stays, so
  * that it is still there when this tab decides the row again; it is read once (`lineWords`), and goes with this tab's.
  */
-const withSides = (sides: ReadonlyArray<Side>, more: ReadonlyArray<Side>): ReadonlyArray<Side> =>
+const withSides: {
+  (sides: ReadonlyArray<Side>, more: ReadonlyArray<Side>): ReadonlyArray<Side>
+  (more: ReadonlyArray<Side>): (sides: ReadonlyArray<Side>) => ReadonlyArray<Side>
+} = dual(2, (sides: ReadonlyArray<Side>, more: ReadonlyArray<Side>): ReadonlyArray<Side> =>
   A.reduce(more, sides, (line, one) => {
     const merges = (side: Side): boolean => side.here === one.here && sameDecision(side.decision, one.decision)
     return A.some(line, merges) ? A.map(line, (side) => (merges(side) ? together(side, one) : side)) : [...line, one]
   })
+)
 
 /** One row as everything known now has it: what waits, and its line. */
-const linedRow = (draft: Draft, book: Book, rowId: string): void => {
+const linedRow: {
+  (draft: Draft, book: Book, rowId: string): void
+  (book: Book, rowId: string): (draft: Draft) => void
+} = dual(3, (draft: Draft, book: Book, rowId: string): void => {
   const theirs = knownOf(draft, rowId)
   const out = R.has(flying(draft), rowId)
   const waits = R.get(book.unsent, rowId)
@@ -1078,7 +1112,7 @@ const linedRow = (draft: Draft, book: Book, rowId: string): void => {
       O.map(goes, (side) => ({ ...side, live: false, overtaken: false }))
     )
   }
-}
+})
 
 /** Every line as everything known now has it: before anything is sent, and after everything that happens. */
 const lined = (draft: Draft): Draft => {
@@ -1271,11 +1305,18 @@ const outWith = (draft: Draft, id: number): O.Option<Sides> =>
   )
 
 /** An answer nobody waits for any more has come: nothing is remembered of its save. */
-const withoutStray = (draft: Draft, id: number): Draft =>
+const withoutStray: {
+  (draft: Draft, id: number): Draft
+  (id: number): (draft: Draft) => Draft
+} = dual(2, (draft: Draft, id: number): Draft =>
   R.has(draft.strays, `${id}`) ? { ...draft, strays: R.remove(draft.strays, `${id}`) } : draft
+)
 
 /** The save that was out did not get through: its rows wait, and a confirm that waited for it is not made. */
-const failing = (draft: Draft, id: number, said: Said): Stepped =>
+const failing: {
+  (draft: Draft, id: number, said: Said): Stepped
+  (id: number, said: Said): (draft: Draft) => Stepped
+} = dual(3, (draft: Draft, id: number, said: Said): Stepped =>
   O.match(outWith(draft, id), {
     onNone: () => only(withoutStray(draft, id)),
     onSome: (rows) => ({
@@ -1283,9 +1324,13 @@ const failing = (draft: Draft, id: number, said: Said): Stepped =>
       effects: [DraftEffect.Say({ what: said })]
     })
   })
+)
 
 /** What a save stored: its rows, without the parts the server did not apply and the rows it did not write. */
-const storedOf = (rows: RowChanges, event: Answer): RowChanges => {
+const storedOf: {
+  (rows: RowChanges, event: Answer): RowChanges
+  (event: Answer): (rows: RowChanges) => RowChanges
+} = dual(2, (rows: RowChanges, event: Answer): RowChanges => {
   const since = R.fromEntries(A.map(event.decidedSince, (row) => [row.rowId, true] as const))
   const gone = partsNamed(event.notApplied)
   return R.map(
@@ -1295,7 +1340,7 @@ const storedOf = (rows: RowChanges, event: Answer): RowChanges => {
       return withParts(change, (part) => !isGone(part))
     }
   )
-}
+})
 
 /**
  * A decision made again over one that was sent, without the parts of that one the server did not apply (a part made

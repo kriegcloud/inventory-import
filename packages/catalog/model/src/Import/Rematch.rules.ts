@@ -312,20 +312,33 @@ export const withoutStaleDecisions = (input: {
 // differs. A row that does not read is not compared, so "no difference" alone cannot tell it from a row that agrees.
 type RowComparison = { readonly reads: boolean; readonly stored: ReadonlyArray<StoredDifference> }
 
-const sameDifferences = (a: ReadonlyArray<StoredDifference>, b: ReadonlyArray<StoredDifference>): boolean =>
-  a.length === b.length &&
-  A.every(a, (one) =>
-    A.some(b, (other) => other.field === one.field && other.stored === one.stored && other.file === one.file)
-  )
+const sameDifferences: {
+  (a: ReadonlyArray<StoredDifference>, b: ReadonlyArray<StoredDifference>): boolean
+  (b: ReadonlyArray<StoredDifference>): (a: ReadonlyArray<StoredDifference>) => boolean
+} = dual(
+  2,
+  (a: ReadonlyArray<StoredDifference>, b: ReadonlyArray<StoredDifference>): boolean =>
+    a.length === b.length &&
+    A.every(a, (one) =>
+      A.some(b, (other) => other.field === one.field && other.stored === one.stored && other.file === one.file)
+    )
+)
 
-const sameComparison = (a: O.Option<RowComparison>, b: O.Option<RowComparison>): boolean =>
+const sameComparison: {
+  (a: O.Option<RowComparison>, b: O.Option<RowComparison>): boolean
+  (b: O.Option<RowComparison>): (a: O.Option<RowComparison>) => boolean
+} = dual(2, (a: O.Option<RowComparison>, b: O.Option<RowComparison>): boolean =>
   O.isNone(a)
     ? O.isNone(b)
     : O.isSome(b) && a.value.reads === b.value.reads && sameDifferences(a.value.stored, b.value.stored)
+)
 
 // The decision as the row read before `field` was matched again, for that field only: what the re-match of another
 // field takes back in any case is left out on both sides, so a change is told against this field alone.
-const beforeOnly = (question: ComparisonQuestion, field: Field): RowDecision => ({
+const beforeOnly: {
+  (question: ComparisonQuestion, field: Field): RowDecision
+  (field: Field): (question: ComparisonQuestion) => RowDecision
+} = dual(2, (question: ComparisonQuestion, field: Field): RowDecision => ({
   ...question.now,
   accepted: A.filter(
     question.then.accepted,
@@ -335,7 +348,7 @@ const beforeOnly = (question: ComparisonQuestion, field: Field): RowDecision => 
     question.then.reverted,
     (reverted) => reverted === field || A.contains(question.now.reverted, reverted)
   )
-})
+}))
 
 // A field and the column a comparison reads it from, whatever it reads now.
 type Pin = { readonly field: Field; readonly column: O.Option<number> }
@@ -571,12 +584,18 @@ export const sameDecision: {
 // match judges every stored decision as made on the revision it read, which a save on any other row moves between two
 // tries. A decision made again in between, even to the same choice, was made on what the row compares with by then: it
 // is another question (`decided`).
-const sameQuestion = (a: ComparisonQuestion, b: ComparisonQuestion): boolean =>
-  a.rowId === b.rowId &&
-  a.decided === b.decided &&
-  a.fields.length === b.fields.length &&
-  A.every(a.fields, ({ field }, index) => field === b.fields[index]?.field) &&
-  sameDecision(a.then, b.then)
+const sameQuestion: {
+  (a: ComparisonQuestion, b: ComparisonQuestion): boolean
+  (b: ComparisonQuestion): (a: ComparisonQuestion) => boolean
+} = dual(
+  2,
+  (a: ComparisonQuestion, b: ComparisonQuestion): boolean =>
+    a.rowId === b.rowId &&
+    a.decided === b.decided &&
+    a.fields.length === b.fields.length &&
+    A.every(a.fields, ({ field }, index) => field === b.fields[index]?.field) &&
+    sameDecision(a.then, b.then)
+)
 
 /**
  * The review's answer to one try of a request (a match, a save or a confirm worked out again because something it read
@@ -727,7 +746,7 @@ export const takenBackOfMatch = (input: {
           )
         )
         const named = A.take(A.sort(rows, fileOrder), takenBackRowsNamed)
-        return rows.length === 0
+        return A.isReadonlyArrayEmpty(rows)
           ? []
           : [
               {

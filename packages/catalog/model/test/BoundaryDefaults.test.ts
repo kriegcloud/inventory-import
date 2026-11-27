@@ -3,7 +3,7 @@ import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
-import { StoredDecisions } from "../src/Import/ImportStore.store.ts"
+import { StoredDecisions } from "../src/Import/ImportStore.port.ts"
 import { Row } from "../src/Reading/Spreadsheet.rules.ts"
 import { withPreferred } from "../src/Review/CellReading.rules.ts"
 

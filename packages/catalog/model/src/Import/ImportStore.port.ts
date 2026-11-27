@@ -628,4 +628,4 @@ export class ImportStore extends Context.Service<
     /** Every item of the organization, by SKU. */
     readonly items: (organizationId: OrganizationId) => Effect.Effect<ReadonlyArray<StoredItem>>
   }
->()("@inventory/catalog-model/Import/ImportStore.store/ImportStore") {}
+>()("@inventory/catalog-model/Import/ImportStore.port/ImportStore") {}

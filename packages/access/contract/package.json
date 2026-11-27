@@ -14,7 +14,7 @@
     "./PeoplePayload": "./src/People/People.payload.ts",
     "./PeopleRejection": "./src/People/People.rejection.ts",
     "./AuditTrail": "./src/Activity/AuditTrail.read.ts",
-    "./ModelAllowance": "./src/Allowance/ModelAllowance.gateway.ts"
+    "./ModelAllowance": "./src/Allowance/ModelAllowance.port.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",

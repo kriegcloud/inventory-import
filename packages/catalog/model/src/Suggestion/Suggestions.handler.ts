@@ -33,7 +33,7 @@ import { Answerer, ModelAvailability, ModelQuestion, answeredByRules } from "../
 import { asAgent } from "@inventory/kernel/Agent"
 import { ImportId, SuggestionId } from "@inventory/catalog-contract/Ids"
 import { CurrentActor } from "@inventory/kernel/Actor"
-import { SuggestionStore, StoreSuggestions } from "./SuggestionStore.store.ts"
+import { SuggestionStore, StoreSuggestions } from "./SuggestionStore.port.ts"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import { Activity } from "@inventory/kernel/Activity"
 import { ActivityId } from "@inventory/kernel/Ids"

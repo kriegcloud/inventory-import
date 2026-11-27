@@ -16,7 +16,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import { usedUpSentence } from "./Allowance.rules.ts"
-import { AllowanceStore, Reservation } from "./AllowanceStore.store.ts"
+import { AllowanceStore, Reservation } from "./AllowanceStore.port.ts"
 
 /**
  * Takes one call from the actor's organization's allowance, before the call is made.

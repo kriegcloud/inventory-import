@@ -35,4 +35,4 @@ export class SuggestionStore extends Context.Service<
      */
     readonly store: (write: StoreSuggestions) => Effect.Effect<ReadonlyArray<Suggestion>>
   }
->()("@inventory/catalog-model/Suggestion/SuggestionStore.store/SuggestionStore") {}
+>()("@inventory/catalog-model/Suggestion/SuggestionStore.port/SuggestionStore") {}

@@ -1,8 +1,8 @@
 // The items an organization has, as its endpoints answer for them: the organization is always the actor's, never one
 // named in the request.
 import * as Effect from "effect/Effect"
-import { ImportStore } from "../Import/ImportStore.store.ts"
-import { EditOutcome, ItemStore } from "./ItemStore.store.ts"
+import { ImportStore } from "../Import/ImportStore.port.ts"
+import { EditOutcome, ItemStore } from "./ItemStore.port.ts"
 import { CurrentActor, requireRole } from "@inventory/kernel/Actor"
 import { ItemQueryParams, ItemChanged, ItemNotFound } from "@inventory/catalog-contract/Catalog"
 import { ItemId } from "@inventory/catalog-contract/Ids"

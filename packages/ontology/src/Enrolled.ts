@@ -26,7 +26,7 @@ const person = "packages/access/contract/src/People/Person.read.ts#Person"
 const auditTrail = "packages/access/contract/src/Activity/AuditTrail.read.ts#AuditTrail"
 const agentRun = "packages/kernel/src/AgentRun.schema.ts#AgentRun"
 const organizationChoice = "packages/access/contract/src/Session/SessionState.read.ts#OrganizationChoice"
-const modelCallPurpose = "packages/access/contract/src/Allowance/ModelAllowance.gateway.ts#ModelCallPurpose"
+const modelCallPurpose = "packages/access/contract/src/Allowance/ModelAllowance.port.ts#ModelCallPurpose"
 const usageModelCallPurpose = "packages/usage/contract/src/Allowance/ModelCall.payload.ts#ModelCallPurpose"
 const membership = "packages/access/contract/src/Session/SessionState.read.ts#Membership"
 

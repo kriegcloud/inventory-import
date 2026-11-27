@@ -16,7 +16,7 @@
     "as": "record"
   },
   {
-    "file": "packages/access/contract/src/Allowance/ModelAllowance.gateway.ts",
+    "file": "packages/access/contract/src/Allowance/ModelAllowance.port.ts",
     "export": "ModelCallPurpose",
     "as": "scheme"
   },

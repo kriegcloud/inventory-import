@@ -1301,15 +1301,19 @@ export function queue(input: {
 export const weakGuess = (fix: { readonly by: O.Option<string>; readonly confidence: O.Option<string> }): boolean =>
   O.contains(fix.by, "model") && O.contains(fix.confidence, "low")
 
-/** A `low` fix is a question for the person, not something to accept. Its choices are `to` and the alternatives. */
+/**
+ * A `low` fix, and one whose source gave no confidence, is a question for the person, not something to accept: asked,
+ * never applied in one press or for a group (Benjamin, 2026-11-26, as for a stored proposal with none). Its choices
+ * are `to` and the alternatives.
+ */
 export const choicesOf = (fix: {
   readonly to: string
   readonly confidence: O.Option<string>
   readonly why: { readonly alternatives: ReadonlyArray<string> }
 }): O.Option<ReadonlyArray<string>> =>
   O.map(
-    O.filter(fix.confidence, (confidence) => confidence === "low"),
-    () => [fix.to, ...fix.why.alternatives]
+    O.liftPredicate(fix, (fix) => !O.exists(fix.confidence, (confidence) => confidence !== "low")),
+    (fix) => [fix.to, ...fix.why.alternatives]
   )
 
 /** What the caller writes, and what it holds with a reason for each row. */

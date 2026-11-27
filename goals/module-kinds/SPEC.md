@@ -45,7 +45,7 @@ code does what it did before.
 - **No event or command moves before `block-files` holds decision 2's three checks**: the stem is the tag, a kind's
   export names, no named import of `Event` or `Command`.
 - **No rename in a file another open goal is moving, in the same change.** `alchemy-domain-uptake` works in
-  `packages/catalog/model`; steps 8 and 9 wait for his word on which goes first.
+  `packages/catalog/model`; he said this goal moves that package first (2026-11-27).
 - **No folder for one block and no `index.ts`.** A folder is for a kind with more than five files in its module
   (decision 8).
 - **The experiment is the pattern, not the source.** `scratchpad/experiments/catalog-model/model` is read beside
@@ -75,4 +75,6 @@ code does what it did before.
 ## Decisions
 
 - 2026-11-27: he chose "Graduate to an uptake goal" with every decision of the exploration answered.
+- 2026-11-27: "module-kinds first": steps 8 and 9 move `packages/catalog/model` before `alchemy-domain-uptake`
+  touches it again.
 - Decisions 1 to 13: [DECISIONS](../../explorations/module-taxonomy/DECISIONS.md).

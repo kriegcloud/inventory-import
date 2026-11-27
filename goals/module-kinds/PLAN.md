@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: "Module kinds, plan"
-description: "The steps of the module kinds goal in the order the brief's Map gives, each with what it is built on, what gates it and its status; steps 8 and 9 wait on Benjamin's word about the order with alchemy-domain-uptake."
+description: "The steps of the module kinds goal in the order the brief's Map gives, each with what it is built on, what gates it and its status, and the choices made in each step built."
 from: explorations/module-taxonomy
 ---
 
@@ -21,7 +21,7 @@ day, and steps 5, 6 and 7 after them.
 | 5 | `.event.ts`, `.state.ts`, `.transition.ts` and `.union.ts` as kinds; decision 2's three checks; decision 8's count | `Kinds.registry.ts`, `BlockFiles.rules.ts` | step 2 | done |
 | 6 | The kinds of decisions 6, 7 and 9 to 11 in the registry (`.config.ts`, `.route.ts`, `.sealed.ts`, `.host.ts`, `.cron.ts`, `.singleton.ts`, a surface's four); `.handler.ts` and `.live.ts` retired; a model's merged Live in `<Model>.model.ts` | `Kinds.registry.ts`; the brief's placement table | step 2; before `alchemy-domain-uptake` builds the first of them | done |
 | 7 | `Host.ts` to `<Model>.host.ts` in both hosts, `Config.ts` to `Auth.config.ts`, `Adapters.ts` into the host file; `.reference.ts` kept as a kind | `packages/access/host/src`, `packages/catalog/host/src` | step 6 | done |
-| 8 | Every block of `Import` in a file of its kind, read as a namespace; the 60 mutants written again | `Import.aggregate.ts`; `scratchpad/experiments/catalog-model/model/Import` | step 5; **Benjamin's**: the order with `alchemy-domain-uptake` | todo |
+| 8 | Every block of `Import` in a file of its kind, read as a namespace; the 60 mutants written again | `Import.aggregate.ts`; `scratchpad/experiments/catalog-model/model/Import` | step 5; his word on the order, given 2026-11-27 | doing |
 | 9 | The same for `Row`, `Group` and the four decisions | `Row.aggregate.ts`, `Group.aggregate.ts`, `Review/*.decision.ts`; `catalog-model/model` | step 8 | todo |
 
 ## First slice
@@ -87,9 +87,9 @@ three endings used once. Step 3 cleared nine and steps 6 and 7 the rest.
 
 ## Benjamin's
 
-- **Before step 8: which goal moves `packages/catalog/model` first.** `alchemy-domain-uptake` is open on that
-  package (its move 3 writes the import's commands). Moving the files first means its briefs are written against
-  the new homes; moving them after means every block it adds is moved once more. Steps 1 to 7 do not wait on this.
+Nothing is waiting on him. On 2026-11-27 he answered the order for steps 8 and 9: "module-kinds first". The catalog
+model's blocks move now; `alchemy-domain-uptake` writes its later briefs against the new homes, and a branch of it
+open on those files is rebased over the move.
 
 ## What the experiment left unchecked
 

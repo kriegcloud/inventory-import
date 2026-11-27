@@ -1,10 +1,11 @@
-// The whole catalog model under Verify, as `packages/catalog/model/test/Catalog.verify.test.ts` runs it, four times: on a
+// The whole catalog model under Verify, as `packages/catalog/model/test/Catalog.verify.test.ts` runs it, five times: on a
 // copy of the package's files (`model-baseline`) and on that copy with `MatchColumn`, its event, its decide, the
 // rejections it shares and the import's state in files of their own, and every decision importing them from there
 // (`model-split`), and on the copy with only the command, its event and the shared rejections moved and every
 // decide left in the aggregate (`model-split-command`), the shape decision 1 chose, and on the copy whose
 // Import aggregate only lists (`model-full`: every evolve beside its event, every decide beside its command, the
-// invariants with the state and the transitions in a rules file). Each is held to its own copy of the package's lock and to the lock's list of rules that must stay
+// invariants with the state), and on that copy with each command's file read as a namespace
+// (`model-ns`: `StageImport.decide`, `StageImport.evolve`). Each is held to its own copy of the package's lock and to the lock's list of rules that must stay
 // proved. Run with CI=true, so that nothing is written to a lock and a rule it does not list fails.
 import { Story } from "@alchemy.run/domain/Story"
 import * as Verify from "@alchemy.run/domain/Verify"
@@ -21,6 +22,8 @@ import { Catalog as Baseline } from "./model-baseline/Catalog.model.ts"
 import { CatalogApi as SplitApi } from "./model-split/Catalog.api.ts"
 import { CatalogApi as FullApi } from "./model-full/Catalog.api.ts"
 import { Catalog as Full } from "./model-full/Catalog.model.ts"
+import { CatalogApi as NsApi } from "./model-ns/Catalog.api.ts"
+import { Catalog as Ns } from "./model-ns/Catalog.model.ts"
 import { Catalog as Split } from "./model-split/Catalog.model.ts"
 import { CatalogApi as SplitCommandApi } from "./model-split-command/Catalog.api.ts"
 import { Catalog as SplitCommand } from "./model-split-command/Catalog.model.ts"
@@ -129,6 +132,29 @@ layer(NodeServices.layer)("command-file, the whole model", (it) => {
         apis: [FullApi],
         story: Story.make(Full),
         source: new URL("./model-full/Catalog.model.ts", import.meta.url),
+        depth: DEPTH,
+        lock,
+        require: { proved }
+      })
+      const said = Verify.render(report)
+      expect(report.explored.depth, said).toBe(DEPTH)
+      expect(report.undone, said).toEqual([])
+      expect(Verify.verified(report), said).toBe(true)
+      expect(report.relocked, said).toEqual([])
+    }),
+    3_000_000
+  )
+
+  it.effect(
+    "with each command's file read as a namespace, the model is verified against the same lock",
+    Effect.fnUntraced(function* () {
+      const lock = new URL("./model-ns/Catalog.lock.json", import.meta.url)
+      const proved = yield* lockedProved(lock)
+      expect(proved.length).toBe(134)
+      const report = yield* Verify.report(Ns, {
+        apis: [NsApi],
+        story: Story.make(Ns),
+        source: new URL("./model-ns/Catalog.model.ts", import.meta.url),
         depth: DEPTH,
         lock,
         require: { proved }

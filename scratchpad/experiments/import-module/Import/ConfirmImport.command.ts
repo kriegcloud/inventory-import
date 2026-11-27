@@ -18,7 +18,7 @@ export class ImportConfirmed extends Domain.Event(
 ) {}
 
 /** What an import is after `ImportConfirmed`. */
-export const evolveImportConfirmed: {
+export const evolve: {
   (e: ImportConfirmed): (s: ImportState) => ImportState
   (s: ImportState, e: ImportConfirmed): ImportState
 } = dual(2, (s: ImportState, e: ImportConfirmed): ImportState =>
@@ -93,7 +93,7 @@ export class ConfirmImport extends Domain.Command(
 ) {}
 
 /** What the import decides of `ConfirmImport`. */
-export const decideConfirmImport = Effect.fn("Import.ConfirmImport")(function* (s: ImportState, cmd: ConfirmImport) {
+export const decide = Effect.fn("Import.ConfirmImport")(function* (s: ImportState, cmd: ConfirmImport) {
   const actor = yield* CurrentActor
   if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})
   if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})

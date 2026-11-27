@@ -97,6 +97,15 @@ sorted lines.
   tried: the whole model's verify, a decision, a static `decide`, and the same change to `src/` (which bun reads; the
   repository's patch carries both).
 
+- **With that change the whole module can be written with statics.** Every event with `static readonly evolve` and
+  every command with `static readonly decide`: the import proves as the baseline does, and the whole model verifies
+  against the unchanged lock, both run with a copy of the library carrying the patch. The copies of the model and of
+  the library are not kept, since no test here can run them without the patch.
+- **Read as a namespace, the same module needs no change to the prover** (`Namespace.test.ts`, `full-ns/`;
+  `WholeModel.test.ts`, `model-ns/`). Each command's file exports `evolve` and `decide` under those names and the
+  aggregate holds `import * as StageImport` and `StageImport.decide`, `StageImport.evolve`,
+  `StageImport.StageImport`. Proved as the baseline; the whole model verified against the unchanged lock.
+
 Not tried here: the stories; `laws block-files` and `laws model-inputs` on the new files. The model's mutants name a file, an
 anchor and the exact text of a line with its indentation (60 of the 192 name `src/Import/Import.aggregate.ts`), so
 moving a decide means writing those again; moving only a command and its event leaves every decide where its mutants

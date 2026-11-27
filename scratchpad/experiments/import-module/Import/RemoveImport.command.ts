@@ -17,7 +17,7 @@ export class ImportRemoved extends Domain.Event(
 ) {}
 
 /** What an import is after `ImportRemoved`. */
-export const evolveImportRemoved = (s: ImportState): ImportState =>
+export const evolve = (s: ImportState): ImportState =>
   ImportState.guards.Open(s)
     ? ImportState.cases.Removed.make({ status: "Removed", organizationId: s.organizationId })
     : s
@@ -42,7 +42,7 @@ export class RemoveImport extends Domain.Command(
 ) {}
 
 /** What the import decides of `RemoveImport`. */
-export const decideRemoveImport = Effect.fn("Import.RemoveImport")(function* (s: ImportState, cmd: RemoveImport) {
+export const decide = Effect.fn("Import.RemoveImport")(function* (s: ImportState, cmd: RemoveImport) {
   const actor = yield* CurrentActor
   if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})
   if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})

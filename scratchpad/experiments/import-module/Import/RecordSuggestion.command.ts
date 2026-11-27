@@ -17,7 +17,7 @@ export class SuggestionRecorded extends Domain.Event(
 ) {}
 
 /** What an import is after `SuggestionRecorded`. */
-export const evolveSuggestionRecorded = (s: ImportState): ImportState =>
+export const evolve = (s: ImportState): ImportState =>
   ImportState.guards.Open(s) ? { ...s, suggestions: s.suggestions + 1 } : s
 
 /** Record that a suggestion was asked for. */
@@ -33,7 +33,7 @@ export class RecordSuggestion extends Domain.Command(
 ) {}
 
 /** What the import decides of `RecordSuggestion`. */
-export const decideRecordSuggestion = Effect.fn("Import.RecordSuggestion")(function* (s: ImportState) {
+export const decide = Effect.fn("Import.RecordSuggestion")(function* (s: ImportState) {
   const actor = yield* CurrentActor
   if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})
   if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})

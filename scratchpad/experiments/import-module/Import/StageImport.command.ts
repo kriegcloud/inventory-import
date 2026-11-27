@@ -18,7 +18,7 @@ export class ImportStaged extends Domain.Event(
 ) {}
 
 /** What an import is after `ImportStaged`. */
-export const evolveImportStaged: {
+export const evolve: {
   (e: ImportStaged): (s: ImportState) => ImportState
   (s: ImportState, e: ImportStaged): ImportState
 } = dual(2, (_: ImportState, e: ImportStaged): ImportState =>
@@ -60,7 +60,7 @@ export class StageImport extends Domain.Command(
 ) {}
 
 /** What the import decides of `StageImport`. */
-export const decideStageImport = Effect.fn("Import.StageImport")(function* (s: ImportState, cmd: StageImport) {
+export const decide = Effect.fn("Import.StageImport")(function* (s: ImportState, cmd: StageImport) {
   const actor = yield* CurrentActor
   if (actor.role === "viewer") return yield* NotPermitted.make({})
   if (!ImportState.guards.Unstaged(s)) return yield* AlreadyStaged.make({})

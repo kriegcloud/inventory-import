@@ -20,7 +20,7 @@ export class GroupCounted extends Domain.Event(
 ) {}
 
 /** What an import is after `GroupCounted`. */
-export const evolveGroupCounted: {
+export const evolve: {
   (e: GroupCounted): (s: ImportState) => ImportState
   (s: ImportState, e: GroupCounted): ImportState
 } = dual(2, (s: ImportState, e: GroupCounted): ImportState =>

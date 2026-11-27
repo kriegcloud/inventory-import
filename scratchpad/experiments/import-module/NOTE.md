@@ -20,17 +20,27 @@ twelve by a script (not kept) and formatted with the repository's settings. No l
 
 | File | Kind | Holds |
 | --- | --- | --- |
-| `<Command>.command.ts` (seven) | command | the event it records and what that event makes of an import (`evolve<Event>`), the rejections only it returns, the command, and what the import decides of it (`decide<Command>`) |
+| `<Command>.command.ts` (seven) | command | the event it records and what that event makes of an import (`evolve`), the rejections only it returns, the command, and what the import decides of it (`decide`) |
 | `<Event>.event.ts` (two) | event | an event only a decision records (`ActCounted`, `GroupCounted`), and its `evolve` |
 | `Import.rejection.ts` | rejection | the five rejections several commands or decisions return |
 | `Import.state.ts` | state | the state's schema and the four invariants, each a named function |
 | `Import.aggregate.ts` | aggregate | the two unions the transitions read, the 23 transitions, and the listing of everything else |
 
+Every command's and event's file exports the same two names, `evolve` and `decide`, and the aggregate reads each file
+as a namespace, as `effect/Option` is read: `import * as StageImport from "./StageImport.command.ts"`, then
+`StageImport.StageImport`, `StageImport.ImportStaged`, `StageImport.decide`, `StageImport.evolve` (Benjamin,
+2026-11-27).
+
 ## What was found
+
+- **The namespace form needs no change to the prover.** It follows `import * as` already. The same logic as a
+  static of the class (`StageImport.decide` with `StageImport` the class) needs about forty lines added to it
+  (`../command-file/prover-static-member.patch`), and then also verifies on the whole model.
+- **One file, one `evolve`.** A command that records two events would need two names; none of the import's does.
 
 - **It proves what the one file proves** (`ImportModule.test.ts`): 210 lines of standing, the same as the package's
   own aggregate, read from the package.
-- **The whole model verifies with it against the unchanged lock** (`command-file`, `model-full`).
+- **The whole model verifies with it against the unchanged lock** (`command-file`, `model-ns`).
 - **The transitions stay in the aggregate's file, written in place.** Moved to a file of their own they prove the
   same, and the lock then refuses all 23: it keeps each rule's text, and "only an invariant of an aggregate is
   compared with the one it was". Moving them is a relock a person reads, not a refactor. The invariants moved and
@@ -38,7 +48,7 @@ twelve by a script (not kept) and formatted with the repository's settings. No l
 - **`invariants` cannot be one imported object.** With `invariants` and `transitions` each exported as an object and
   the aggregate holding `invariants, transitions`, the prover fails: "declares Import without its invariants". The
   aggregate's file must hold the object, so it lists them by name.
-- **An `evolve` is an exported function, not a static of its event's class.** `ColumnMatched: ColumnMatched.evolve`
+- **Without that change, an `evolve` is an exported function, not a static of its event's class.** `ColumnMatched: ColumnMatched.evolve`
   type-checks and runs, and the prover answers `NotTranslated` for every rule of the command, with a plain static
   and with the `dual` one. The repository patches the prover already (`packages/patches/alchemy-domain.patch`);
   following a static of a class is about forty more lines of it, tried on a copy of the library

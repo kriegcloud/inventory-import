@@ -4,7 +4,7 @@ title: Module taxonomy
 description: Whether the per-unit module shape tried on RPCs in beep-effect (one unit, role-named files, a contract door and a handler door) gives @alchemy.run/domain blocks, and the rest of this repository, one consistent structure. A reading from source and two experiments run: a command in its own file proves as before, and a registry of kinds refuses sixteen of the two contexts' 173 files.
 status: active
 stage: shape
-next: he says whether the import-module shape replaces decision 1, and whether the prover is patched to read a static of an event's class; the brief matches as written (2026-11-27); decisions 2, 6 and 7 are open
+next: he says whether the import-module shape (each command's file read as a namespace) replaces decision 1; the brief matches as written (2026-11-27); decisions 2, 6 and 7 are open
 goals: []
 ---
 
@@ -298,3 +298,7 @@ whether a block's name, tag and stem being equal is a law.
   library: with them `ColumnMatched: ColumnMatched.evolve` proves as the baseline does, and a broken static is
   caught. `scratchpad/experiments/command-file/prover-static-member.patch`. Nothing in `node_modules` or
   `packages/patches` was changed.
+- 2026-11-27: statics on the whole module, as he chose: with the changed prover it proves and the whole model
+  verifies. He then proposed reading each command's file as a namespace instead, as Effect's modules are read
+  (`StageImport.decide`, `StageImport.evolve`, `StageImport.StageImport`). That needs no change to the prover: proved,
+  and the whole model verified against the unchanged lock. `import-module` is now in that form.

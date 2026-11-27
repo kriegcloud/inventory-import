@@ -21,7 +21,7 @@ export class ColumnMatched extends Domain.Event(
 ) {}
 
 /** What an import is after `ColumnMatched`. */
-export const evolveColumnMatched: {
+export const evolve: {
   (e: ColumnMatched): (s: ImportState) => ImportState
   (s: ImportState, e: ColumnMatched): ImportState
 } = dual(2, (s: ImportState, e: ColumnMatched): ImportState =>
@@ -41,7 +41,7 @@ export class MatchColumn extends Domain.Command(
 ) {}
 
 /** What the import decides of `MatchColumn`. */
-export const decideMatchColumn = Effect.fn("Import.MatchColumn")(function* (s: ImportState, cmd: MatchColumn) {
+export const decide = Effect.fn("Import.MatchColumn")(function* (s: ImportState, cmd: MatchColumn) {
   const actor = yield* CurrentActor
   if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})
   if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})

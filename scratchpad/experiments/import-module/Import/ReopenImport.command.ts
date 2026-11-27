@@ -18,7 +18,7 @@ export class ImportReopened extends Domain.Event(
 ) {}
 
 /** What an import is after `ImportReopened`. */
-export const evolveImportReopened: {
+export const evolve: {
   (e: ImportReopened): (s: ImportState) => ImportState
   (s: ImportState, e: ImportReopened): ImportState
 } = dual(2, (s: ImportState, e: ImportReopened): ImportState =>
@@ -58,7 +58,7 @@ export class ReopenImport extends Domain.Command(
 ) {}
 
 /** What the import decides of `ReopenImport`. */
-export const decideReopenImport = Effect.fn("Import.ReopenImport")(function* (s: ImportState, cmd: ReopenImport) {
+export const decide = Effect.fn("Import.ReopenImport")(function* (s: ImportState, cmd: ReopenImport) {
   const actor = yield* CurrentActor
   if (!ImportState.guards.Imported(s) && !ImportState.guards.TakenBack(s)) return yield* NotClosed.make({})
   if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})

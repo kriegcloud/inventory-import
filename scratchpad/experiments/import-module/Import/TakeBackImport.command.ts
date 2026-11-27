@@ -23,7 +23,7 @@ export class ImportTakenBack extends Domain.Event(
 
 // Taken back from its result it says so; taken back while it is open again it stays open.
 /** What an import is after `ImportTakenBack`. */
-export const evolveImportTakenBack: {
+export const evolve: {
   (e: ImportTakenBack): (s: ImportState) => ImportState
   (s: ImportState, e: ImportTakenBack): ImportState
 } = dual(2, (s: ImportState, e: ImportTakenBack): ImportState =>
@@ -77,7 +77,7 @@ export class TakeBackImport extends Domain.Command(
 ) {}
 
 /** What the import decides of `TakeBackImport`. */
-export const decideTakeBackImport = Effect.fn("Import.TakeBackImport")(function* (s: ImportState, cmd: TakeBackImport) {
+export const decide = Effect.fn("Import.TakeBackImport")(function* (s: ImportState, cmd: TakeBackImport) {
   const actor = yield* CurrentActor
   if (!ImportState.guards.Imported(s) && !ImportState.guards.Open(s)) return yield* NotImported.make({})
   if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})

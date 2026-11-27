@@ -22,9 +22,9 @@ import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 import { CurrentActor } from "../Actor/Actor.context.ts"
 import { ImportKey } from "../Review/Change.schema.ts"
-import { ActCounted, evolveActCounted } from "./ActCounted.event.ts"
-import { ConfirmImport, decideConfirmImport, evolveImportConfirmed, ImportConfirmed } from "./ConfirmImport.command.ts"
-import { evolveGroupCounted, GroupCounted } from "./GroupCounted.event.ts"
+import * as ActCounted from "./ActCounted.event.ts"
+import * as ConfirmImport from "./ConfirmImport.command.ts"
+import * as GroupCounted from "./GroupCounted.event.ts"
 import {
   ImportState,
   NoMoreInForceThanRows,
@@ -32,32 +32,22 @@ import {
   OutcomesAddUpToTheRows,
   WhatIsInForceThenIsWhatWasKept
 } from "./Import.state.ts"
-import { ColumnMatched, decideMatchColumn, evolveColumnMatched, MatchColumn } from "./MatchColumn.command.ts"
-import {
-  decideRecordSuggestion,
-  evolveSuggestionRecorded,
-  RecordSuggestion,
-  SuggestionRecorded
-} from "./RecordSuggestion.command.ts"
-import { decideRemoveImport, evolveImportRemoved, ImportRemoved, RemoveImport } from "./RemoveImport.command.ts"
-import { decideReopenImport, evolveImportReopened, ImportReopened, ReopenImport } from "./ReopenImport.command.ts"
-import { decideStageImport, evolveImportStaged, ImportStaged, StageImport } from "./StageImport.command.ts"
-import {
-  decideTakeBackImport,
-  evolveImportTakenBack,
-  ImportTakenBack,
-  TakeBackImport
-} from "./TakeBackImport.command.ts"
+import * as MatchColumn from "./MatchColumn.command.ts"
+import * as RecordSuggestion from "./RecordSuggestion.command.ts"
+import * as RemoveImport from "./RemoveImport.command.ts"
+import * as ReopenImport from "./ReopenImport.command.ts"
+import * as StageImport from "./StageImport.command.ts"
+import * as TakeBackImport from "./TakeBackImport.command.ts"
 
 /** A command the import itself decides, told by its `_tag`. */
 export const ImportCommand = S.Union([
-  StageImport,
-  MatchColumn,
-  RecordSuggestion,
-  ConfirmImport,
-  TakeBackImport,
-  ReopenImport,
-  RemoveImport
+  StageImport.StageImport,
+  MatchColumn.MatchColumn,
+  RecordSuggestion.RecordSuggestion,
+  ConfirmImport.ConfirmImport,
+  TakeBackImport.TakeBackImport,
+  ReopenImport.ReopenImport,
+  RemoveImport.RemoveImport
 ])
   .annotate({ description: "A command the import itself decides" })
   .pipe(S.toTaggedUnion("_tag"))
@@ -66,15 +56,15 @@ export type ImportCommand = typeof ImportCommand.Type
 
 /** An event the import folds: its own commands', and `ActCounted` and `GroupCounted`, which only a decision records. */
 export const ImportEvent = S.Union([
-  ImportStaged,
-  ColumnMatched,
-  ActCounted,
-  GroupCounted,
-  SuggestionRecorded,
-  ImportConfirmed,
-  ImportTakenBack,
-  ImportReopened,
-  ImportRemoved
+  StageImport.ImportStaged,
+  MatchColumn.ColumnMatched,
+  ActCounted.ActCounted,
+  GroupCounted.GroupCounted,
+  RecordSuggestion.SuggestionRecorded,
+  ConfirmImport.ImportConfirmed,
+  TakeBackImport.ImportTakenBack,
+  ReopenImport.ImportReopened,
+  RemoveImport.ImportRemoved
 ])
   .annotate({ description: "An event the import folds, its own or one a decision records on it" })
   .pipe(S.toTaggedUnion("_tag"))
@@ -238,28 +228,36 @@ export class Import extends Domain.Aggregate(
         return actor.role !== "viewer"
       })
     },
-    commands: [StageImport, MatchColumn, RecordSuggestion, ConfirmImport, TakeBackImport, ReopenImport, RemoveImport],
-    events: [ActCounted, GroupCounted],
+    commands: [
+      StageImport.StageImport,
+      MatchColumn.MatchColumn,
+      RecordSuggestion.RecordSuggestion,
+      ConfirmImport.ConfirmImport,
+      TakeBackImport.TakeBackImport,
+      ReopenImport.ReopenImport,
+      RemoveImport.RemoveImport
+    ],
+    events: [ActCounted.ActCounted, GroupCounted.GroupCounted],
     keyOf: (cmd) => cmd.importId,
     decide: {
-      StageImport: decideStageImport,
-      MatchColumn: decideMatchColumn,
-      RecordSuggestion: decideRecordSuggestion,
-      ConfirmImport: decideConfirmImport,
-      TakeBackImport: decideTakeBackImport,
-      ReopenImport: decideReopenImport,
-      RemoveImport: decideRemoveImport
+      StageImport: StageImport.decide,
+      MatchColumn: MatchColumn.decide,
+      RecordSuggestion: RecordSuggestion.decide,
+      ConfirmImport: ConfirmImport.decide,
+      TakeBackImport: TakeBackImport.decide,
+      ReopenImport: ReopenImport.decide,
+      RemoveImport: RemoveImport.decide
     },
     evolve: {
-      ImportStaged: evolveImportStaged,
-      ColumnMatched: evolveColumnMatched,
-      ActCounted: evolveActCounted,
-      GroupCounted: evolveGroupCounted,
-      SuggestionRecorded: evolveSuggestionRecorded,
-      ImportConfirmed: evolveImportConfirmed,
-      ImportTakenBack: evolveImportTakenBack,
-      ImportReopened: evolveImportReopened,
-      ImportRemoved: evolveImportRemoved
+      ImportStaged: StageImport.evolve,
+      ColumnMatched: MatchColumn.evolve,
+      ActCounted: ActCounted.evolve,
+      GroupCounted: GroupCounted.evolve,
+      SuggestionRecorded: RecordSuggestion.evolve,
+      ImportConfirmed: ConfirmImport.evolve,
+      ImportTakenBack: TakeBackImport.evolve,
+      ImportReopened: ReopenImport.evolve,
+      ImportRemoved: RemoveImport.evolve
     }
   },
   { description: "One import's lifecycle, which numbers every change of its review" }

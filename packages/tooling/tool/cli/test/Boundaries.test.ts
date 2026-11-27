@@ -236,6 +236,103 @@ describe("laws boundaries", () => {
       })
   )
 
+  // Benjamin, 2026-11-26: "A second app, apps/model, with one new row in the boundaries law so packages/infra may
+  // declare it". The stack yields the model's Worker, so its code imports the app's Worker entry, and nothing else.
+  it.effect("lets the infra package's code import the model app's Worker entry, declared, and nothing else of it", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        {
+          ...base,
+          "packages/infra/package.json": pkg(
+            "@x/infra",
+            { family: "infra" },
+            { "@inventory/model-app": "workspace:*" }
+          ),
+          "packages/infra/src/stack.ts": 'import "@inventory/model-app/Worker"\n',
+          "packages/infra/src/other.ts": 'import "@inventory/model-app/Routes"\nimport "@inventory/model-app"\n',
+          "packages/infra/test/stack.test.ts": 'import "@inventory/model-app/Worker"\n',
+          "apps/model/package.json": pkg("@inventory/model-app", {}),
+          "packages/drivers/d1/package.json": pkg(
+            "@x/d1",
+            { family: "drivers" },
+            { "@inventory/model-app": "workspace:*" }
+          ),
+          "packages/drivers/d1/src/main.ts": 'import "@inventory/model-app/Worker"\n'
+        },
+        Effect.map(boundaries(), render(boundariesSentence))
+      )
+      expect(printed(report)).toEqual([
+        "err: check-boundaries FAIL",
+        "err:   @x/d1 declares @inventory/model-app, which its layer may not use",
+        "err:   packages/drivers/d1/src/main.ts imports @inventory/model-app, which its layer may not use",
+        "err:   packages/infra/src/other.ts imports @inventory/model-app, which its layer may not use",
+        "err:   packages/infra/test/stack.test.ts imports @inventory/model-app, which its layer may not use"
+      ])
+    })
+  )
+
+  // The row names the one app: any other app, the site's included, is still not infra's to declare or import, so the
+  // stack never depends on the app whose stack test depends on it.
+  it.effect("refuses the infra package any app but the model's Worker, the site's included", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        {
+          ...base,
+          "packages/infra/package.json": pkg(
+            "@x/infra",
+            { family: "infra" },
+            { "@x/site": "workspace:*", "@inventory/model-app": "workspace:*" }
+          ),
+          "packages/infra/src/stack.ts": 'import "@x/site/Worker"\nimport "@inventory/model-app/Worker"\n',
+          "apps/model/package.json": pkg("@inventory/model-app", {}),
+          "apps/site/package.json": json({
+            name: "@x/site",
+            beep: {},
+            dependencies: {},
+            devDependencies: { "@x/infra": "workspace:*" }
+          }),
+          "apps/site/test/stack.slow.test.ts": 'import "@x/infra/InventoryDev"\n'
+        },
+        Effect.map(boundaries(), render(boundariesSentence))
+      )
+      expect(printed(report)).toEqual([
+        "err: check-boundaries FAIL",
+        "err:   @x/infra declares @x/site, which its layer may not use",
+        "err:   packages/infra/src/stack.ts imports @x/site, which its layer may not use"
+      ])
+    })
+  )
+
+  // Before, the Worker's exception came ahead of the test-only check, so the stack's code imported the model app
+  // declared only in devDependencies and passed. Declared in peerDependencies, it is there for the code.
+  it.effect("refuses the Worker entry in src when the infra package declares the model app only for its tests", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        {
+          ...base,
+          "packages/infra/package.json": json({
+            name: "@x/infra",
+            beep: { family: "infra" },
+            devDependencies: { "@inventory/model-app": "workspace:*" }
+          }),
+          "packages/infra/src/stack.ts": 'import "@inventory/model-app/Worker"\n',
+          "packages/infra-peer/package.json": json({
+            name: "@x/infra-peer",
+            beep: { family: "infra" },
+            peerDependencies: { "@inventory/model-app": "workspace:*" }
+          }),
+          "packages/infra-peer/src/stack.ts": 'import "@inventory/model-app/Worker"\n',
+          "apps/model/package.json": pkg("@inventory/model-app", {})
+        },
+        Effect.map(boundaries(), render(boundariesSentence))
+      )
+      expect(printed(report)).toEqual([
+        "err: check-boundaries FAIL",
+        "err:   packages/infra/src/stack.ts imports @inventory/model-app, which @x/infra declares only for its tests (devDependencies): declare it in dependencies, or keep it in test"
+      ])
+    })
+  )
+
   // Report 14 section 7.2: the ontology package may use the foundation, the kernel and a context's contract package,
   // and nothing else of the repository's.
   it.effect("lets the ontology package use the foundation, the kernel and a context's contract, and nothing else", () =>

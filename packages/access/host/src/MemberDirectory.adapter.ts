@@ -32,6 +32,11 @@ const Chosen = S.Struct({ userId: UserId, organizationId: S.OptionFromNullOr(Org
   description: "A user and the organization they chose, or null for their earliest"
 })
 
+/** A member and the organization they are asked about. */
+const MemberIn = S.Struct({ id: MemberId, organizationId: OrganizationId }).annotate({
+  description: "A member's id and the organization a guarded read asks whether they are still in"
+})
+
 /**
  * `MemberDirectory` over `member`, `organization` and `user`.
  *
@@ -62,6 +67,14 @@ export const MemberDirectoryD1: Layer.Layer<MemberDirectory, never, SqlClient.Sq
         ORDER BY m.createdAt, m.id LIMIT 1`
     })
 
+    // A removed member keeps their row, with `removedAt` set and no account: they are not in it any more.
+    const findStillIn = SqlSchema.findOneOption({
+      Request: MemberIn,
+      Result: Member,
+      execute: ({ id, organizationId }) =>
+        sql`${select} WHERE m.id = ${id} AND m.organizationId = ${organizationId} AND m.removedAt IS NULL`
+    })
+
     const findInOrganization = SqlSchema.findAll({
       Request: OrganizationId,
       Result: Member,
@@ -89,6 +102,9 @@ export const MemberDirectoryD1: Layer.Layer<MemberDirectory, never, SqlClient.Sq
     return MemberDirectory.of({
       byId: Effect.fn("Members.findById")(function* (id: MemberId) {
         return yield* findOne(id).pipe(Effect.orDie)
+      }),
+      stillIn: Effect.fn("Members.stillIn")(function* (member: Pick<Member, "id" | "organizationId">) {
+        return yield* findStillIn({ id: member.id, organizationId: member.organizationId }).pipe(Effect.orDie)
       }),
       actorFor: Effect.fn("Members.findByUser")(function* (user: SignedInUser) {
         return yield* findMembership({

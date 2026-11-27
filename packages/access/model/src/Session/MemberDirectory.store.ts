@@ -56,6 +56,12 @@ export class MemberDirectory extends Context.Service<
     readonly testAccounts: (users: ReadonlyArray<UserId>) => Effect.Effect<ReadonlyArray<TestAccount>>
     /** One member by id, whatever their organization: the test identity's lookup, where a header names the member. */
     readonly byId: (member: MemberId) => Effect.Effect<O.Option<Member>>
+    /**
+     * The member as the record holds them now, in the organization named: none once they were removed from it, or
+     * when they were never in it. The check a guarded read is to make on every push, through the kernel's
+     * `SessionLookup.memberNow`; no read makes it yet.
+     */
+    readonly stillIn: (member: Pick<Member, "id" | "organizationId">) => Effect.Effect<O.Option<Member>>
   }
 >()($I`MemberDirectory`) {
   /** The directory over the shared in-memory state. */
@@ -115,6 +121,16 @@ export class MemberDirectory extends Context.Service<
           const state = yield* Ref.get(ref)
           return O.map(
             A.findFirst(state.memberships, (row) => row.member.id === member),
+            (row) => row.member
+          )
+        }),
+        stillIn: Effect.fn("Members.stillIn")(function* (member: Pick<Member, "id" | "organizationId">) {
+          const state = yield* Ref.get(ref)
+          return O.map(
+            A.findFirst(
+              current(state),
+              (row) => row.member.id === member.id && row.member.organizationId === member.organizationId
+            ),
             (row) => row.member
           )
         })

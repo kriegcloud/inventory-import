@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "rules": {
+    "Usage": {
+      "Allowance.NeverMoreThanFortyInADay": {
+        "kind": "invariant",
+        "source": "(s) =>\n        AllowanceState.guards.Fresh(s) || (s.taken >= 1 && s.taken <= dailyModelCalls)"
+      },
+      "Allowance.WithinADayTheCountRisesByOne": {
+        "kind": "transition",
+        "source": "({ before, after }) =>\n        !AllowanceState.guards.Counting(before) ||\n        !AllowanceState.guards.Counting(after) ||\n        after.day !== before.day ||\n        after.taken === before.taken + 1"
+      },
+      "Allowance.ANewDayStartsAtOne": {
+        "kind": "transition",
+        "source": "({ before, after }) =>\n        !AllowanceState.guards.Counting(after) ||\n        (AllowanceState.guards.Counting(before) && before.day === after.day) ||\n        after.taken === 1"
+      },
+      "Allowance.ADayChangesOnlyForward": {
+        "kind": "transition",
+        "source": "({ before, after }) =>\n        !AllowanceState.guards.Counting(before) || !AllowanceState.guards.Counting(after) || after.day >= before.day"
+      },
+      "Allowance.AnAllowanceNeverChangesOrganization": {
+        "kind": "transition",
+        "source": "({ before, after }) =>\n        !AllowanceState.guards.Counting(before) ||\n        !AllowanceState.guards.Counting(after) ||\n        before.organizationId === after.organizationId"
+      },
+      "Allowance.OnlyItsOwnOrganizationTakesACall": {
+        "kind": "transition",
+        "source": "Effect.fn(\"Allowance.OnlyItsOwnOrganizationTakesACall\")(function* ({\n        command\n      }) {\n        return (yield* CurrentActor).organizationId === command.organizationId\n      })"
+      },
+      "Allowance.AViewerTakesOnlyTheAssistantsCall": {
+        "kind": "transition",
+        "source": "Effect.fn(\"Allowance.AViewerTakesOnlyTheAssistantsCall\")(function* ({\n        command\n      }) {\n        return (yield* CurrentActor).role !== \"viewer\" || command.purpose === \"view\"\n      })"
+      },
+      "Allowance.EveryCallSaysWhoAndWhatFor": {
+        "kind": "transition",
+        "source": "Effect.fn(\"Allowance.EveryCallSaysWhoAndWhatFor\")(function* ({ command, events }) {\n        const actor = yield* CurrentActor\n        return A.every(events, (e) => e.by === actor.memberId && e.purpose === command.purpose)\n      })"
+      },
+      "Usage.ACallCanBeTaken": {
+        "kind": "sometimes",
+        "source": "(all) => A.some(all.Allowance, (allowance) => A.isReadonlyArrayNonEmpty(allowance.events))"
+      }
+    }
+  }
+}

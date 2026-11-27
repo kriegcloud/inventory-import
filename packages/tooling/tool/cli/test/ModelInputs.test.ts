@@ -145,6 +145,43 @@ describe("laws model-inputs", () => {
     })
   )
 
+  // Before, a task with no inputs passed whatever its walks reached. Turbo then reads the package's own files and no
+  // other: a story's helper outside the package, or a file of a workspace it depends on reached by a path, can change
+  // and replay an old pass. Its dependency's files come into the hash only through a task it depends on, never
+  // because the package declares it.
+  it.effect("reads a task with no inputs as the package's own files, and refuses what its walks reach outside", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        {
+          "packages/shop/package.json": json({
+            name: "@x/shop",
+            beep: { layer: "model" },
+            dependencies: { "@x/lib": "workspace:*" }
+          }),
+          "packages/shop/turbo.json": json({ tasks: { verify: { outputs: [] }, mutants: {} } }),
+          "packages/shop/src/Shop.model.ts": 'import { a } from "./A.ts"\nimport { b } from "../../lib/src/B.ts"\n',
+          "packages/shop/src/A.ts": "export const a = 1\n",
+          "packages/shop/test/Shop.test.ts": 'import { t } from "../../helpers/T.ts"\n',
+          "packages/shop/test/Pay.story.test.ts": 'import { s } from "../../helpers/Story.ts"\n',
+          "packages/shop/mutants/mutants.json": json({ stories: ["test/Pay.story.test.ts"], sample: [], mutants: [] }),
+          "packages/lib/package.json": json({ name: "@x/lib" }),
+          "packages/lib/src/B.ts": "export const b = 1\n",
+          "packages/helpers/T.ts": "export const t = 1\n",
+          "packages/helpers/Story.ts": "export const s = 1\n"
+        },
+        Effect.map(modelInputs(), render(modelInputsSentence))
+      )
+      expect(printed(report).slice(1)).toEqual([
+        'err:   packages/lib/src/B.ts, which packages/shop/src/Shop.model.ts imports, is outside packages/shop, and verify in packages/shop/turbo.json names no inputs, so it reads only the package\'s own files: write its inputs as "$TURBO_DEFAULT$" and "$TURBO_ROOT$/packages/lib/src/B.ts"',
+        'err:   packages/helpers/Story.ts, which packages/shop/test/Pay.story.test.ts imports, is outside packages/shop, and verify in packages/shop/turbo.json names no inputs, so it reads only the package\'s own files: write its inputs as "$TURBO_DEFAULT$" and "$TURBO_ROOT$/packages/helpers/Story.ts"',
+        'err:   packages/helpers/T.ts, which packages/shop/test/Shop.test.ts imports, is outside packages/shop, and verify in packages/shop/turbo.json names no inputs, so it reads only the package\'s own files: write its inputs as "$TURBO_DEFAULT$" and "$TURBO_ROOT$/packages/helpers/T.ts"',
+        'err:   packages/lib/src/B.ts, which packages/shop/src/Shop.model.ts imports, is outside packages/shop, and mutants in packages/shop/turbo.json names no inputs, so it reads only the package\'s own files: write its inputs as "$TURBO_DEFAULT$" and "$TURBO_ROOT$/packages/lib/src/B.ts"',
+        'err:   packages/helpers/Story.ts, which packages/shop/test/Pay.story.test.ts imports, is outside packages/shop, and mutants in packages/shop/turbo.json names no inputs, so it reads only the package\'s own files: write its inputs as "$TURBO_DEFAULT$" and "$TURBO_ROOT$/packages/helpers/Story.ts"',
+        'err:   packages/helpers/T.ts, which packages/shop/test/Shop.test.ts imports, is outside packages/shop, and mutants in packages/shop/turbo.json names no inputs, so it reads only the package\'s own files: write its inputs as "$TURBO_DEFAULT$" and "$TURBO_ROOT$/packages/helpers/T.ts"'
+      ])
+    })
+  )
+
   it.effect("walks from every code file a task's inputs read: a proof, a helper, a mutant", () =>
     Effect.gen(function* () {
       const report = yield* inTree(
@@ -173,6 +210,51 @@ describe("laws model-inputs", () => {
         'err:   packages/shop/lib/Cut.cts, which packages/shop/mutants/Flip.ts imports, is in no input of prove in packages/shop/turbo.json: add "lib/Cut.cts" to its inputs',
         'err:   packages/shop/src/Words.rules.ts, which packages/shop/test/Pay.prove.test.ts imports, is in no input of prove in packages/shop/turbo.json: add "src/**/*.rules.ts" to its inputs',
         'err:   packages/shop/src/Seen.rules.mts, which packages/shop/test/Pay.prove.test.ts imports, is in no input of prove in packages/shop/turbo.json: add "src/**/*.rules.mts" to its inputs'
+      ])
+    })
+  )
+
+  // Before, a story file the mutants file names, and what it imports, passed when no input of the mutants' tasks read
+  // it: the walk started only from files the inputs already match, and turbo replayed an old run when it changed.
+  it.effect("walks the mutants' tasks from every file their mutants file names, and refuses one that is no file", () =>
+    Effect.gen(function* () {
+      const inputs = ["src/**/*.decision.ts", "test/**/*.prove.test.ts", "mutants/**"]
+      const report = yield* inTree(
+        {
+          "packages/shop/package.json": json({ name: "@x/shop", beep: { layer: "model" } }),
+          "packages/shop/turbo.json": json({ tasks: { mutants: { inputs }, "mutants:sample": { inputs } } }),
+          "packages/shop/src/Pay.decision.ts": "export const pay = 1\n",
+          "packages/shop/test/Pay.prove.test.ts": "export const proved = 1\n",
+          "packages/shop/test/Pay.api.test.ts": 'import { session } from "./session.ts"\n',
+          "packages/shop/test/session.ts": "export const session = 1\n",
+          "packages/shop/mutants/mutants.json": json({
+            stories: ["test/Pay.api.test.ts", "test/Gone.story.test.ts"],
+            sample: [],
+            mutants: [
+              {
+                key: "pay-check",
+                target: "Pay",
+                kind: "check",
+                file: "src/Pay.decision.ts",
+                anchors: ["export"],
+                old: "1",
+                new: "2",
+                proof: "test/Pay.prove.test.ts",
+                expect: "rule",
+                trialRules: [],
+                trialStories: []
+              }
+            ]
+          })
+        },
+        Effect.map(modelInputs(), render(modelInputsSentence))
+      )
+      expect(printed(report).slice(1)).toEqual([
+        "err:   packages/shop/mutants/mutants.json names test/Gone.story.test.ts, which is no file of packages/shop: write the path of the test it means",
+        'err:   packages/shop/test/Pay.api.test.ts, which packages/shop/mutants/mutants.json names, is in no input of mutants in packages/shop/turbo.json: add "test/**/*.test.ts" to its inputs',
+        'err:   packages/shop/test/session.ts, which packages/shop/test/Pay.api.test.ts imports, is in no input of mutants in packages/shop/turbo.json: add "test/session.ts" to its inputs',
+        'err:   packages/shop/test/Pay.api.test.ts, which packages/shop/mutants/mutants.json names, is in no input of mutants:sample in packages/shop/turbo.json: add "test/**/*.test.ts" to its inputs',
+        'err:   packages/shop/test/session.ts, which packages/shop/test/Pay.api.test.ts imports, is in no input of mutants:sample in packages/shop/turbo.json: add "test/session.ts" to its inputs'
       ])
     })
   )

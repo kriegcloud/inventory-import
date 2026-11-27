@@ -18,11 +18,12 @@ import { changedCheckArguments } from "./commands/Check/CheckChanged.schema.ts"
 import * as Command from "effect/cli/Command"
 import * as Digest from "effect/crypto/Digest"
 import { Workstation } from "./commands/Infra/Workstation.service.ts"
+import { Vitest } from "./commands/Mutants/Vitest.service.ts"
 import { Repo } from "./Repo.service.ts"
 import { rootCommand } from "./Root.command.ts"
 
-/** What every command runs with: the workstation's tools, the repository, Bun's services and a digest. */
-const services = Workstation.layer.pipe(
+/** What every command runs with: the workstation's tools, vitest, the repository, Bun's services and a digest. */
+const services = Layer.merge(Workstation.layer, Vitest.layer).pipe(
   Layer.provideMerge(Repo.layer()),
   Layer.provideMerge(BunServices.layer),
   Layer.provide(Digest.layerWebCrypto)

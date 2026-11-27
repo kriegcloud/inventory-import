@@ -294,8 +294,9 @@ jobs:
           echo "rest, web, slow: $RESULTS"
           for result in $RESULTS; do [ "$result" = success ] || exit 1; done
 
-  # The review's model, apart from the jobs above: its proofs, the search of the whole model, the property that holds it
-  # against the review region (`fold`) and a sample of its mutants. Each is a turbo task that names what it reads: the
+  # The models, apart from the jobs above: the review's model and the usage model each with its proofs, its search
+  # and a sample of its mutants (`mutants:sample` in packages/catalog/model and packages/usage/model), and the property
+  # that holds the review's model against the review region (`fold`). Each is a turbo task that names what it reads: the
   # proofs, the search and the mutants rerun when the model's files, its stories or proofs, the mutants, the kernel,
   # the pinned library or a version the lockfile resolves for the package change; the fold reruns on any change to
   # the web package or what it imports. The three long ones start at once, a runner each: the proofs, the search,

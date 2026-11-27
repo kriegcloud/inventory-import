@@ -1215,3 +1215,62 @@ index e4502fb..8e01f7d 100644
            };
          }
          return (
+Package: @alchemy.run/domain
+Applies-to: vendor/alchemy/alchemy.run-domain-e1c3e6d.tgz
+Upstream: not yet reported
+Why: Verify runs each sequence its search found as a `Story`, and a `Story` starts its clock at a time of its own
+  (2026-01-01 at this pin). The search gives the commands of a short sequence one time, the solver's first (the
+  epoch), and a sequence whose commands share one time is written with no clock step. A `decide` that reads `now`
+  (the usage model's allowance works out its day from it) then records another day when the sequence runs as a story
+  than the search read, and Verify reports that the model does something else. With this every found sequence sets
+  the clock before its first command, so the story runs it when the search did, whatever time the story starts at.
+Remove-when: The library's found sequences set the clock the search used before their first command.
+  `bun run beep patches prove` then says this patch's test passes without it.
+Test: test/alchemy-domain/06-a-found-sequence-keeps-its-time/FoundSequenceTime.test.ts
+
+diff --git a/lib/Explore/internal/Script.js b/lib/Explore/internal/Script.js
+index 36af935..06b1c41 100644
+--- a/lib/Explore/internal/Script.js
++++ b/lib/Explore/internal/Script.js
+@@ -10,7 +10,6 @@ import { whole } from "./ModelSearch.js";
+ export const ops = (shown) => {
+     const story = whole(shown);
+     const made = [];
+-    const timed = new Set(story.map((step) => DateTime.toEpochMillis(step.now))).size > 1;
+     const provided = new Map();
+     let clock;
+     let at = 0;
+@@ -39,7 +38,9 @@ export const ops = (shown) => {
+                     value: context.value,
+                 });
+             }
+-            if (timed && clock !== now) {
++            // A `Story` starts its clock at a time of its own: the first command sets the clock the
++            // search ran it at, even when every command of the sequence shares that time.
++            if (clock !== now) {
+                 made.push({ _tag: "Clock", at: head.now });
+                 clock = now;
+             }
+diff --git a/src/Explore/internal/Script.ts b/src/Explore/internal/Script.ts
+index 6052032..ff42e0f 100644
+--- a/src/Explore/internal/Script.ts
++++ b/src/Explore/internal/Script.ts
+@@ -38,7 +38,6 @@ export type Op =
+ export const ops = (shown: Story): ReadonlyArray<Op> => {
+   const story = whole(shown);
+   const made: Array<Op> = [];
+-  const timed = new Set(story.map((step) => DateTime.toEpochMillis(step.now))).size > 1;
+   const provided = new Map<string, string>();
+   let clock: number | undefined;
+   let at = 0;
+@@ -65,7 +64,9 @@ export const ops = (shown: Story): ReadonlyArray<Op> => {
+           value: context.value,
+         });
+       }
+-      if (timed && clock !== now) {
++      // A `Story` starts its clock at a time of its own: the first command sets the clock the
++      // search ran it at, even when every command of the sequence shares that time.
++      if (clock !== now) {
+         made.push({ _tag: "Clock", at: head.now });
+         clock = now;
+       }

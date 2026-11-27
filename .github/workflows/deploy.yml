@@ -42,7 +42,10 @@ jobs:
       github.event_name == 'pull_request' && github.event.action != 'closed' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Each of the three deploy jobs gets 45 minutes (Benjamin, 2026-11-26, "Deploy jobs to 45 minutes"): a deploy
+    # waits up to 30 for the model's new views to be filled (the library's default `backfillTimeout`), so a job cut
+    # off at 20 would end before the library could say the fill is still running.
+    timeout-minutes: 45
     environment: preview
     concurrency:
       group: deploy-pr-${{ github.event.pull_request.number }}
@@ -126,7 +129,8 @@ jobs:
       github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 45 minutes, as the preview's job, for the same wait.
+    timeout-minutes: 45
     environment: staging
     # A group of its own only for a run that deploys: any other run of this workflow gets a group nobody shares, so
     # it cannot cancel a staging deploy that is waiting, whether or not GitHub reads a skipped job's group.
@@ -240,7 +244,8 @@ jobs:
     # Only when the guard named a tag: a release branch's head with no tag deploys nothing and asks nobody.
     if: needs.release-tag.outputs.tag != ''
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 45 minutes, as the preview's job, for the same wait.
+    timeout-minutes: 45
     # Waits for the approval the environment asks for. Only a run whose ref is main may use it, which a run started
     # from CI's completed run is, and a pull request's or a pushed branch's own workflow is not.
     environment: production

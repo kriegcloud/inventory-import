@@ -20,5 +20,10 @@
     "export": "ModelCallPurpose",
     "as": "scheme"
   },
+  {
+    "file": "packages/usage/contract/src/Allowance/ModelCall.payload.ts",
+    "export": "ModelCallPurpose",
+    "as": "scheme"
+  },
   { "file": "packages/access/contract/src/Session/SessionState.read.ts", "export": "Membership", "as": "noTerm" }
 ]

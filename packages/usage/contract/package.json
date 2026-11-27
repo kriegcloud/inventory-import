@@ -1,0 +1,34 @@
+{
+  "name": "@inventory/usage-contract",
+  "version": "0.0.0",
+  "private": true,
+  "description": "What the rest of the app may know of the day's model calls: how many an organization may make in a UTC day, and what a call is for",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    "./ModelCall": "./src/Allowance/ModelCall.payload.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "lint": "oxlint --quiet src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/identity": "workspace:*",
+    "@beep/schema": "workspace:*",
+    "@inventory/kernel": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "vitest": "catalog:"
+  },
+  "beep": {
+    "family": "context",
+    "context": "usage",
+    "layer": "contract"
+  }
+}

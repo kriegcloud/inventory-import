@@ -862,3 +862,93 @@ reconnects under another person's cookie is refused and the page asks to load ag
 receiving within a minute; and the boundaries law stays as it is. Rejected: deleting the record of who used a call
 before I have said whether it matters; a push for one account reaching another account's page; a revoked session
 that keeps receiving for days; contexts coupled through one host. Reverse: a new decision by him.
+
+### 2026-11-26 — Move 2, fourth round: the deploy token, the deploy's wait, telemetry, the harness test
+
+| Question | Options, the recommended one first | Answer |
+| --- | --- | --- |
+| The model's Worker brings the library's Backfill, which runs on a Cloudflare Workflow, and production's deploy token names no such permission. How is the token made ready? | The permission is added to the GitHub stack's code and to `beep infra setup`'s check of my preview token, and I apply the stack before move 2's first deploy; nothing until a deploy is refused and names the group | "Add the permission first" |
+| The library waits up to 30 minutes for a new view to be filled and GitHub ends a deploy job after 20. Which gives way? | The three deploy jobs get 45 minutes; `backfillTimeout` of about 12 minutes; both left as they are | "Deploy jobs to 45 minutes" |
+| Which stages does the model's Worker send its own spans and metrics from? | The same rule and collector as Cloudflare's own telemetry (staging and prod when the address is set, locally through `bun run telemetry`); previews too; not wired at move 2 | "Same rule, same collector" |
+| How does the harness test of the allowance reach `TakeCall`, which only the service binding serves, and where does it live? | Beside the stack test in `apps/inventory/test/stack`, sent to the local address `alchemy dev` gives the model's Worker; through the site's Worker as a page does; in `apps/model` with a harness of its own | "Beside the stack test" |
+
+I chose; the agent recommended the same, all four. Applying the GitHub stack stays mine. The exact name of
+Cloudflare's permission for Workflows was not checked when I was asked: it is read from the provider before the
+stack's code changes. Rejected: a first deploy that fails halfway; a fill cut off with no word of why; preview
+traffic at the collector; a second package that declares the harness. Reverse: a new decision by him.
+
+Not asked, with the reason. What identifies a model call in the vocabulary (the ratified term `ModelCall` names the
+`modelCall` table's key): the table stays until move 7, so the term is true until then.
+
+### 2026-11-26 — Move 2: which Worker builds Better Auth on Alchemy's package
+
+Asked once the pinned `@alchemy.run/better-auth` had been read: its `BetterAuth` needs Alchemy's runtime context and
+an Alchemy resource for its secret (`src/BetterAuth.ts`), so it runs only inside an Alchemy Worker, and the site's
+Worker is a plain `fetch` that keeps `/api/auth/*` (decision 31). Options, the recommended one first: the model's
+Worker only, as a second construction from the one options module, with the package's own migration turned off and
+the site's secret passed in, while the site's Worker keeps `betterAuth()`; the site's Worker rebuilt as an Alchemy
+Worker; only the model's Worker builds it and sign-in is forwarded across the binding. Answer: "Model's Worker only".
+I chose; the agent recommended the same. This narrows my answer of the same day that `@beep/better-auth` is "built on
+Alchemy's `BetterAuth`": that holds for the model's Worker. Same tables, secret and cookie, so one sign-in covers
+both Workers. Rejected: reversing the site's plain Worker, or decision 31's list of what stays on it. Reverse: a new
+decision by him.
+
+### 2026-11-27 — Move 2, after the first slices were built: the limit's home, a gap in the library, a taken id
+
+| Question | Options, the recommended one first | Answer |
+| --- | --- | --- |
+| The limit of 40 calls a day and the three purposes of a call live in access's contract, which the `Usage` model may not import. Where does the one copy live? | A new `packages/usage/contract`, which also takes the `ModelAllowance` gateway at the hosted half; the kernel; each context keeps its own copy | "packages/usage/contract" |
+| Verify gives every command of a found sequence the same time and replays it as a story that starts on 2026-01-01, so a model whose `decide` reads the clock fails the replay. How is the gap handled? | A repository patch with its own test, dropped when the library fixes it; the test keeps starting each replay at the epoch; reported upstream only | "A repository patch" |
+| What does staging an import under an id another organization already used answer? | Today's "No import with that id in your organization."; "already staged" | "Today's not-found sentence" |
+
+I chose; the agent recommended the same, all three. Rejected: a number and a list of one context in the kernel, or
+three copies no check compares; a test that rests on the solver picking the epoch; telling a member plainly that
+another organization's import exists. Reverse: a new decision by him.
+
+Decided by the rule, for him to overrule. A live read that lost its connection is said with today's "The server
+could not be reached..." and an undeclared failure with today's "Something went wrong on our side...": no new words
+(the brief's no-go). In the catalog's model the role is checked before the organization, as today's handlers do
+(`requireRole("editor")`, then the import is looked up), so a viewer of another organization reads the sentence
+about their own role.
+
+### 2026-11-27 — Move 2, after the second round: the limit's copies, the ontology mark, Usage's refusal
+
+| Question | Options, the recommended one first | Answer |
+| --- | --- | --- |
+| The boundaries law lets neither access's contract, access's model nor the catalog's in-memory ports read `packages/usage/contract`, so the limit of 40 and the three purposes are still written in three places. What holds the copies together until the old allowance is deleted? | A test in a package that may read all three; a new row of the law that opens the usage contract to every contract and model; the kernel holds them | "Compare test" |
+| The usage contract's `ModelCallPurpose` carries the mark of `inv:ModelCallPurposeScheme` and only access's copy is enrolled. Where is the mark enrolled? | Both copies; the usage contract's only; access's only | "Enrol both" |
+| What does `Usage` answer a take, or a read of the day's count, that names another organization? | 404, as the catalog answers another organization's import; 403 `NotYourOrganization` | "404, like the catalog" |
+
+I chose; the agent recommended the same, all three. The test is `apps/inventory/test/server/ModelCallCopies.test.ts`,
+since only an app may read every context; it and access's enrolment go when the old allowance does. The refusal is
+`AllowanceNotFound`, with no sentence of its own: no screen reads the count at move 2, and the site's Worker always
+names the actor's own organization. Rejected: the first contract every context may read; a copy the scheme's gate
+does not check; two answers for one kind of mistake. Reverse: a new decision by him.
+
+Decided by the rule, for him to overrule. The member's id is the last segment of the live read's address (the
+library adds `?read=` itself, so it cannot be a query field); the site's Worker reads it there at web-02.
+
+### 2026-11-27 — Move 2, after the third round: the deploy token, the database's home, host-06
+
+| Question | Options, the recommended one first | Answer |
+| --- | --- | --- |
+| The provider's catalog has no permission group named for Workflows, and Cloudflare's reference accepts "Workers Scripts Write", which the deploy token holds, on the four Workflows calls a backfill makes. What does the token get? | Nothing more, confirmed by the first deploy that starts a backfill; "Workers Admin" as well; a name I read from the live list | "Leave it as it is" |
+| Both Workers bind one D1 database. Where is it declared? | `packages/infra`, as today; `apps/model`, which infra imports | "Stay in packages/infra" |
+| INVENTORY's host-06 says `bun run dev` starts both Workers under `alchemy dev`, which my answer "Keep Vite; dev:alchemy beside it" ended. How does it read? | "`bun run dev:alchemy` starts both Workers", the model's on its own local address; the same with no local address for the model's Worker | "Restate for dev:alchemy" |
+
+I chose; the agent recommended the same, all three. This replaces "add the Workflows permission in code first" of
+2026-11-26: there is no such group to name. If the first deploy that starts a backfill is refused, the permission is
+added then and I apply the stack. Under `dev:alchemy` the model's Worker answers on localhost:1338, its server
+prefix too; deployed it has no address of its own (`workersDev: false`). Rejected: a wider permission the reference
+does not ask for; moving a declared database; a harness that can reach the model's Worker only through the site's.
+Reverse: a new decision by him.
+
+### 2026-11-27 — Move 2: how long the model's Worker keeps receipts (host-07)
+
+**Asked:** the library keeps a command's receipt 30 days by default, and delivery marks and cancelled schedules 7
+days. I was told a receipt is kept for ever, and the kept queue of presses rests on it. How long are receipts kept?
+**Options:** receipts for ever, the other two at the library's 7 days; the library's defaults; one year. Answer:
+"Receipts forever". I chose; the agent recommended the same. One `retention` value, `receipts: "forever"`, is passed
+by every model in the model's Worker, so a kept press is never applied twice however old it is; each record's object
+grows by one row an act and is not trimmed. Rejected: a window after which a press is decided again, which would
+need a second decision on what an older press does. Reverse: a new decision by him.

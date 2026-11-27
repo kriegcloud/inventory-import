@@ -14,6 +14,8 @@ import * as P from "effect/Predicate"
 import * as S from "effect/Schema"
 import * as HttpClientError from "effect/http/HttpClientError"
 import * as HttpApiError from "effect/http-api/HttpApiError"
+import * as RpcClientError from "effect/rpc/RpcClientError"
+import * as Socket from "effect/socket/Socket"
 import { Forbidden, NotSignedIn } from "@inventory/kernel/AccessError"
 import { toast } from "sonner"
 
@@ -52,20 +54,12 @@ const DraftBusy = S.TaggedStruct("DraftBusy", {})
 const FileProblem = S.TaggedStruct("FileProblem", { problem: S.String, todo: S.String })
 const ReadFailed = S.TaggedStruct("ReadFailed", { message: S.String })
 const FileNotKept = S.TaggedStruct("FileNotKept", {})
-const isBadRequest = S.is(HttpApiError.BadRequestProblem)
-const isServerProblem = S.is(HttpApiError.InternalServerErrorProblem)
-const isFileProblem = S.is(FileProblem)
-const isReadFailed = S.is(ReadFailed)
-const isFileNotKept = S.is(FileNotKept)
 
 const NonblankReason = S.String.check(S.isPattern(/\S/)).annotate({
   description: "A failure's sentence for the person, preserving its original whitespace when nonblank."
 })
 const reasonOf = (error: unknown): O.Option<string> =>
   P.hasProperty(error, "reason") ? O.liftPredicate(error.reason, S.is(NonblankReason)) : O.none()
-
-const statusOf = (error: HttpClientError.HttpClientError): O.Option<number> =>
-  "response" in error.reason ? O.some(error.reason.response.status) : O.none()
 
 const FieldWords = S.String.pipe(
   S.decode(
@@ -156,7 +150,7 @@ export const sayError: {
     // Said by its kind, from the sentences the app installed (the contract's `modelSentences`), never by the error's
     // own text: a provider's words never reach the screen.
     Match.when(S.is(ModelTrouble), (trouble) => said("The model did not answer", troubleSentence(trouble.kind))),
-    Match.when(isBadRequest, () => {
+    Match.when(S.is(HttpApiError.BadRequestProblem), () => {
       const problems = requestProblems(error, options.fields)
       return A.match(problems, {
         onEmpty: () =>
@@ -179,37 +173,21 @@ export const sayError: {
         onSome: (reason) => said("Nothing was written", reason)
       })
     ),
-    Match.when(isServerProblem, () =>
-      said(
-        "Something went wrong on our side",
-        "Nothing was changed. Try again; if it keeps happening, reload the page."
-      )
-    ),
+    Match.when(S.is(HttpApiError.InternalServerErrorProblem), () => ourSide),
     Match.option
   )
   if (O.isSome(known)) return known.value
-  if (HttpClientError.isHttpClientError(error)) {
-    const status = statusOf(error)
-    if (unreachable(error)) {
-      return said(
-        "The server could not be reached",
-        "Check the connection and try again. Nothing was lost on this page."
-      )
-    }
-    if (O.contains(status, 429)) return said("Too many requests at once", "Wait a few seconds and try again.")
-    if (O.exists(status, (status) => status >= 500)) {
-      return said(
-        "Something went wrong on our side",
-        "Nothing was changed. Try again; if it keeps happening, reload the page."
-      )
-    }
-    return said("The server's answer could not be read", "Reload the page and try again.")
-  }
+  // What the app's own request or a model's call met before any handler answered: said in today's words, the same for
+  // both.
+  const met = metOf(error)
+  if (O.isSome(met)) return saidMet(met.value)
+  // The model's server failed with an error its Api does not declare: the library sends one defect in its place.
+  if (isUndeclared(error)) return ourSide
   // A file's own problem (`FileProblem`, read by its tag) is written for the person: what is wrong, then what to do.
-  if (isFileProblem(error)) return said("The file was not read", `${error.problem} ${error.todo}`)
+  if (S.is(FileProblem)(error)) return said("The file was not read", `${error.problem} ${error.todo}`)
   // The reader itself failed: its sentence says what to do.
-  if (isReadFailed(error)) return said("The file was not read", error.message)
-  if (isFileNotKept(error)) {
+  if (S.is(ReadFailed)(error)) return said("The file was not read", error.message)
+  if (S.is(FileNotKept)(error)) {
     return said(
       "This browser would not keep your progress",
       "Your work on this page is fine, but a refresh would lose it. Finish here, or allow this site to store data."
@@ -256,19 +234,116 @@ export const toastError: {
   }
 )
 
-/** True when the request never got an answer: the server could not be reached. */
-const unreachable = (error: HttpClientError.HttpClientError): boolean =>
-  error.reason instanceof HttpClientError.TransportError
+// The words a request's failure is said in, today's for the app's own HTTP requests, and the same for a model's call.
+const unreached: Said = {
+  title: "The server could not be reached",
+  sentence: "Check the connection and try again. Nothing was lost on this page.",
+  problems: []
+}
+// A server error does not say whether the request was applied: a command can be stored and its answer lost on the way
+// back, and a second press is a new command. So the sentence never says "nothing was changed"; it says to look first.
+const ourSide: Said = {
+  title: "Something went wrong on our side",
+  sentence: "It may not have gone through. Reload the page to see what is stored before trying again.",
+  problems: []
+}
+const tooMany: Said = {
+  title: "Too many requests at once",
+  sentence: "Wait a few seconds and try again.",
+  problems: []
+}
+const unreadable: Said = {
+  title: "The server's answer could not be read",
+  sentence: "Reload the page and try again.",
+  problems: []
+}
+
+/**
+ * What a request met before any handler answered it: no answer at all (the network, a socket), a live read that
+ * could not reconnect, an answer with a status, or nothing that could be read (a request that could not be made, an
+ * answer that could not be decoded). Read from the app's own HTTP request and from a model's call alike (`metOf`),
+ * then said and asked again by its case alone.
+ */
+const Met = S.TaggedUnion({
+  Unreached: {},
+  LiveReadLost: {},
+  Answered: { status: S.Int.annotateKey({ description: "The answer's HTTP status" }) },
+  Unreadable: {}
+}).annotate({ description: "What a request met before any handler answered it." })
+type Met = typeof Met.Type
+
+/** The words for what a request met: a live read that could not reconnect is the server not reached. */
+const saidMet = Met.match({
+  Unreached: () => unreached,
+  LiveReadLost: () => unreached,
+  Answered: ({ status }) => (status === 429 ? tooMany : status >= 500 ? ourSide : unreadable),
+  Unreadable: () => unreadable
+})
+
+/**
+ * Whether asking again may pass: no answer, a server error or "too many requests" may; an answer that could not be
+ * read gets the same answer every time. A live read that could not reconnect is asked again by its own atom, not here.
+ */
+const passes = Met.match({
+  Unreached: () => true,
+  LiveReadLost: () => false,
+  Answered: ({ status }) => status === 429 || status >= 500,
+  Unreadable: () => false
+})
+
+/** The message of the defect a live read fails with once it could not reconnect. */
+const LostLiveRead = S.String.check(S.isPattern(/^Live read \S+ lost its connection$/)).annotate({
+  description: "The message of the defect a live read fails with once it could not reconnect."
+})
+
+/** What an HTTP client's reason met: no answer for a transport's failure, else the status of an answer it holds. */
+const metOfReason = (reason: unknown): Met => {
+  if (reason instanceof HttpClientError.TransportError) return Met.cases.Unreached.make({})
+  if (
+    P.hasProperty(reason, "response") &&
+    P.hasProperty(reason.response, "status") &&
+    P.isNumber(reason.response.status)
+  )
+    return Met.cases.Answered.make({ status: reason.response.status })
+  return Met.cases.Unreadable.make({})
+}
+
+/**
+ * What a failure says its request met, when it is a request's: the app's own (`HttpClientError`), or a model's call
+ * (`@alchemy.run/domain`'s Api client, over Effect RPC), which fails before its handler answers with the RPC client's
+ * error, whose reason says what failed (node_modules/effect/src/rpc/RpcClientError.ts): the HTTP request it was sent
+ * in, kept whole as `cause`; a socket; or the protocol itself (`RpcClientDefect`). A live read that lost its connection
+ * for good is a protocol defect too, told from a decoding failure only by its message
+ * (node_modules/@alchemy.run/domain/src/Api.ts, `protocolWebSocket`: "Live read <tag> lost its connection"). A
+ * worker's failure is none of these.
+ */
+const metOf = (error: unknown): O.Option<Met> => {
+  if (HttpClientError.isHttpClientError(error)) return O.some(error.reason).pipe(O.map(metOfReason))
+  if (!S.is(RpcClientError.RpcClientError)(error)) return O.none()
+  const reason = error.reason
+  if (S.is(HttpClientError.HttpClientErrorSchema)(reason)) return O.some(reason.cause).pipe(O.map(metOfReason))
+  if (S.is(Socket.SocketErrorReason)(reason)) return O.some(Met.cases.Unreached.make({}))
+  if (S.is(RpcClientError.RpcClientDefect)(reason))
+    return O.some(S.is(LostLiveRead)(reason.message) ? Met.cases.LiveReadLost.make({}) : Met.cases.Unreadable.make({}))
+  return O.none()
+}
+
+/**
+ * The one defect the model's server sends in place of any failure its Api does not declare (a defect, an undeclared
+ * error): node_modules/@alchemy.run/domain/src/internal.ts, `internalError`, read whole by its message.
+ */
+const Undeclared = S.Struct({ message: S.Literal("Internal server error") }).annotate({
+  description: "The defect a model's server sends for a failure its Api does not declare."
+})
+const isUndeclared = (error: unknown): boolean => error instanceof Error && S.is(Undeclared)(error)
 
 /**
  * True for a failure that asking again may fix: the network, a server error, "too many requests". A typed refusal
- * (a role, a bad request, a missing record) gets the same answer every time, so it is never asked again.
+ * (a role, a bad request, a missing record) gets the same answer every time, so it is never asked again. A model's
+ * call is read the same way through its RPC error (`metOf`): its HTTP request by the same rule, and a socket's failure
+ * as one that may pass. A protocol defect is not asked again here: a live read that lost its connection and an answer
+ * that could not be decoded differ only in their message, and a live read is asked again by its own atom.
  */
-export const isTransient = (error: unknown): boolean => {
+export const isTransient = (error: unknown): boolean =>
   // The server's own 500, as the API's problem document: the request was fine, so another try may pass.
-  if (isServerProblem(error)) return true
-  if (!HttpClientError.isHttpClientError(error)) return false
-  if (unreachable(error)) return true
-  const status = statusOf(error)
-  return O.exists(status, (status) => status === 429 || status >= 500)
-}
+  S.is(HttpApiError.InternalServerErrorProblem)(error) || O.exists(metOf(error), passes)

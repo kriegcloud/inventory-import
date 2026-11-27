@@ -21,6 +21,7 @@
     "@beep/vocabulary": "workspace:*",
     "@inventory/access-contract": "workspace:*",
     "@inventory/kernel": "workspace:*",
+    "@inventory/usage-contract": "workspace:*",
     "effect": "catalog:",
     "n3": "^2.13.12"
   },

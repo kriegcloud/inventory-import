@@ -20,6 +20,7 @@ import * as Domain from "@alchemy.run/domain"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
+import { Role } from "@inventory/kernel/Role"
 import { CurrentActor } from "../Actor/Actor.context.ts"
 import { Session } from "../Actor/Session.middleware.ts"
 import { Change, Columns, Digest, ImportKey, Step } from "../Review/Change.schema.ts"
@@ -115,11 +116,29 @@ export class ImportRemoved extends Domain.Event(
   { description: "An import with nothing in force was removed" }
 ) {}
 
-/** The person is a viewer, or acts in another organization, or is not the one who may do this. */
+/**
+ * The person's role is too low for this: `required` is the lowest role that may do it, so the screen can say which
+ * role they have, which one this needs and whom to ask, as a refused write on `/api/v1` says it. It is asked before
+ * anything stored is read, so it tells nothing of the import.
+ */
 export class NotPermitted extends Domain.Rejection(
   "NotPermitted",
-  {},
-  { description: "This person may not do this" }
+  { required: Role.pipe(S.annotateKey({ description: "The lowest role that may do this" })) },
+  { description: "The person's role is too low for this", httpApiStatus: 403 }
+) {}
+
+/** What a person reads of an import their organization has none of: the words `/api/v1` says today. */
+export const NoImportThere = "No import with that id in your organization."
+
+/**
+ * No import with this id is in the person's organization: it was never staged, or it is another organization's. Both
+ * are answered alike, and before any state is told, so nothing stored is told to whoever names an id that is not
+ * theirs. A row or a group kept under another import's name is answered the same.
+ */
+export class ImportNotFound extends Domain.Rejection(
+  "ImportNotFound",
+  { reason: S.Literal(NoImportThere).pipe(S.annotateKey({ description: "The sentence the person reads" })) },
+  { description: "No import with this id is in the person's organization", httpApiStatus: 404 }
 ) {}
 /** An import with this id was staged already. */
 export class AlreadyStaged extends Domain.Rejection(
@@ -193,7 +212,7 @@ export class StageImport extends Domain.Command(
     middleware: [Session],
     input: { importId: ImportKey, rows: S.Natural, columns: Columns },
     events: [ImportStaged],
-    rejects: [NotPermitted, AlreadyStaged]
+    rejects: [NotPermitted, ImportNotFound, AlreadyStaged]
   },
   { description: "Stage a file for review: its rows and the column each field reads by its heading" }
 ) {}
@@ -205,7 +224,7 @@ export class MatchColumn extends Domain.Command(
     middleware: [Session],
     input: { importId: ImportKey, columns: Columns, saw: S.Int, opening: S.Int },
     events: [ColumnMatched],
-    rejects: [NotPermitted, NotOpen, ConfirmedSince, MatchedSince]
+    rejects: [NotPermitted, ImportNotFound, NotOpen, ConfirmedSince, MatchedSince]
   },
   { description: "Match a column to a field, naming the last match the sender saw" }
 ) {}
@@ -217,7 +236,7 @@ export class RecordSuggestion extends Domain.Command(
     middleware: [Session],
     input: { importId: ImportKey },
     events: [SuggestionRecorded],
-    rejects: [NotPermitted, NotOpen]
+    rejects: [NotPermitted, ImportNotFound, NotOpen]
   },
   { description: "Record that a suggestion was asked for; it changes no decision" }
 ) {}
@@ -243,7 +262,7 @@ export class ConfirmImport extends Domain.Command(
       notImported: S.Natural
     },
     events: [ImportConfirmed],
-    rejects: [NotPermitted, NotOpen, ReviewMovedOn, PlanBehind, NotWhatWasShown, CountsDoNotAddUp]
+    rejects: [NotPermitted, ImportNotFound, NotOpen, ReviewMovedOn, PlanBehind, NotWhatWasShown, CountsDoNotAddUp]
   },
   { description: "Confirm the import, naming the last change the screen received and what its button said" }
 ) {}
@@ -255,7 +274,7 @@ export class TakeBackImport extends Domain.Command(
     middleware: [Session],
     input: { importId: ImportKey, seen: Change, kept: S.Natural, keptReplaced: S.Natural },
     events: [ImportTakenBack],
-    rejects: [NotPermitted, NotImported, ReviewMovedOn, MoreKeptThanInForce]
+    rejects: [NotPermitted, ImportNotFound, NotImported, ReviewMovedOn, MoreKeptThanInForce]
   },
   { description: "Take back everything the import has in force, keeping the items someone changed" }
 ) {}
@@ -267,7 +286,7 @@ export class ReopenImport extends Domain.Command(
     middleware: [Session],
     input: { importId: ImportKey, seen: Change },
     events: [ImportReopened],
-    rejects: [NotPermitted, NotClosed, ReviewMovedOn]
+    rejects: [NotPermitted, ImportNotFound, NotClosed, ReviewMovedOn]
   },
   { description: "Open a confirmed or taken-back import again, naming its last change" }
 ) {}
@@ -279,7 +298,7 @@ export class RemoveImport extends Domain.Command(
     middleware: [Session],
     input: { importId: ImportKey, seen: Change },
     events: [ImportRemoved],
-    rejects: [NotPermitted, NotOpen, ReviewMovedOn, HasItemsInForce]
+    rejects: [NotPermitted, ImportNotFound, NotOpen, ReviewMovedOn, HasItemsInForce]
   },
   { description: "Remove an open import with nothing in force, naming its last change" }
 ) {}
@@ -536,7 +555,11 @@ export class Import extends Domain.Aggregate(
     decide: {
       StageImport: Effect.fn("Import.StageImport")(function* (s, cmd) {
         const actor = yield* CurrentActor
-        if (actor.role === "viewer") return yield* NotPermitted.make({})
+        if (actor.role === "viewer") return yield* NotPermitted.make({ required: "editor" })
+        // Another organization's id is answered as one this organization has none of, not as taken.
+        if (!ImportState.guards.Unstaged(s) && actor.organizationId !== s.organizationId) {
+          return yield* ImportNotFound.make({ reason: NoImportThere })
+        }
         if (!ImportState.guards.Unstaged(s)) return yield* AlreadyStaged.make({})
         return [
           ImportStaged.make({
@@ -549,8 +572,11 @@ export class Import extends Domain.Aggregate(
       }),
       MatchColumn: Effect.fn("Import.MatchColumn")(function* (s, cmd) {
         const actor = yield* CurrentActor
+        if (actor.role === "viewer") return yield* NotPermitted.make({ required: "editor" })
+        if (ImportState.guards.Unstaged(s) || actor.organizationId !== s.organizationId) {
+          return yield* ImportNotFound.make({ reason: NoImportThere })
+        }
         if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})
-        if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})
         if (cmd.opening !== s.confirms) return yield* ConfirmedSince.make({})
         if (cmd.saw !== s.matching) return yield* MatchedSince.make({ matching: s.matching })
         // Every field reads this already, by its heading or by hand: nothing is recorded, and nothing is taken back.
@@ -566,14 +592,20 @@ export class Import extends Domain.Aggregate(
       }),
       RecordSuggestion: Effect.fn("Import.RecordSuggestion")(function* (s) {
         const actor = yield* CurrentActor
+        if (actor.role === "viewer") return yield* NotPermitted.make({ required: "editor" })
+        if (ImportState.guards.Unstaged(s) || actor.organizationId !== s.organizationId) {
+          return yield* ImportNotFound.make({ reason: NoImportThere })
+        }
         if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})
-        if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})
         return [SuggestionRecorded.make({ by: actor.memberId })]
       }),
       ConfirmImport: Effect.fn("Import.ConfirmImport")(function* (s, cmd) {
         const actor = yield* CurrentActor
+        if (actor.role === "viewer") return yield* NotPermitted.make({ required: "editor" })
+        if (ImportState.guards.Unstaged(s) || actor.organizationId !== s.organizationId) {
+          return yield* ImportNotFound.make({ reason: NoImportThere })
+        }
         if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})
-        if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})
         if (cmd.seen !== s.changes) return yield* ReviewMovedOn.make({ last: s.changes })
         if (cmd.planAt !== s.changes) return yield* PlanBehind.make({ last: s.changes })
         if (cmd.plan !== cmd.shown) return yield* NotWhatWasShown.make({})
@@ -595,8 +627,11 @@ export class Import extends Domain.Aggregate(
       }),
       TakeBackImport: Effect.fn("Import.TakeBackImport")(function* (s, cmd) {
         const actor = yield* CurrentActor
+        if (actor.role === "viewer") return yield* NotPermitted.make({ required: "editor" })
+        if (ImportState.guards.Unstaged(s) || actor.organizationId !== s.organizationId) {
+          return yield* ImportNotFound.make({ reason: NoImportThere })
+        }
         if (!ImportState.guards.Imported(s) && !ImportState.guards.Open(s)) return yield* NotImported.make({})
-        if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})
         if (s.standing < 1) return yield* NotImported.make({})
         if (cmd.seen !== s.changes) return yield* ReviewMovedOn.make({ last: s.changes })
         if (cmd.kept > s.inForce || cmd.keptReplaced > s.replaced) return yield* MoreKeptThanInForce.make({})
@@ -613,15 +648,21 @@ export class Import extends Domain.Aggregate(
       }),
       ReopenImport: Effect.fn("Import.ReopenImport")(function* (s, cmd) {
         const actor = yield* CurrentActor
+        if (actor.role === "viewer") return yield* NotPermitted.make({ required: "editor" })
+        if (ImportState.guards.Unstaged(s) || actor.organizationId !== s.organizationId) {
+          return yield* ImportNotFound.make({ reason: NoImportThere })
+        }
         if (!ImportState.guards.Imported(s) && !ImportState.guards.TakenBack(s)) return yield* NotClosed.make({})
-        if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})
         if (cmd.seen !== s.changes) return yield* ReviewMovedOn.make({ last: s.changes })
         return [ImportReopened.make({ change: s.changes + 1, by: actor.memberId })]
       }),
       RemoveImport: Effect.fn("Import.RemoveImport")(function* (s, cmd) {
         const actor = yield* CurrentActor
+        if (actor.role === "viewer") return yield* NotPermitted.make({ required: "editor" })
+        if (ImportState.guards.Unstaged(s) || actor.organizationId !== s.organizationId) {
+          return yield* ImportNotFound.make({ reason: NoImportThere })
+        }
         if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})
-        if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})
         if (cmd.seen !== s.changes) return yield* ReviewMovedOn.make({ last: s.changes })
         if (s.inForce !== 0 || s.standing !== 0) return yield* HasItemsInForce.make({})
         return [ImportRemoved.make({ change: s.changes + 1, by: actor.memberId })]

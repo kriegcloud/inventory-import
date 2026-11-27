@@ -167,7 +167,8 @@ const contextMay = (a: Kind, b: Kind): boolean => {
  * Nothing depends on `tooling`: the repository's own commands are run by the root, never imported by a package.
  * Nothing depends on `infra` either: it declares what is deployed, so nothing that is deployed may import it, the
  * app included; the app's stack test is the one exception, made outside this table (`localStackEntry`). An `infra`
- * package itself may use the foundation and nothing else.
+ * package itself may use the foundation and nothing else, but for the model's Worker, also made outside this table
+ * (`workerEntry`).
  *
  * Nothing depends on `ontology` either, the app included (decision 9; report 14 section 7.2): it projects the
  * vocabulary into generated files and holds the ontology's gates, so it is run, never imported. The rule has no
@@ -202,6 +203,25 @@ export const allowed =
  * @category rules
  */
 export const localStackEntry = "InventoryDev"
+
+/**
+ * The one exception to "an infra package uses the foundation and nothing else", and to "nothing depends on an app"
+ * (Benjamin, 2026-11-26: "A second app, apps/model, with one new row in the boundaries law so packages/infra may
+ * declare it"): the model's Worker is an Effect-native Alchemy Worker, a class the stack yields to deploy it and to
+ * bind it to the site's Worker, so the stack must import it. An infra package may declare that one app (`modelApp`),
+ * and a file under its `src` may import that app's `Worker` entry and no other: the rest of the app is still not
+ * infra's to read, and no other app is infra's at all, the site's included, whose stack test depends on infra.
+ *
+ * @category rules
+ */
+export const workerEntry = "Worker"
+
+/**
+ * The one app an infra package may declare: the model's Worker (`workerEntry`).
+ *
+ * @category rules
+ */
+export const modelApp = "@inventory/model-app"
 
 const Declared = S.optionalKey(S.Record(S.String, S.String))
 /** The part of the root manifest this rule reads: what it declares for every workspace. */
@@ -334,9 +354,17 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
         )
       const forStackTest = (dependency: string): boolean =>
         kind.family === "app" && isInfra(dependency) && !A.contains(forCode, dependency)
+      // The model Worker's exception (`workerEntry`): the one app it names, declared by an infra package.
+      const forStack = (dependency: string): boolean =>
+        kind.family === "infra" &&
+        dependency === modelApp &&
+        R.get(byName, dependency).pipe(
+          O.map(kindOf),
+          O.exists((other) => other.family === "app")
+        )
       const fromManifest = A.appendAll(
         A.flatMap(declared, (dependency) =>
-          may(dependency) || forStackTest(dependency)
+          may(dependency) || forStackTest(dependency) || forStack(dependency)
             ? A.empty<BoundariesFinding>()
             : A.of(BoundariesFinding.cases.DeclaredAgainstRow.make({ name, dependency }))
         ),
@@ -419,10 +447,14 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
                   if (!A.contains(declared, imported)) {
                     return A.of(BoundariesFinding.cases.Undeclared.make({ where, imported, name }))
                   }
+                  // Before the exceptions: the Worker's is for the code, so declared for the tests only it is not there.
+                  if (testOnly(imported)) return testOnlyFinding(imported)
                   if (!code && forStackTest(imported) && specifier === `${imported}/${localStackEntry}`) {
                     return A.empty<BoundariesFinding>()
                   }
-                  if (testOnly(imported)) return testOnlyFinding(imported)
+                  if (code && forStack(imported) && specifier === `${imported}/${workerEntry}`) {
+                    return A.empty<BoundariesFinding>()
+                  }
                   return may(imported)
                     ? A.empty<BoundariesFinding>()
                     : A.of(BoundariesFinding.cases.ImportedAgainstRow.make({ where, imported }))

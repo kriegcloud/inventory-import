@@ -1,0 +1,725 @@
+{
+  "stories": ["test/Allowance.story.test.ts", "test/AllowanceLeft.test.ts", "test/UsageApi.test.ts"],
+  "sample": [
+    {
+      "key": "takecall-limit",
+      "why": "check, rule: the day's limit removed; NeverMoreThanFortyInADay breaks"
+    },
+    {
+      "key": "takecall-first-calltaken-by",
+      "why": "field, rule: who asked, on a day's first call; EveryCallSaysWhoAndWhatFor breaks"
+    },
+    {
+      "key": "evolve-newday-organization",
+      "why": "field, rule: a new day taking the event's organization; AnAllowanceNeverChangesOrganization breaks, and no story sees it"
+    },
+    {
+      "key": "takecall-first-nothing",
+      "why": "nothing, story: a day's first call records nothing; the proof's count of paths moves too (class proof)"
+    },
+    {
+      "key": "view-validate",
+      "why": "check, story: the view's validate removed; only the Api test, which runs the middleware, sees it"
+    },
+    {
+      "key": "lefton-today",
+      "why": "check, story: today's count read as a full day; the rule of what is left, held by its own test"
+    }
+  ],
+  "mutants": [
+    {
+      "key": "takecall-viewer",
+      "target": "TakeCall",
+      "kind": "check",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")"],
+      "until": "    evolve: {",
+      "old": "        if (actor.role === \"viewer\" && cmd.purpose !== \"view\") return yield* NotPermitted.make({ required: \"editor\" })\n",
+      "new": "",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["AViewerTakesOnlyTheAssistantsCall"],
+      "trialStories": [
+        "Allowance: a viewer is refused the check's and the suggestions' call, and takes the table assistant's",
+        "Allowance: a viewer of another organization asking for the check's call is told the role first, as the catalog asks",
+        "UsageApi: a viewer is refused the check's call NotPermitted, with the role it needs"
+      ]
+    },
+    {
+      "key": "takecall-viewer-purpose",
+      "target": "TakeCall",
+      "kind": "check",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")"],
+      "until": "    evolve: {",
+      "old": " && cmd.purpose !== \"view\")",
+      "new": ")",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Allowance: a viewer is refused the check's and the suggestions' call, and takes the table assistant's",
+        "UsageApi: a member reads their organization's count after a call is taken, a viewer included"
+      ]
+    },
+    {
+      "key": "takecall-notpermitted-required",
+      "target": "TakeCall",
+      "kind": "field",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")"],
+      "until": "    evolve: {",
+      "old": "NotPermitted.make({ required: \"editor\" })",
+      "new": "NotPermitted.make({ required: \"admin\" })",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Allowance: a viewer is refused the check's and the suggestions' call, and takes the table assistant's",
+        "Allowance: a viewer of another organization asking for the check's call is told the role first, as the catalog asks",
+        "UsageApi: a viewer is refused the check's call NotPermitted, with the role it needs"
+      ]
+    },
+    {
+      "key": "takecall-otherorg",
+      "target": "TakeCall",
+      "kind": "check",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")"],
+      "until": "    evolve: {",
+      "old": "        if (actor.organizationId !== cmd.organizationId) return yield* AllowanceNotFound.make({})\n",
+      "new": "",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["OnlyItsOwnOrganizationTakesACall"],
+      "trialStories": [
+        "Allowance: a member of another organization is refused a call from this one, and nothing is counted",
+        "UsageApi: a member of another organization is refused AllowanceNotFound: a take, a read and a watch of this organization's count"
+      ]
+    },
+    {
+      "key": "takecall-order",
+      "target": "TakeCall",
+      "kind": "check",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")"],
+      "until": "    evolve: {",
+      "old": "        if (actor.role === \"viewer\" && cmd.purpose !== \"view\") return yield* NotPermitted.make({ required: \"editor\" })\n        if (actor.organizationId !== cmd.organizationId) return yield* AllowanceNotFound.make({})\n",
+      "new": "        if (actor.organizationId !== cmd.organizationId) return yield* AllowanceNotFound.make({})\n        if (actor.role === \"viewer\" && cmd.purpose !== \"view\") return yield* NotPermitted.make({ required: \"editor\" })\n",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Allowance: a viewer of another organization asking for the check's call is told the role first, as the catalog asks"
+      ]
+    },
+    {
+      "key": "takecall-limit",
+      "target": "TakeCall",
+      "kind": "check",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")"],
+      "until": "    evolve: {",
+      "old": "        if (s.taken >= dailyModelCalls) return yield* DayUsedUp.make({ day: s.day })\n",
+      "new": "",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["NeverMoreThanFortyInADay"],
+      "trialStories": [
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing"
+      ]
+    },
+    {
+      "key": "takecall-limit-bound",
+      "target": "TakeCall",
+      "kind": "check",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")"],
+      "until": "    evolve: {",
+      "old": "s.taken >= dailyModelCalls",
+      "new": "s.taken > dailyModelCalls",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["NeverMoreThanFortyInADay"],
+      "trialStories": [
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing"
+      ]
+    },
+    {
+      "key": "takecall-dayusedup-day",
+      "target": "TakeCall",
+      "kind": "field",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")"],
+      "until": "    evolve: {",
+      "old": "DayUsedUp.make({ day: s.day })",
+      "new": "DayUsedUp.make({ day: s.day + 1 })",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing"
+      ]
+    },
+    {
+      "key": "takecall-today",
+      "target": "TakeCall",
+      "kind": "field",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")"],
+      "until": "    evolve: {",
+      "old": "Math.floor(DateTime.toEpochMillis(now) / dayMs)",
+      "new": "Math.ceil(DateTime.toEpochMillis(now) / dayMs)",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Allowance: a call is taken: it counts one against today and keeps who asked and for what",
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched",
+        "Allowance: a viewer is refused the check's and the suggestions' call, and takes the table assistant's",
+        "AllowanceLeft: names the day the allowance counts a call against, on either side of midnight UTC"
+      ]
+    },
+    {
+      "key": "takecall-rollover",
+      "target": "TakeCall",
+      "kind": "check",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")"],
+      "until": "    evolve: {",
+      "old": " || today > s.day) {",
+      "new": ") {",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "AllowanceLeft: names the day the allowance counts a call against, on either side of midnight UTC"
+      ]
+    },
+    {
+      "key": "takecall-rollover-fresh",
+      "target": "TakeCall",
+      "kind": "check",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")"],
+      "until": "    evolve: {",
+      "old": "if (AllowanceState.guards.Fresh(s) || today > s.day) {",
+      "new": "if (today > s.day) {",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Allowance: a call is taken: it counts one against today and keeps who asked and for what",
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched",
+        "Allowance: a viewer is refused the check's and the suggestions' call, and takes the table assistant's",
+        "AllowanceLeft: names the day the allowance counts a call against, on either side of midnight UTC",
+        "UsageApi: a member reads their organization's count after a call is taken, a viewer included",
+        "UsageApi: a member of another organization is refused AllowanceNotFound: a take, a read and a watch of this organization's count"
+      ]
+    },
+    {
+      "key": "takecall-rollover-sameday",
+      "target": "TakeCall",
+      "kind": "check",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")"],
+      "until": "    evolve: {",
+      "old": "today > s.day) {",
+      "new": "today >= s.day) {",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["NeverMoreThanFortyInADay"],
+      "trialStories": [
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing"
+      ]
+    },
+    {
+      "key": "takecall-rollover-backward",
+      "target": "TakeCall",
+      "kind": "check",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")"],
+      "until": "    evolve: {",
+      "old": "today > s.day) {",
+      "new": "today !== s.day) {",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["ADayChangesOnlyForward"],
+      "trialStories": []
+    },
+    {
+      "key": "takecall-first-calltaken-organization",
+      "target": "TakeCall",
+      "kind": "field",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")", "today > s.day) {"],
+      "until": "if (s.taken >= dailyModelCalls)",
+      "old": "organizationId: cmd.organizationId",
+      "new": "organizationId: actor.memberId",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Allowance: a call is taken: it counts one against today and keeps who asked and for what",
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched",
+        "Allowance: a viewer is refused the check's and the suggestions' call, and takes the table assistant's",
+        "AllowanceLeft: names the day the allowance counts a call against, on either side of midnight UTC"
+      ]
+    },
+    {
+      "key": "takecall-first-calltaken-day",
+      "target": "TakeCall",
+      "kind": "field",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")", "today > s.day) {"],
+      "until": "if (s.taken >= dailyModelCalls)",
+      "old": "day: today",
+      "new": "day: today + 1",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Allowance: a call is taken: it counts one against today and keeps who asked and for what",
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched",
+        "Allowance: a viewer is refused the check's and the suggestions' call, and takes the table assistant's",
+        "AllowanceLeft: names the day the allowance counts a call against, on either side of midnight UTC"
+      ]
+    },
+    {
+      "key": "takecall-first-calltaken-by",
+      "target": "TakeCall",
+      "kind": "field",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")", "today > s.day) {"],
+      "until": "if (s.taken >= dailyModelCalls)",
+      "old": "by: actor.memberId",
+      "new": "by: actor.organizationId",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryCallSaysWhoAndWhatFor"],
+      "trialStories": [
+        "Allowance: a call is taken: it counts one against today and keeps who asked and for what",
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched",
+        "Allowance: a viewer is refused the check's and the suggestions' call, and takes the table assistant's",
+        "AllowanceLeft: names the day the allowance counts a call against, on either side of midnight UTC"
+      ]
+    },
+    {
+      "key": "takecall-first-calltaken-purpose",
+      "target": "TakeCall",
+      "kind": "field",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")", "today > s.day) {"],
+      "until": "if (s.taken >= dailyModelCalls)",
+      "old": "purpose: cmd.purpose",
+      "new": "purpose: \"view\"",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryCallSaysWhoAndWhatFor"],
+      "trialStories": [
+        "Allowance: a call is taken: it counts one against today and keeps who asked and for what",
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched"
+      ]
+    },
+    {
+      "key": "takecall-first-nothing",
+      "target": "TakeCall",
+      "kind": "nothing",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")", "today > s.day) {"],
+      "until": "if (s.taken >= dailyModelCalls)",
+      "old": "          return [",
+      "new": "          return []\n          return [",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Allowance: a call is taken: it counts one against today and keeps who asked and for what",
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched",
+        "Allowance: a viewer is refused the check's and the suggestions' call, and takes the table assistant's",
+        "AllowanceLeft: names the day the allowance counts a call against, on either side of midnight UTC",
+        "UsageApi: a member reads their organization's count after a call is taken, a viewer included"
+      ]
+    },
+    {
+      "key": "takecall-next-calltaken-organization",
+      "target": "TakeCall",
+      "kind": "field",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")", "return yield* DayUsedUp.make({ day: s.day })"],
+      "until": "    evolve: {",
+      "old": "organizationId: cmd.organizationId",
+      "new": "organizationId: actor.memberId",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched"
+      ]
+    },
+    {
+      "key": "takecall-next-calltaken-day",
+      "target": "TakeCall",
+      "kind": "field",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")", "return yield* DayUsedUp.make({ day: s.day })"],
+      "until": "    evolve: {",
+      "old": "day: s.day, by:",
+      "new": "day: today, by:",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["ADayChangesOnlyForward"],
+      "trialStories": []
+    },
+    {
+      "key": "takecall-next-calltaken-by",
+      "target": "TakeCall",
+      "kind": "field",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")", "return yield* DayUsedUp.make({ day: s.day })"],
+      "until": "    evolve: {",
+      "old": "by: actor.memberId",
+      "new": "by: actor.organizationId",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryCallSaysWhoAndWhatFor"],
+      "trialStories": [
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched"
+      ]
+    },
+    {
+      "key": "takecall-next-calltaken-purpose",
+      "target": "TakeCall",
+      "kind": "field",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")", "return yield* DayUsedUp.make({ day: s.day })"],
+      "until": "    evolve: {",
+      "old": "purpose: cmd.purpose",
+      "new": "purpose: \"view\"",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryCallSaysWhoAndWhatFor"],
+      "trialStories": [
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched"
+      ]
+    },
+    {
+      "key": "takecall-next-nothing",
+      "target": "TakeCall",
+      "kind": "nothing",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["Effect.fn(\"Allowance.TakeCall\")", "return yield* DayUsedUp.make({ day: s.day })"],
+      "until": "    evolve: {",
+      "old": "        return [",
+      "new": "        return []\n        return [",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched",
+        "UsageApi: a member reads their organization's count after a call is taken, a viewer included"
+      ]
+    },
+    {
+      "key": "evolve-sameday",
+      "target": "evolve",
+      "kind": "check",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["    evolve: {"],
+      "until": "  { description: \"One organization's model calls: forty",
+      "old": "AllowanceState.guards.Counting(s) && s.day === e.day\n",
+      "new": "AllowanceState.guards.Counting(s)\n",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["NeverMoreThanFortyInADay"],
+      "trialStories": [
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day"
+      ]
+    },
+    {
+      "key": "evolve-sameday-taken",
+      "target": "evolve",
+      "kind": "field",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["    evolve: {"],
+      "until": "  { description: \"One organization's model calls: forty",
+      "old": "taken: s.taken + 1",
+      "new": "taken: s.taken + 2",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["NeverMoreThanFortyInADay", "WithinADayTheCountRisesByOne"],
+      "trialStories": [
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched"
+      ]
+    },
+    {
+      "key": "evolve-sameday-organization",
+      "target": "evolve",
+      "kind": "field",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["    evolve: {"],
+      "until": "  { description: \"One organization's model calls: forty",
+      "old": "organizationId: s.organizationId,\n",
+      "new": "organizationId: e.organizationId,\n",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["AnAllowanceNeverChangesOrganization"],
+      "trialStories": []
+    },
+    {
+      "key": "evolve-newday-taken",
+      "target": "evolve",
+      "kind": "field",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["    evolve: {"],
+      "until": "  { description: \"One organization's model calls: forty",
+      "old": "taken: 1\n",
+      "new": "taken: 0\n",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["NeverMoreThanFortyInADay", "ANewDayStartsAtOne"],
+      "trialStories": [
+        "Allowance: a call is taken: it counts one against today and keeps who asked and for what",
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched"
+      ]
+    },
+    {
+      "key": "evolve-newday-day",
+      "target": "evolve",
+      "kind": "field",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["    evolve: {"],
+      "until": "  { description: \"One organization's model calls: forty",
+      "old": "day: e.day,",
+      "new": "day: e.day + 1,",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Allowance: a call is taken: it counts one against today and keeps who asked and for what",
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched",
+        "UsageApi: a member reads their organization's count after a call is taken, a viewer included"
+      ]
+    },
+    {
+      "key": "evolve-newday-organization",
+      "target": "evolve",
+      "kind": "field",
+      "file": "src/Allowance/Allowance.aggregate.ts",
+      "anchors": ["    evolve: {"],
+      "until": "  { description: \"One organization's model calls: forty",
+      "old": "AllowanceState.guards.Counting(s) ? s.organizationId : e.organizationId",
+      "new": "e.organizationId",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["AnAllowanceNeverChangesOrganization"],
+      "trialStories": []
+    },
+    {
+      "key": "view-sameday",
+      "target": "AllowanceToday",
+      "kind": "check",
+      "file": "src/Allowance/AllowanceToday.view.ts",
+      "anchors": ["    evolve: {"],
+      "until": "    version: 0",
+      "old": "(e.day === s.day ?",
+      "new": "(true ?",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Allowance: a call is taken: it counts one against today and keeps who asked and for what",
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched",
+        "Allowance: a viewer is refused the check's and the suggestions' call, and takes the table assistant's"
+      ]
+    },
+    {
+      "key": "view-sameday-taken",
+      "target": "AllowanceToday",
+      "kind": "field",
+      "file": "src/Allowance/AllowanceToday.view.ts",
+      "anchors": ["    evolve: {"],
+      "until": "    version: 0",
+      "old": "taken: s.taken + 1 }",
+      "new": "taken: s.taken }",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched",
+        "UsageApi: a member reads their organization's count after a call is taken, a viewer included"
+      ]
+    },
+    {
+      "key": "view-newday-taken",
+      "target": "AllowanceToday",
+      "kind": "field",
+      "file": "src/Allowance/AllowanceToday.view.ts",
+      "anchors": ["    evolve: {"],
+      "until": "    version: 0",
+      "old": "taken: 1 })",
+      "new": "taken: 0 })",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Allowance: a call is taken: it counts one against today and keeps who asked and for what",
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched",
+        "Allowance: a viewer is refused the check's and the suggestions' call, and takes the table assistant's",
+        "UsageApi: a member reads their organization's count after a call is taken, a viewer included"
+      ]
+    },
+    {
+      "key": "view-newday-day",
+      "target": "AllowanceToday",
+      "kind": "field",
+      "file": "src/Allowance/AllowanceToday.view.ts",
+      "anchors": ["    evolve: {"],
+      "until": "    version: 0",
+      "old": "{ day: e.day, taken: 1 }",
+      "new": "{ day: s.day, taken: 1 }",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Allowance: a call is taken: it counts one against today and keeps who asked and for what",
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched",
+        "Allowance: a viewer is refused the check's and the suggestions' call, and takes the table assistant's",
+        "UsageApi: a member reads their organization's count after a call is taken, a viewer included"
+      ]
+    },
+    {
+      "key": "view-validate",
+      "target": "AllowanceToday",
+      "kind": "check",
+      "file": "src/Allowance/AllowanceToday.view.ts",
+      "anchors": ["Effect.fn(\"AllowanceToday.validate\")"],
+      "old": "      if (request.key.id !== actor.organizationId) return yield* AllowanceNotFound.make({})\n",
+      "new": "",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "UsageApi: a member of another organization is refused AllowanceNotFound: a take, a read and a watch of this organization's count"
+      ]
+    },
+    {
+      "key": "dayof-floor",
+      "target": "AllowanceLeft",
+      "kind": "check",
+      "file": "src/Allowance/AllowanceLeft.rules.ts",
+      "anchors": ["export const dayOf"],
+      "until": "\n",
+      "old": "Math.floor(",
+      "new": "Math.ceil(",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Allowance: a call is taken: it counts one against today and keeps who asked and for what",
+        "Allowance: forty calls are taken in a day, and the forty-first is refused DayUsedUp and records nothing",
+        "Allowance: past midnight UTC the next call names the new day and counts 1, with no command to start the day",
+        "Allowance: a second organization takes its own first call while the first's day is used, and the first's is untouched",
+        "Allowance: a viewer is refused the check's and the suggestions' call, and takes the table assistant's",
+        "AllowanceLeft: reads all forty on the day after, though the state still holds the day before's forty",
+        "AllowanceLeft: names the day the allowance counts a call against, on either side of midnight UTC"
+      ]
+    },
+    {
+      "key": "lefton-today",
+      "target": "AllowanceLeft",
+      "kind": "check",
+      "file": "src/Allowance/AllowanceLeft.rules.ts",
+      "anchors": ["} = dual(2,"],
+      "old": "state.day >= today",
+      "new": "state.day > today",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "AllowanceLeft: is forty less what today took, for every count from none to one past the limit",
+        "AllowanceLeft: reads all forty on the day after, though the state still holds the day before's forty"
+      ]
+    },
+    {
+      "key": "lefton-ahead",
+      "target": "AllowanceLeft",
+      "kind": "check",
+      "file": "src/Allowance/AllowanceLeft.rules.ts",
+      "anchors": ["} = dual(2,"],
+      "old": "state.day >= today",
+      "new": "state.day === today",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "AllowanceLeft: counts a state one day ahead of the reader's clock against that day, as decide does"
+      ]
+    },
+    {
+      "key": "lefton-zero",
+      "target": "AllowanceLeft",
+      "kind": "check",
+      "file": "src/Allowance/AllowanceLeft.rules.ts",
+      "anchors": ["} = dual(2,"],
+      "old": "Math.max(0, dailyModelCalls - state.taken)",
+      "new": "dailyModelCalls - state.taken",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": ["AllowanceLeft: is forty less what today took, for every count from none to one past the limit"]
+    },
+    {
+      "key": "lefton-full",
+      "target": "AllowanceLeft",
+      "kind": "field",
+      "file": "src/Allowance/AllowanceLeft.rules.ts",
+      "anchors": ["} = dual(2,"],
+      "old": ": dailyModelCalls\n",
+      "new": ": 0\n",
+      "proof": "test/Allowance.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "AllowanceLeft: reads all forty on the day after, though the state still holds the day before's forty",
+        "AllowanceLeft: reads all forty for an allowance that has taken no call"
+      ]
+    }
+  ]
+}

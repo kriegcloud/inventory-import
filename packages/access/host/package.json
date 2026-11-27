@@ -14,6 +14,7 @@
     "./Config": "./src/Config.ts",
     "./SignIn": "./src/SignIn.route.ts",
     "./SessionIdentity": "./src/SessionIdentity.adapter.ts",
+    "./SessionLookup": "./src/SessionLookup.adapter.ts",
     "./MemberDirectoryD1": "./src/MemberDirectory.adapter.ts",
     "./PeopleStoreD1": "./src/PeopleStore.adapter.ts",
     "./AuditTrailStoreD1": "./src/AuditTrailStore.adapter.ts",

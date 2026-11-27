@@ -85,6 +85,8 @@ the line to write; `bun run imports:fix` repairs code.
   with changes or an unmerged branch may be another session's, so it is listed for Benjamin, never removed.
 - **Never** commit a secret. Never push to `main` or a `release/*` branch, force-push, push a tag, merge a pull
   request or deploy unless Benjamin asks in that message.
+- **When Benjamin asks for a merge**, it is `gh pr merge <n> --merge --auto --match-head-commit <sha>`: the pull
+  request merges itself once the required checks pass, and its branch is deleted. Nobody waits on the checks.
 
 ## Rules for an import
 

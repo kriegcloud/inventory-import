@@ -2,7 +2,7 @@
 type: Goal
 title: Focus and friction
 description: The repository is put back in front of the person it is for. A person who did not build the import uses it on their own spreadsheet, a failing check says in one place what to fix, a small change is checked in seconds, a merge needs nobody watching, and the worktrees and standing files say where things are.
-status: active
+status: done
 from: explorations/ideal-architecture
 ---
 
@@ -66,28 +66,30 @@ Steps 2 and 3 rest on no exploration; it rests on the product rule in `CLAUDE.md
 
 ## Acceptance
 
-- [ ] [PLAN.md](PLAN.md), "The person's session", holds at least one session with someone who did not build the
+- [ ] Moved on 2026-11-27 to [person-session](../person-session/SPEC.md), on Benjamin's answer. [PLAN.md](PLAN.md), "The person's session", holds at least one session with someone who did not build the
       import, on a file of their own. It records what they did, where they stopped, and the counts the screen showed,
       and holds no file content and no name. Each problem it found is a fix merged or a question answered in the root
       `DECISIONS.md`.
 - [x] Benjamin's ruling on what waits (step 2) is in the exploration's `DECISIONS.md`; it ends when step 3 is
       recorded.
-- [ ] `wc -l CLAUDE.md` is at most the length Benjamin chose in step 4, `bun run docs:check` passes, and every rule
+- [x] `wc -l CLAUDE.md` is at most the length Benjamin chose in step 4, `bun run docs:check` passes, and every rule
       that left the file is found word for word under `docs/` (a check in the step's pull request lists them).
 - [x] Breaking one law in a scratch commit (`??` in a model file), then running `bun run check`, ends with a summary
       that names `defaults`, the file and line, and what to write. A test of the summary command feeds it two laws'
       failures.
 - [x] `bun run check:changed` on a one-file change in one package finishes in the time PLAN records as the target, and
       fails on the same scratch commit as above.
-- [ ] `gh api repos/kriegcloud/inventory-import --jq .allow_auto_merge` prints `true`, if Benjamin turns it on, and
+- [x] `gh api repos/kriegcloud/inventory-import --jq .allow_auto_merge` prints `true`, if Benjamin turns it on, and
       a pull request merged that way is named in PLAN.
-- [ ] `git worktree list` shows no clean worktree whose branch is in main. PLAN lists every worktree left, with its
+- [x] `git worktree list` shows no clean worktree whose branch is in main (step 9; three made by other sessions
+      since are named in PLAN's closing note, with why they stayed). PLAN lists every worktree left, with its
       reason. `CLAUDE.md` says where this repository's worktrees go.
-- [ ] `bun run check:full` passes on `main` after the last merge, and this goal's `status` is `done` with its closing
+- [x] `bun run check:full` passes on `main` after the last merge, and this goal's `status` is `done` with its closing
       note.
 
 ## Decisions
 
 All seven were answered on 2026-11-26, each as recommended:
 [the exploration's decisions](../../explorations/ideal-architecture/DECISIONS.md), "2026-11-26 — focus and friction".
-[PLAN.md](PLAN.md), "Decided 2026-11-26", says what each changes. Questions that come up later are logged there too.
+[PLAN.md](PLAN.md), "Decided 2026-11-26", says what each changes. Questions that come up later are logged there too. The last, on 2026-11-27, moved the person's session to its own
+goal: the exploration's decisions, "2026-11-27 — focus and friction closes; the person's session is its own goal".

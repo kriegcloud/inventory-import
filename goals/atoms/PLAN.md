@@ -1051,7 +1051,7 @@ filter, no finalizer on the timer, a repeated sort written).
 ### Batch 2, the data grid (2026-11-26)
 
 Benjamin: "Move it to atoms (Recommended)", over deleting it (the exploration's DECISIONS, 2026-11-26). No screen of
-the product draws the grid: the development page `/gallery/grid` and `bun run grid:keys` are what show it, so the
+the product draws the grid: the development page `/gallery/grid` and `bun run --cwd apps/inventory grid:keys` are what show it, so the
 batch's proof is those two and the package's tests, not the review (which has its own grid). The table's row above
 said "the review typed into on screen"; that was wrong.
 
@@ -1100,7 +1100,7 @@ console error or warning; a click on r1 Number and a shift-click on r3 Long text
 on "12"; ArrowDown from r1 Text put the focus on r2 Text; Delete on that range read `r1.number` null, `r2.url` "",
 `r3.long` "" in the list under the grid, `r4.number` and `r1.text` untouched, and Ctrl+Z gave back 12,
 `https://a.example` and ab; a right-click opened Copy, Cut and Clear at the pointer with the selection kept, and Clear
-then Ctrl+Z did the same. `bun run grid:keys`: 96 of 96.
+then Ctrl+Z did the same. `bun run --cwd apps/inventory grid:keys`: 96 of 96.
 
 **A regression found on screen and fixed.** The first hand-back passed the check and `grid:keys` and still had no
 keyboard: ArrowDown, Delete and Ctrl+Z did nothing (the same page on `main`'s grid files gave the values back). The

@@ -15,10 +15,8 @@ import type { DataGridCellProps } from "@inventory/ui/components/data-grid/data-
 
 import {
   ColumnVariants,
-  getCellKey,
   getHasCustomCell,
-  getHasCustomDisplay,
-  parseCellKey
+  getHasCustomDisplay
 } from "@inventory/ui/components/data-grid/data-grid-utils"
 import { DataGridCell } from "@inventory/ui/components/data-grid/data-grid-cell"
 import { DataGridCellPreview } from "@inventory/ui/components/data-grid/data-grid-cell-preview"
@@ -39,8 +37,8 @@ interface DataGridDataCellProps<TData extends RowData> extends DataGridCellProps
 }
 
 /**
- * What one cell on screen keeps between draws: the row it last showed in full, and its ref callback, made again only
- * when what it closes over changes.
+ * What one cell on screen keeps between draws: whether it is a preview and the row it was last drawn for, and its ref
+ * callback, made again only when what it closes over changes.
  */
 interface CellKept {
   readonly isPreview: (rowId: string, isScrolling: boolean) => boolean
@@ -50,18 +48,25 @@ interface CellKept {
 /** A cell's `CellKept`, made for each instance (its `useId`) and let go when the cell leaves the screen. */
 const cellKept = Atom.family((_instance: string) =>
   Atom.readable((): CellKept => {
-    let shownInFull: string | undefined
+    let previewing = false
+    let drawnFor: string | undefined
     let kept: { readonly deps: ReadonlyArray<unknown>; readonly ref: RefCallback<HTMLDivElement> } | undefined
     return {
-      // Upstream: a preview from the first draw while scrolling, a full cell once scrolling ends, and a preview again
-      // only when the cell is drawn for another row while scrolling. Saying which row was last shown in full is the
-      // same answer for the same draw, however often React draws it.
+      // Upstream's state, step for step: a preview from the first draw while scrolling; a preview again when the cell
+      // is drawn for another row while scrolling, kept until scrolling ends whatever row it is drawn for next; a full
+      // cell once scrolling ends. Each step leaves the state where the same draw finds it, so a draw React repeats
+      // gives the same answer.
       isPreview: (rowId, isScrolling) => {
-        if (!isScrolling) {
-          shownInFull = rowId
-          return false
+        if (drawnFor === undefined) {
+          drawnFor = rowId
+          previewing = isScrolling
         }
-        return shownInFull !== rowId
+        if (rowId !== drawnFor) {
+          drawnFor = rowId
+          if (isScrolling && !previewing) previewing = true
+        }
+        if (previewing && !isScrolling) previewing = false
+        return previewing
       },
       ref: (deps, make) => {
         if (
@@ -212,9 +217,21 @@ function DataGridCustomCellContentImpl<TData extends RowData>({
   return flexRender(cell.column.columnDef.cell, cell.getContext())
 }
 
+// A cell's row and column as one key that reads back to exactly the two ids, whatever they hold: the row id's length
+// comes first, so a separator inside an id cannot move the split (`getCellKey` joins them with a separator).
+function cellPairKey(rowId: string, columnId: string) {
+  return `${rowId.length}:${rowId}${columnId}`
+}
+
+function cellPairOf(key: string) {
+  const colon = key.indexOf(":")
+  const rowEnd = colon + 1 + Number(key.slice(0, colon))
+  return { rowId: key.slice(colon + 1, rowEnd), columnId: key.slice(rowEnd) }
+}
+
 // How many times each cell of a table on screen was updated, as an atom that subscribes to the table's cell while
-// something reads it and lets go with its finalizer: one family per table, keyed by the cell's key.
-const cellUpdates = new WeakMap<object, (cellKey: string) => Atom.Atom<number>>()
+// something reads it and lets go with its finalizer: one family per table, keyed by the cell's row and column.
+const cellUpdates = new WeakMap<object, (pairKey: string) => Atom.Atom<number>>()
 
 function cellUpdatesOf<TData extends RowData>(
   table: Cell<DataGridFeatures, TData>["table"],
@@ -223,8 +240,8 @@ function cellUpdatesOf<TData extends RowData>(
 ) {
   let family = cellUpdates.get(table)
   if (family === undefined) {
-    family = Atom.family((cellKey: string) => {
-      const position = parseCellKey(cellKey)
+    family = Atom.family((pairKey: string) => {
+      const position = cellPairOf(pairKey)
       return Atom.readable((get) => {
         let count = 0
         get.addFinalizer(table.subscribeCell(position.rowId, position.columnId, () => get.setSelf(++count)))
@@ -233,7 +250,7 @@ function cellUpdatesOf<TData extends RowData>(
     })
     cellUpdates.set(table, family)
   }
-  return family(getCellKey(rowId, columnId))
+  return family(cellPairKey(rowId, columnId))
 }
 
 // Live updates patch rows in place, so the `cell` prop never changes; this

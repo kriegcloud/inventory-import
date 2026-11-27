@@ -22,10 +22,8 @@ import {
   CELL_TINTS,
   getCellFocusTarget,
   getCellLayoutStyle,
-  getCellKey,
   getHasCustomCell,
-  getIsEditableTarget,
-  parseCellKey
+  getIsEditableTarget
 } from "@inventory/ui/components/data-grid/data-grid-utils"
 
 /** One ref callback that hands the node to each ref, and cleans up after each when the node goes. */
@@ -47,9 +45,14 @@ function composeRefs<T>(...refs: ReadonlyArray<Ref<T> | undefined>): RefCallback
   }
 }
 
-/** What one cell on screen keeps between draws: its ref callback, made again only when what it closes over changes. */
+/**
+ * What one cell on screen keeps between draws: its ref callback, made again only when what it closes over changes, and
+ * the caller's ref, held on the node across those changes.
+ */
 interface KeptRef {
   readonly of: (deps: ReadonlyArray<unknown>, make: () => RefCallback<HTMLDivElement>) => RefCallback<HTMLDivElement>
+  readonly hold: (ref: Ref<HTMLDivElement> | undefined, node: HTMLDivElement) => void
+  readonly release: () => void
 }
 
 /**
@@ -59,7 +62,36 @@ interface KeptRef {
 const keptCellRef = Atom.family((_instance: string) =>
   Atom.readable((): KeptRef => {
     let kept: { readonly deps: ReadonlyArray<unknown>; readonly ref: RefCallback<HTMLDivElement> } | undefined
+    // The caller's ref is given the node once, as upstream's composed ref did: a change of focus makes a new ref
+    // callback, and React hands the same node from the old callback to the new one within one commit, so the caller's
+    // ref is let go a microtask after the old one's cleanup, unless the new callback took the same node back first.
+    let heldRef: Ref<HTMLDivElement> | undefined
+    let heldNode: HTMLDivElement | null = null
+    let heldCleanup: (() => void) | undefined
+    let releasing = false
+    const letGo = () => {
+      heldCleanup?.()
+      heldCleanup = undefined
+      heldRef = undefined
+      heldNode = null
+    }
     return {
+      hold: (ref, node) => {
+        releasing = false
+        if (heldCleanup !== undefined && heldRef === ref && heldNode === node) return
+        letGo()
+        heldRef = ref
+        heldNode = node
+        heldCleanup = composeRefs(ref)(node) ?? undefined
+      },
+      release: () => {
+        releasing = true
+        queueMicrotask(() => {
+          if (!releasing) return
+          releasing = false
+          letGo()
+        })
+      },
       of: (deps, make) => {
         if (
           kept !== undefined &&
@@ -133,9 +165,15 @@ export function DataGridCell<TData extends RowData>({
     !getHasCustomCell(cell.column) &&
     (variant === "text" || variant === "number" || variant === "url" || variant === "long-text")
   const takesFocus = isFocused && !isEditing
-  const composedRef = useAtomValue(keptCellRef(useId())).of([ref, takesFocus], () =>
-    takesFocus ? composeRefs(ref, focusCell) : composeRefs(ref)
-  )
+  const kept = useAtomValue(keptCellRef(useId()))
+  // The callback changes when `takesFocus` does, so the focus runs where upstream's layout effect ran again; the
+  // caller's ref is held across that change and is not handed the node a second time.
+  const composedRef = kept.of([ref, takesFocus], () => (node: HTMLDivElement | null) => {
+    if (node === null) return
+    kept.hold(ref, node)
+    if (takesFocus) focusCell(node)
+    return kept.release
+  })
 
   const isSelectionTinted = isSelected && !isEditing
   const isTinted = isSelectionTinted || isSearchMatch || isActiveSearchMatch
@@ -276,10 +314,22 @@ export function DataGridCell<TData extends RowData>({
   )
 }
 
+// A cell's row and column as one key that reads back to exactly the two ids, whatever they hold: the row id's length
+// comes first, so a separator inside an id cannot move the split (`getCellKey` joins them with a separator).
+function cellPairKey(rowId: string, columnId: string) {
+  return `${rowId.length}:${rowId}${columnId}`
+}
+
+function cellPairOf(key: string) {
+  const colon = key.indexOf(":")
+  const rowEnd = colon + 1 + Number(key.slice(0, colon))
+  return { rowId: key.slice(colon + 1, rowEnd), columnId: key.slice(rowEnd) }
+}
+
 // The value of each cell of a table on screen, as an atom that subscribes to the table's cell while something reads it
-// and lets go with its finalizer: one family per table, keyed by the cell's key, as upstream's subscription was keyed
-// by the table, the row and the column.
-const cellValues = new WeakMap<object, (cellKey: string) => Atom.Atom<unknown>>()
+// and lets go with its finalizer: one family per table, keyed by the cell's row and column, as upstream's subscription
+// was keyed by the table, the row and the column.
+const cellValues = new WeakMap<object, (pairKey: string) => Atom.Atom<unknown>>()
 
 function cellValueOf<TData extends RowData>(
   table: Cell<DataGridFeatures, TData>["table"],
@@ -288,8 +338,8 @@ function cellValueOf<TData extends RowData>(
 ) {
   let family = cellValues.get(table)
   if (family === undefined) {
-    family = Atom.family((cellKey: string) => {
-      const position = parseCellKey(cellKey)
+    family = Atom.family((pairKey: string) => {
+      const position = cellPairOf(pairKey)
       const read = () => table.getRowModel().rowsById[position.rowId]?.getValue(position.columnId)
       return Atom.readable((get) => {
         get.addFinalizer(table.subscribeCell(position.rowId, position.columnId, () => get.setSelf(read())))
@@ -298,7 +348,7 @@ function cellValueOf<TData extends RowData>(
     })
     cellValues.set(table, family)
   }
-  return family(getCellKey(rowId, columnId))
+  return family(cellPairKey(rowId, columnId))
 }
 
 export function useCellValue<TData extends RowData>(cell: Cell<DataGridFeatures, TData>) {

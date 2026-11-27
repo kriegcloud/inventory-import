@@ -1,6 +1,7 @@
 // Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 2); no longer as its registry has it.
-// A row's ref callback, which files its element by index for the grid, is made once for each index of each grid and
-// kept (`rowRefOf`), so React sees the same function across draws and calls it anew only when the row's index changes,
+// A row's ref callback, which files its element by index for the grid, is kept for each index of each grid while a row
+// with that index is on screen (`rowRefOf`), so React sees the same function across draws and calls it anew only when
+// the row's index changes,
 // as upstream's `useCallback` did; composing it with a caller's own ref is kept the same way (`composedRefOf`), in place
 // of Radix's internal `useComposedRefs`. The utility cell's focus handler goes to a plain element, so it is a plain
 // function. `DataGridRowContext` stays React context, read with `useContext`: it carries what the grid was drawn with
@@ -67,7 +68,12 @@ type RowRef = (node: HTMLDivElement | null) => void
 
 const rowRefs = new WeakMap<RowMapRef, Map<number, RowRef>>()
 
-/** The ref callback that files row `index`'s element in the grid's map, the same function for each index of a grid. */
+/**
+ * The ref callback that files row `index`'s element in the grid's map: the same function while a row with that index is
+ * on screen. It is kept from the moment it is attached until it is detached, so the cache holds only the rows on screen,
+ * not every index scrolled past. React detaches every old ref before it attaches the new ones, so a slot that takes
+ * over an index from another slot gets the callback that slot let go, and keeps it.
+ */
 function rowRefOf(rowMapRef: RowMapRef, index: number): RowRef {
   const byIndex = rowRefs.get(rowMapRef) ?? new Map<number, RowRef>()
   rowRefs.set(rowMapRef, byIndex)
@@ -76,11 +82,12 @@ function rowRefOf(rowMapRef: RowMapRef, index: number): RowRef {
   const ref: RowRef = (node) => {
     if (node) {
       rowMapRef.current.set(index, node)
+      byIndex.set(index, ref)
     } else {
       rowMapRef.current.delete(index)
+      if (byIndex.get(index) === ref) byIndex.delete(index)
     }
   }
-  byIndex.set(index, ref)
   return ref
 }
 

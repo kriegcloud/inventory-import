@@ -3,12 +3,14 @@
 // The viewport of one grid on screen is one instance, made for its `useId` (`viewportOf`): the insets it measures are
 // its atom, written by a ResizeObserver it starts from its own ref callbacks; where the last scroll left the rows is
 // recorded when the row virtualizer reports a change (after the commit a scroll makes); the virtualizers are handed to
-// the hook's boxes as they are drawn and taken back when the viewport leaves; the columns are measured again a frame
-// after the table's column state changes (`viewportListeners`).
+// the hook's boxes when the grid's element is attached and taken back when it is detached; the columns are measured
+// again a frame after the table's column state changes, while the element is attached. Each ref callback is made for
+// the boxes it fills (`gridRefFor`, `footerRefFor`, kept per box), so a draw handed another grid's boxes or another
+// table attaches the element to them, and the old attachment's cleanup empties only what it filled.
 //
 // The rule this file protects: what the rows and the header are given keeps its identity exactly while upstream's
 // memos did (`keepOne`), so a draw of the viewport draws no row whose props did not change.
-import { useAtomMount, useAtomValue } from "@effect/atom-react"
+import { useAtomValue } from "@effect/atom-react"
 import { type Column, flexRender, type HeaderGroup, type RowData, type TableState } from "@tanstack/react-table"
 import { defaultRangeExtractor, type Range, useVirtualizer, type Virtualizer } from "@tanstack/react-virtual"
 import { cn } from "cn"
@@ -159,8 +161,8 @@ interface Viewport<TData extends RowData> {
   } | null>
   readonly scroll: RefObject<CommittedScroll>
   readonly insets: Atom.Writable<ViewportInsets>
-  readonly gridRef: (node: HTMLDivElement | null) => (() => void) | undefined
-  readonly footerRef: (node: HTMLDivElement | null) => (() => void) | undefined
+  readonly gridRefFor: (owner: GridAttachment<TData>) => ElementRef
+  readonly footerRefFor: (footerRef: DataGridProps<TData>["footerRef"]) => ElementRef
   readonly onRowVirtualizerChange: (virtualizer: Virtualizer<HTMLDivElement, Element>) => void
   readonly onRowAdd: (event: MouseEvent<HTMLDivElement>) => void
   readonly onFooterCellKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void
@@ -171,7 +173,21 @@ interface Viewport<TData extends RowData> {
     readonly columnWindow: Keep<ColumnWindow | null>
     readonly readOnlyColumnIds: Keep<Set<string>>
     readonly rowContext: Keep<ComponentProps<typeof DataGridRowContext>["value"]>
+    readonly gridRef: Keep<ElementRef>
+    readonly footerRef: Keep<ElementRef>
   }
+}
+
+/** A ref callback that returns its cleanup. */
+type ElementRef = (node: HTMLDivElement | null) => (() => void) | undefined
+
+/** The boxes and the table one attachment of the grid's element fills and listens to. */
+interface GridAttachment<TData extends RowData> {
+  readonly dataGridRef: DataGridProps<TData>["dataGridRef"]
+  readonly headerRef: DataGridProps<TData>["headerRef"]
+  readonly rowVirtualizerRef: DataGridProps<TData>["rowVirtualizerRef"]
+  readonly columnVirtualizerRef: DataGridProps<TData>["columnVirtualizerRef"]
+  readonly atoms: DataGridProps<TData>["table"]["atoms"]
 }
 
 /** Whether the rows are pinned for a jump: the scroll moved further since the last scroll drawn than the rows kept. */
@@ -218,32 +234,60 @@ function makeViewport<TData extends RowData>(registry: AtomRegistry.AtomRegistry
     observer.observe(node)
   }
 
+  const virtualizers: Viewport<TData>["virtualizers"] = { current: null }
+
   return {
     latest,
-    virtualizers: { current: null },
+    virtualizers,
     scroll,
     insets,
     // The grid and its header are measured from when the grid is attached, the footer from when it appears: each is
     // observed while it is on screen, where upstream measured them again when the footer or the row count changed.
-    gridRef: (node) => {
-      const draw = latest.current
-      if (!draw || !node) return undefined
-      const { dataGridRef } = draw
-      const header = draw.headerRef.current
+    // While attached, the element fills this attachment's boxes with it and the virtualizers (upstream's layout
+    // effects), and both virtualizers measure again a frame after this table's columns, order, pinning, sizes,
+    // visibility or sorting change, and once at once. Its cleanup empties only the boxes that still hold what it put.
+    gridRefFor: (owner) => (node) => {
+      if (!node) return undefined
+      const { dataGridRef, headerRef, rowVirtualizerRef, columnVirtualizerRef, atoms } = owner
+      const header = headerRef.current
       dataGridRef.current = node
       observe(node)
       if (header) observe(header)
       measure()
+      const attached = virtualizers.current
+      if (attached) {
+        rowVirtualizerRef.current = attached.row
+        columnVirtualizerRef.current = attached.column
+      }
+      let frame = 0
+      const measureSoon = () => {
+        cancelAnimationFrame(frame)
+        frame = requestAnimationFrame(() => {
+          attached?.row.measure()
+          attached?.column.measure()
+        })
+      }
+      measureSoon()
+      const subscriptions = [
+        atoms.columnFilters.subscribe(measureSoon),
+        atoms.columnOrder.subscribe(measureSoon),
+        atoms.columnPinning.subscribe(measureSoon),
+        atoms.columnSizing.subscribe(measureSoon),
+        atoms.columnVisibility.subscribe(measureSoon),
+        atoms.sorting.subscribe(measureSoon)
+      ]
       return () => {
+        cancelAnimationFrame(frame)
+        for (const subscription of subscriptions) subscription.unsubscribe()
         observer?.unobserve(node)
         if (header) observer?.unobserve(header)
         if (dataGridRef.current === node) dataGridRef.current = null
+        if (attached && rowVirtualizerRef.current === attached.row) rowVirtualizerRef.current = null
+        if (attached && columnVirtualizerRef.current === attached.column) columnVirtualizerRef.current = null
       }
     },
-    footerRef: (node) => {
-      const draw = latest.current
-      if (!draw || !node) return undefined
-      const { footerRef } = draw
+    footerRefFor: (footerRef) => (node) => {
+      if (!node) return undefined
       footerRef.current = node
       observe(node)
       measure()
@@ -288,7 +332,9 @@ function makeViewport<TData extends RowData>(registry: AtomRegistry.AtomRegistry
       columnRangeExtractor: keepOne(),
       columnWindow: keepOne(),
       readOnlyColumnIds: keepOne(),
-      rowContext: keepOne()
+      rowContext: keepOne(),
+      gridRef: keepOne(),
+      footerRef: keepOne()
     }
   }
 }
@@ -299,51 +345,7 @@ function makeViewport<TData extends RowData>(registry: AtomRegistry.AtomRegistry
  * callbacks of a second viewport to the one drawn.
  */
 const viewportOf = Atom.family((_instance: string) =>
-  Atom.readable((get) => {
-    const viewport: Viewport<any> = makeViewport<any>(get.registry)
-    get.addFinalizer(() => {
-      const draw = viewport.latest.current
-      const virtualizers = viewport.virtualizers.current
-      if (!draw || !virtualizers) return
-      if (draw.rowVirtualizerRef.current === virtualizers.row) draw.rowVirtualizerRef.current = null
-      if (draw.columnVirtualizerRef.current === virtualizers.column) draw.columnVirtualizerRef.current = null
-    })
-    return viewport
-  }).pipe(Atom.setIdleTTL("1 second"))
-)
-
-/**
- * While a viewport is mounted: both virtualizers measure again a frame after the table's columns, order, pinning,
- * sizes, visibility or sorting change, and once when it mounts, as upstream's layout effect did.
- */
-const viewportListeners = Atom.family((instance: string) =>
-  Atom.readable((get) => {
-    const viewport = get(viewportOf(instance))
-    const draw = viewport.latest.current
-    if (!draw) return
-    const { atoms } = draw.table
-    let frame = 0
-    const measureSoon = () => {
-      cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(() => {
-        viewport.virtualizers.current?.row.measure()
-        viewport.virtualizers.current?.column.measure()
-      })
-    }
-    measureSoon()
-    const subscriptions = [
-      atoms.columnFilters.subscribe(measureSoon),
-      atoms.columnOrder.subscribe(measureSoon),
-      atoms.columnPinning.subscribe(measureSoon),
-      atoms.columnSizing.subscribe(measureSoon),
-      atoms.columnVisibility.subscribe(measureSoon),
-      atoms.sorting.subscribe(measureSoon)
-    ]
-    get.addFinalizer(() => {
-      cancelAnimationFrame(frame)
-      for (const subscription of subscriptions) subscription.unsubscribe()
-    })
-  }).pipe(Atom.setIdleTTL(0))
+  Atom.readable((get): Viewport<any> => makeViewport<any>(get.registry)).pipe(Atom.setIdleTTL("1 second"))
 )
 
 function DataGridViewport<TData extends RowData>({
@@ -458,11 +460,13 @@ function DataGridViewport<TData extends RowData>({
     rangeExtractor: columnRangeExtractor
   })
 
-  // Each virtualizer is the same object for the viewport's life: the hook's boxes hold them from the first draw.
+  // Each virtualizer is the same object for the viewport's life; the grid's element hands them to the hook's boxes.
   viewport.virtualizers.current = { row: rowVirtualizer, column: columnVirtualizer }
-  rowVirtualizerRef.current = rowVirtualizer
-  columnVirtualizerRef.current = columnVirtualizer
-  useAtomMount(viewportListeners(instance))
+  const gridRef = viewport.keep.gridRef(
+    [dataGridRef, headerRef, rowVirtualizerRef, columnVirtualizerRef, table.atoms],
+    () => viewport.gridRefFor({ dataGridRef, headerRef, rowVirtualizerRef, columnVirtualizerRef, atoms: table.atoms })
+  )
+  const footerRefCallback = viewport.keep.footerRef([footerRef], () => viewport.footerRefFor(footerRef))
 
   const scrollOffset = rowVirtualizer.scrollOffset ?? 0
   const isScrolling = rowVirtualizer.isScrolling || columnVirtualizer.isScrolling
@@ -509,7 +513,7 @@ function DataGridViewport<TData extends RowData>({
       aria-multiselectable="true"
       data-slot="data-grid"
       tabIndex={0}
-      ref={viewport.gridRef}
+      ref={gridRef}
       className="relative isolate grid overflow-auto overscroll-x-contain rounded-md border tabular-nums select-none focus:outline-none"
       style={{
         ...columnSizeVars,
@@ -570,7 +574,7 @@ function DataGridViewport<TData extends RowData>({
         <div
           role="rowgroup"
           data-slot="data-grid-footer"
-          ref={viewport.footerRef}
+          ref={footerRefCallback}
           className="sticky bottom-0 z-30 grid border-t bg-background"
         >
           <div

@@ -214,10 +214,23 @@ const gridInstance = Atom.family((_instance: string) =>
   Atom.readable((get): Grid<any> => makeGrid<any>(get.registry)).pipe(Atom.setIdleTTL("1 second"))
 )
 
-/** While the grid's owner is mounted; when it leaves, what is being edited is written and the files it made let go. */
+/**
+ * While the grid's owner is mounted, whether or not the grid's element is on screen (the same table may be shown as
+ * cards): what the handlers read is what the last commit drew, as upstream's refs held it. When it leaves, what is
+ * being edited is written and the files it made let go.
+ */
 const gridMounted = Atom.family((instance: string) =>
   Atom.readable((get) => {
     const grid = get(gridInstance(instance))
+    const owned = grid.tableRef.current
+    if (owned !== null) {
+      grid.committed.current = grid.rendered.current
+      get.addFinalizer(
+        afterEachCommit(owned, () => {
+          grid.committed.current = grid.rendered.current
+        })
+      )
+    }
     get.addFinalizer(() => {
       const table = grid.tableRef.current
       if (table === null) return
@@ -1084,13 +1097,6 @@ function listenOnScreen<TData extends RowData>(
   const table = tableRef.current
   if (table === null) return
 
-  // What the handlers read is what the last commit drew, as upstream's refs held it.
-  addFinalizer(
-    afterEachCommit(table, () => {
-      grid.committed.current = grid.rendered.current
-    })
-  )
-
   container.addEventListener("keydown", handlers.onDataGridKeyDown)
   addFinalizer(() => container.removeEventListener("keydown", handlers.onDataGridKeyDown))
 
@@ -1630,9 +1636,11 @@ function autoScrollWhileDragging<TData extends RowData>(
     else if (!isDragging && active) onAutoScrollStop()
   })
 
+  // A drag the grid leaves in the middle of ends there, its selection kept: no button is down when it comes back.
   addFinalizer(() => {
-    onAutoScrollStop()
     subscription.unsubscribe()
+    onAutoScrollStop()
+    table.endCellDrag()
   })
 }
 

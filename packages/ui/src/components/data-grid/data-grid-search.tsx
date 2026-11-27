@@ -35,7 +35,10 @@ const SEARCH_DELAY_MS = 150
 const searchHasQuery = Atom.family((_instance: string) => Atom.make<boolean | null>(null))
 
 interface SearchBox {
-  /** The input's ref: focuses it as it appears; as it goes, forgets the composition and what was typed. */
+  /**
+   * The input's ref: focuses it as it appears; as it goes, forgets the composition and what was typed, and drops a
+   * search still waiting its pause, so a closed search never filters the grid afterwards.
+   */
   readonly inputRef: (node: HTMLInputElement | null) => void
   readonly isComposing: () => boolean
   readonly setComposing: (composing: boolean) => void
@@ -48,6 +51,7 @@ interface SearchBox {
 const searchBox = Atom.family((instance: string) =>
   Atom.readable((get): SearchBox => {
     const registry = get.registry
+    const timer = get(oneTimer(instance))
     let composing = false
     return {
       inputRef: (node) => {
@@ -57,6 +61,7 @@ const searchBox = Atom.family((instance: string) =>
           })
           return
         }
+        timer.cancel()
         composing = false
         registry.set(searchHasQuery(instance), false)
       },

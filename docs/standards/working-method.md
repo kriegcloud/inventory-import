@@ -6,7 +6,7 @@ tags: [evidence]
 status: stable
 ---
 
-- **Design before code**: Schemas, then the service contract, then the code (`CLAUDE.md` "Adding a feature").
+- **Design before code**: Schemas, then the service contract, then the code (`docs/building.md` "Adding a feature: follow the Items example").
   Check: the plan names the Schemas and endpoints before any component.
 - **Challenge me** once, before building, with evidence and a better option, as a type, a schema or a flow; then do
   what I decide. Check: each plan names one risk or alternative.

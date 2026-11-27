@@ -17,7 +17,7 @@ You do one of two jobs, and your brief says which.
 - **Build.** You build one inventory item: schema first, with its proof. You touch only the files that item names.
 
 Three things are never yours. A product decision (what a rule means, what a row gets, who may do what) is Benjamin's:
-`CLAUDE.md`, "How we work". Hosting is Benjamin's: no deploy, plan, login or state command (`CLAUDE.md`, "Commands").
+`CLAUDE.md`, "How we work". Hosting is Benjamin's: no deploy, plan, login or state command (`docs/commands.md`, "Commands").
 An open decision of the brief is open: you name its number under "what blocks it" and build nothing its answer would
 change, not even the recommended option.
 
@@ -114,7 +114,7 @@ those two files hold nothing else, ports and middleware included. A payload sche
 | Prove | A rule proved from the code of `decide` and `evolve` | `Prove.report`, `invariants`, `decisionReport`, `decision`, `compaction`, `rewrite` from `/Prove` | `test/*.prove.test.ts` | Is the check |
 | Verify | Every proof, then a search of the whole model | `Verify.report`, `Verify.model(model, { apis, ... })`, `Verify.aggregate` from `/Verify` | `test/<Context>.verify.test.ts` | Is the check |
 | Explore | The search alone | `Explore.check`, `report`, `script` from `/Explore` | Rarely: Verify runs it | Is the check |
-| Lock file | The rules as written | `lock` option of Verify; `UPDATE_VERIFY_LOCK=1` | `test/<Context>.lock.json` | `CLAUDE.md`, "The model's blocks" |
+| Lock file | The rules as written | `lock` option of Verify; `UPDATE_VERIFY_LOCK=1` | `test/<Context>.lock.json` | `docs/building.md`, "The model's blocks" |
 | Better Auth with Alchemy | Sign-in as a Layer on the model's Worker | `@alchemy.run/better-auth` (not installed until move 2) | The host | The harness test with a cookie |
 
 ### Choosing between neighbours
@@ -178,7 +178,7 @@ client (`MemberApi`, `ServerApi`, `AdminApi` in the brief). `toHttpApi`, `toCli`
 named in `expose`. An error not declared in `rejects` reaches the client as "Internal server error", so every refusal
 `sayError` has words for is a declared Rejection. No upload and no multipart. What a model's tools may read or propose
 is decision 50 and who may call an MCP server is decision 51, both open: name them under "Blocked by" and build
-neither. Whatever he answers, no tool confirms, takes back, edits or changes a role (`CLAUDE.md`, "AI features").
+neither. Whatever he answers, no tool confirms, takes back, edits or changes a role (`docs/building.md`, "AI features").
 
 **HTTP, CLI, tools.** `toHttpApi`: a command is a POST, a query a QUERY, a read a GET, a live read server-sent events;
 a rejection is 422 unless it has `httpApiStatus`; a view's `list` takes no `where`. `toCli`: a refused call is
@@ -242,7 +242,7 @@ reached. Decision 10's "sealed history" is an undo's lower levels kept as one te
 
 **Story and Verify.** A story fails on any event, rejection or outside call it did not assert. Verify needs `apis`,
 does not run middleware, proves aggregates and decisions, and only searches views, policies and sagas. The solver runs
-under Node, never Bun (`CLAUDE.md`, "Commands"). Beyond the 4,096 paths: 256 compared paths, 10,000 turns of the
+under Node, never Bun (`docs/commands.md`, "Commands"). Beyond the 4,096 paths: 256 compared paths, 10,000 turns of the
 interpreter, and a list from the state or a command tried up to 2 items past the least its schema asks for, its rule
 then Bounded, not Proved. Not read: `Schema.Record`, a pattern, middleware. Read: `.make`, a tagged union's `guards`,
 `isAnyOf`, `match` and `matchOrElse` (the library's own; the repository's patch makes a guard exact and adds
@@ -261,7 +261,7 @@ not installed until move 2).
 | An endpoint in a contract package's HttpApi group with `Schema.TaggedError` failures | Command and Rejection (with `httpApiStatus`) served by an Api | Decision 31; an upload's pieces stay HTTP |
 | `newRequestId()`, a key table, `ON CONFLICT DO NOTHING` for a retry | `commandId` | A rejection stores no receipt: a resend decides again |
 | An `Activity` row written beside a write | Events that carry who acted, and a projection that writes the `activity` line | Decision 36: the `activity` table stays the trail and answers the Activity page. The projection that writes a change to D1 writes its line in the same batch; for a command that changes no D1 row a projection writes the line after, no longer in one write with the change. No stream per model |
-| `requireRole`, `Identity`, `CurrentActor`, `HeaderIdentity`, `asAgent`, `SameOrigin` | Middleware, RequestContext, the rule in `decide` or `validate`; a policy's own actor | `CLAUDE.md`, "Identity and permissions"; the Api has no origin check |
+| `requireRole`, `Identity`, `CurrentActor`, `HeaderIdentity`, `asAgent`, `SameOrigin` | Middleware, RequestContext, the rule in `decide` or `validate`; a policy's own actor | `docs/building.md`, "Identity and permissions"; the Api has no origin check |
 | `D1Client.batch` that writes a confirm or a take-back (`confirm`, `takeBack` in `ImportStore.adapter.ts`) | A command on `Import` recorded first, then a projection's or a saga's batch with its marker | Decisions 5, 18, 19: not one write any more, and not a Decision |
 | A batch that must change two records together or not at all, now (a role change that must keep an admin) | Decision | Path counts; one lock per aggregate type in memory, a two-phase commit on Durable Objects |
 | A unique index that reserves a value (`member_organizationId_userId_uidx`, the email a person is added by, a SKU) | A claim aggregate keyed by the value, decided with its owner (`MemberEmail`, move 6); for a SKU the item's own instance (decision 17) | The brief's "Unique values" row |
@@ -284,7 +284,7 @@ not installed until move 2).
 | `Upload.machine.ts`, `Upload.controller.ts`, the reader worker | Stay; `Upload` records begun, finished and expired | The four upload endpoints stay HTTP |
 | A follow-up after a write: a mail, a notice, a second write | Policy | It is not atomic with the write |
 | A process with steps a person waits for (suggestions, many items) | Saga | Decisions 43, 44; which host has the engine |
-| A model call behind `ModelAllowanceGateway.take`; a driver in `packages/drivers`; `Answerer.port.ts` | ExternalSystem, with `TakeCall` as a command | `CLAUDE.md`, "AI features" |
+| A model call behind `ModelAllowanceGateway.take`; a driver in `packages/drivers`; `Answerer.port.ts` | ExternalSystem, with `TakeCall` as a command | `docs/building.md`, "AI features" |
 | An upload's `expiresAt` and its sweep on the next request | A scheduled command (`ExpireUpload`, with the `eventually` rule `EveryUploadEnds`; move 5) | Only a command with no rejections can be scheduled; `decide` answers `[]` when it no longer applies |
 | A sweep of rows no instance owns (unused confirm plans) | Open: decision 56 (a workflow on the Worker that has D1, or only the sagas) | Name 56 under "Blocked by" |
 | `servicesWith` in `App.ts`, group Layers in `handlers.ts` | `Model.layer(handlers)` and the platform Layer | Decisions 27, 29 |
@@ -391,7 +391,7 @@ list):
   and the suggestions at move 8.
 
 What the trials found (the exploration's `README.md`, "What was found"; `research/04-trial.md`,
-`07-review-decisions-trial.md`), beyond what `CLAUDE.md`, "The model's blocks: what Verify reads", and `docs/verify.md`
+`07-review-decisions-trial.md`), beyond what `docs/building.md`, "The model's blocks: what Verify reads", and `docs/verify.md`
 say of the prover: one instance for a whole import proves nothing about its rows; an aggregate's state is one stored
 value with a ceiling near 8 MiB in workerd, 2 MiB on the Cluster pool; a request context declared in another package
 was not read by the prover on the trial's commit (the installed source now resolves package imports:
@@ -436,7 +436,7 @@ one; split one that crosses a move. End the file with what you looked at and fou
    mutant for each new check and each new event field; the lock updated on purpose, once.
 5. **Host wiring and the screen**, only when the item and its move say so.
 
-Before step 2 on any file with a `decide` or an `evolve`, read `CLAUDE.md`, "The model's blocks: what Verify reads",
+Before step 2 on any file with a `decide` or an `evolve`, read `docs/building.md`, "The model's blocks: what Verify reads",
 and `docs/verify.md`, "Before changing the model". Run `bun run --cwd packages/catalog/model prove` after each change
 to such a file and `verify` before you hand back; state the path counts the proof tests print. `bun run check` before
 you say done.
@@ -445,7 +445,7 @@ you say done.
 
 Inventory: the file you wrote, how many items by kind and by size, the three you would build first and why, and each
 place the installed source disagreed with a page of this repository. Build: what you built, the checks you ran with
-their results, what you did not check, and every contract field you added, changed or rely on (`CLAUDE.md`,
+their results, what you did not check, and every contract field you added, changed or rely on (`docs/agents.md`,
 "Sub-agents").
 
 End with one line: "Needs the person: <the decision only Benjamin can make>" or "Needs the person: nothing".

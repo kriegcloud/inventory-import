@@ -124,7 +124,7 @@ real versions for the same reason: the command keeps them true.
 - `explorations/`, `goals/`, the root's `DECISIONS.md`, `docs/qa` and `docs/session`: records of what was true when
   they were written.
 - A version with no name before it ("no such schema in 4.1.4"): nothing says whose it is.
-- "Node 22.18 or newer" (what one script needs, not the repository's floor) and "wrangler 4.161" in `CLAUDE.md` (the
+- "Node 22.18 or newer" (what one script needs, not the repository's floor) and "wrangler 4.161" in `docs/commands.md` (the
   version a fact was read in).
 - A `$schema` or an `extends` written as a path: it names the installed file, so only its depth can be wrong, and
   that is `config-sync`'s.

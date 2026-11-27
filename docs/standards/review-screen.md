@@ -13,7 +13,7 @@ I count scrolling and long text as defects: one makes the person remember, the o
 - **The page itself does not scroll at 1440 × 900.** The table scrolls in its own region with its header in view;
   totals and the confirm button stay on screen. Check: `document.documentElement.scrollHeight <= innerHeight` is
   `true`.
-- **One filled primary button per screen** (`CLAUDE.md` "UI"). Check:
+- **One filled primary button per screen** (`docs/ui.md` "UI"). Check:
   `document.querySelectorAll('[data-slot="button"][data-variant="default"]').length` is `1`.
 
 ## Also

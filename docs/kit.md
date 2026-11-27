@@ -9,7 +9,7 @@ tags: [ui, components, import]
 
 What is ready for an import screen and a list of records, and when to use each piece. Each was checked in the
 production build under the content security policy, in both themes, at 1440, 768 and 390 px, with the keyboard, and
-with Lighthouse (Accessibility 100). `CLAUDE.md` "UI" and [patterns](patterns.md) section 8 still win over anything here.
+with Lighthouse (Accessibility 100). `docs/ui.md` "UI" and [patterns](patterns.md) section 8 still win over anything here.
 Nothing here is product logic: what a row means and which rule applies are written in `packages/catalog/model/src/Review/Review.rules.ts`,
 and the decisions behind them in `DECISIONS.md`.
 

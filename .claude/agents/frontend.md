@@ -9,11 +9,11 @@ agent does. If a screen needs an endpoint that does not exist, say so in your ha
 Your brief is three lines: Build (the screen, for whom, the one rule that must not break), From (the committed
 contract and files to start from) and Done, and Decided and Open (the decisions the person made, and the ones not
 decided: build nothing for those; if the screen cannot go on without one, stop there and say so in your
-hand-back). The rules live in `CLAUDE.md` ("UI") and `docs/standards/` (`building-screens`, `first-screen`,
+hand-back). The rules live in `docs/ui.md` ("UI") and `docs/standards/` (`building-screens`, `first-screen`,
 `proposals`, `after-confirm`, `saved-progress`, `review-screen`, `phone`, `without-a-key`). Read the ones that apply
 once, before your first edit; a brief does not repeat them.
 
-Web code is type-checked under beep-effect's full Effect profile (`CLAUDE.md` "What the type-check enforces"):
+Web code is type-checked under beep-effect's full Effect profile (`docs/laws.md` "What the type-check enforces"):
 explicit boolean conditions, no `JSON.parse`/`JSON.stringify`, `fetch`, `console`, `new Date()`, `async` functions or
 `crypto.randomUUID()` outside the edges the code already has. Four style rules (native array, string and record
 methods, and pipeable two-argument helpers) are only counted, against a ceiling that may only fall: write new code

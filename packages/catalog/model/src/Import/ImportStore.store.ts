@@ -111,7 +111,7 @@ export class ConfirmWrite extends S.Opaque<ConfirmWrite, { readonly brand: uniqu
       S.annotateKey({ description: "One id per row the plan creates, in the plan's order, made by the handler" })
     ),
     audit: Activity.pipe(
-      S.annotateKey({ description: '"Imported items": its detail is filled in by the batch from what it counted' })
+      S.annotateKey({ description: "\"Imported items\": its detail is filled in by the batch from what it counted" })
     )
   })
     // A store pairs the rows the plan creates with the ids in order, and a pairing stops at the shorter list: with
@@ -122,7 +122,8 @@ export class ConfirmWrite extends S.Opaque<ConfirmWrite, { readonly brand: uniqu
       })
     )
     .annotate({ identifier: "ConfirmWrite", description: "One confirm of an import, as it is written" })
-) {}
+) {
+}
 
 /** What a confirm's write did. */
 export const ConfirmedKind = LiteralKit(["confirmed", "closed", "moved", "itemsChanged"]).annotate({
@@ -130,18 +131,23 @@ export const ConfirmedKind = LiteralKit(["confirmed", "closed", "moved", "itemsC
   description:
     "The confirm was written; or nothing was, because the import was no longer open, because its draft had moved on from the revision the confirm was made on, or because a stored item its judgement read changed since"
 })
+
 class ConfirmWritten extends S.Opaque<ConfirmWritten, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("confirmed") }).annotate({
     identifier: "ConfirmWritten",
     description: "This write confirmed the import"
   })
-) {}
+) {
+}
+
 class ConfirmClosed extends S.Opaque<ConfirmClosed, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("closed") }).annotate({
     identifier: "ConfirmClosed",
     description: "Another confirm won, or the import was not open: nothing was written"
   })
-) {}
+) {
+}
+
 class ConfirmMoved extends S.Opaque<ConfirmMoved, { readonly brand: unique symbol }>()(
   S.Struct({
     kind: S.tag("moved"),
@@ -150,14 +156,18 @@ class ConfirmMoved extends S.Opaque<ConfirmMoved, { readonly brand: unique symbo
     identifier: "ConfirmMoved",
     description: "The draft is open at another revision than the confirm was made on: nothing was written"
   })
-) {}
+) {
+}
+
 class ConfirmItemsChanged extends S.Opaque<ConfirmItemsChanged, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("itemsChanged") }).annotate({
     identifier: "ConfirmItemsChanged",
     description:
       "A stored item the confirm's judgement read was edited, replaced, created or taken back since, or the import's created rows or suggestions changed: nothing was written, and the confirm is judged again"
   })
-) {}
+) {
+}
+
 /**
  * Whether a confirm's write was the one that confirmed the import. Told apart with `Confirmed.match` or its `guards`:
  * the description is given before `S.toTaggedUnion`, since annotating after it rebuilds the union without them.
@@ -189,28 +199,34 @@ export class TakeBackWrite extends S.Opaque<TakeBackWrite, { readonly brand: uni
       S.annotateKey({ description: "The confirms the person was shown; only those still in force are reversed" })
     ),
     audit: Activity.pipe(
-      S.annotateKey({ description: '"Took back an import": its detail is filled in by the batch from what it counted' })
+      S.annotateKey({ description: "\"Took back an import\": its detail is filled in by the batch from what it counted" })
     )
   }).annotate({ identifier: "TakeBackWrite", description: "One take-back of an import, as it is written" })
-) {}
+) {
+}
 
 /** What a take-back's write did. */
 export const TookBackKind = LiteralKit(["tookBack", "nothingInForce"]).annotate({
   identifier: "TookBackKind",
   description: "Confirms were taken back, or none of those named was in force any more"
 })
+
 class TakenBack extends S.Opaque<TakenBack, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("tookBack") }).annotate({
     identifier: "TakenBack",
     description: "At least one of the confirms was in force and is taken back"
   })
-) {}
+) {
+}
+
 class NothingInForce extends S.Opaque<NothingInForce, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("nothingInForce") }).annotate({
     identifier: "NothingInForce",
     description: "None of the confirms was in force any more (a second press): nothing was written"
   })
-) {}
+) {
+}
+
 /** Whether a take-back's write reversed anything. */
 export const TookBack = TookBackKind.mapMembers(() => Tuple.make(TakenBack, NothingInForce)).pipe(
   S.annotate({ identifier: "TookBack", description: "Whether a take-back's write reversed anything" }),
@@ -229,40 +245,51 @@ export const DecidedKind = LiteralKit(["saved", "closed", "rematched", "moved", 
   description:
     "The save was written; or nothing was, because the import was no longer open, because a column was matched again since the choices its decisions were judged against, because the draft moved on from the revision its rows that waited were compared at, or because a stored item that judgement read changed since"
 })
+
 class DecisionsSaved extends S.Opaque<DecisionsSaved, { readonly brand: unique symbol }>()(
   S.Struct({
     kind: S.tag("saved"),
     revision: S.Int.pipe(S.annotateKey({ description: "The draft's revision after the save" })),
     changed: S.Boolean.pipe(S.annotateKey({ description: "Whether this save is what moved the draft there" }))
   }).annotate({ identifier: "DecisionsSaved", description: "The save was written, or changed nothing" })
-) {}
+) {
+}
+
 class DecisionsClosed extends S.Opaque<DecisionsClosed, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("closed") }).annotate({
     identifier: "DecisionsClosed",
     description: "The import was no longer open: nothing was saved"
   })
-) {}
+) {
+}
+
 class DecisionsRematched extends S.Opaque<DecisionsRematched, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("rematched") }).annotate({
     identifier: "DecisionsRematched",
     description:
       "A column was matched again since the draft was read: its decisions were judged against choices it no longer has, and nothing was saved"
   })
-) {}
+) {
+}
+
 class DecisionsMoved extends S.Opaque<DecisionsMoved, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("moved") }).annotate({
     identifier: "DecisionsMoved",
     description:
       "The draft moved on from the revision the save's rows that waited were compared at (somebody saved, matched or confirmed in between): nothing was saved"
   })
-) {}
+) {
+}
+
 class DecisionsItemsChanged extends S.Opaque<DecisionsItemsChanged, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("itemsChanged") }).annotate({
     identifier: "DecisionsItemsChanged",
     description:
       "A stored item the save's judgement of a Replace or Keep-stored read was edited, replaced, created or taken back since, or the import's created rows or suggestions changed: nothing was saved"
   })
-) {}
+) {
+}
+
 /**
  * What a save of decisions did: written (at which revision, and whether it moved the draft), or why not. Told apart
  * with `Decided.match` or its `guards`.
@@ -497,14 +524,14 @@ export class ImportStore extends Context.Service<
       ): Effect.Effect<Decided>
     }
     /** The columns people chose for fields, as stored with the draft. */
-    choices(draft: Draft): Effect.Effect<ReadonlyArray<MappingChoice>>
+    readonly choices: (draft: Draft) => Effect.Effect<ReadonlyArray<MappingChoice>>
     /** Every field that began to read another column at a match, oldest first, as stored with the draft. */
-    moves(draft: Draft): Effect.Effect<ReadonlyArray<ColumnMove>>
+    readonly moves: (draft: Draft) => Effect.Effect<ReadonlyArray<ColumnMove>>
     /**
      * What the matches of the open import took back from the stored decisions, oldest first, as stored with the draft:
      * empty once it is confirmed.
      */
-    takenBack(draft: Draft): Effect.Effect<ReadonlyArray<MatchTakeBack>>
+    readonly takenBack: (draft: Draft) => Effect.Effect<ReadonlyArray<MatchTakeBack>>
     /**
      * Points one field at a file column (or at none, `column` null), in one atomic write with five parts: the choice,
      * stamped with the revision this write moves the draft to when the field reads another column by it (a decision
@@ -559,7 +586,7 @@ export class ImportStore extends Context.Service<
       (self: Draft, actor: Member): Effect.Effect<void>
     }
     /** Every changed value the organization's imports wrote, newest import first. */
-    changes(organizationId: OrganizationId): Effect.Effect<ReadonlyArray<ChangeRecord>>
+    readonly changes: (organizationId: OrganizationId) => Effect.Effect<ReadonlyArray<ChangeRecord>>
     /** The staged file, rows included, exactly as it was sent. */
     readonly table: {
       (organizationId: OrganizationId): (self: Draft) => Effect.Effect<StagedTable>
@@ -588,14 +615,14 @@ export class ImportStore extends Context.Service<
      * draft is at another revision, `itemsChanged` when one of those items changed (the confirm is judged again): in
      * each nothing was written.
      */
-    commit(write: ConfirmWrite): Effect.Effect<Confirmed>
+    readonly commit: (write: ConfirmWrite) => Effect.Effect<Confirmed>
     /**
      * Takes back the confirms named that are still in force, in one atomic batch: removes their items nobody has
      * changed since, puts back the stored items they replaced that nobody has changed since, keeps the ones someone
      * changed, marks the rows of the removed and restored items, records who took them back with the counts, and
      * writes the audit line. `nothingInForce`, having written nothing, when none of them is in force any more.
      */
-    takeBack(write: TakeBackWrite): Effect.Effect<TookBack>
+    readonly takeBack: (write: TakeBackWrite) => Effect.Effect<TookBack>
     /** Every confirm and take-back of the import, oldest first, with the numbers they stored. */
     readonly history: {
       (organizationId: OrganizationId): (self: string) => Effect.Effect<ReadonlyArray<ImportEvent>>
@@ -612,6 +639,7 @@ export class ImportStore extends Context.Service<
       (self: string, organizationId: OrganizationId): Effect.Effect<ReadonlyArray<RowOutcome>>
     }
     /** Every item of the organization, by SKU. */
-    items(organizationId: OrganizationId): Effect.Effect<ReadonlyArray<StoredItem>>
+    readonly items: (organizationId: OrganizationId) => Effect.Effect<ReadonlyArray<StoredItem>>
   }
->()("@inventory/catalog-model/Import/ImportStore.store/ImportStore") {}
+>()("@inventory/catalog-model/Import/ImportStore.store/ImportStore") {
+}

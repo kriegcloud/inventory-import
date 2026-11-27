@@ -5,7 +5,7 @@
 import { storageText } from "@inventory/client/Storage"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
-import { identity } from "effect/Function"
+import { dual, identity } from "effect/Function"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import { browserStorage } from "@inventory/client/Storage"
@@ -65,10 +65,13 @@ const LegacyRules = S.Struct({
  * the rules read) as the reason; any other name is the model of that id, asked through OpenRouter, the only provider
  * version 1 knew, as its first choice.
  */
-const answeredByV1 = (name: string, note: O.Option<string>): AnsweredBy =>
+const answeredByV1: {
+  (name: string, note: O.Option<string>): AnsweredBy,
+  (note: O.Option<string>): (name: string) => AnsweredBy
+} = dual(2, (name: string, note: O.Option<string>): AnsweredBy =>
   name === "Rules"
     ? O.match(note, { onNone: () => LegacyRules.make({}), onSome: (reason) => AnsweredBy.cases.Rules.make({ reason }) })
-    : AnsweredBy.cases.Model.make({ provider: "openrouter", model: name, fallback: false })
+    : AnsweredBy.cases.Model.make({ provider: "openrouter", model: name, fallback: false }))
 
 /** A version 1 conversation as version 2: each entry's answerer turned into its case, the rest kept as it was. */
 const fromV1 = (old: typeof ConversationV1.Type): Conversation => ({
@@ -127,9 +130,12 @@ export const readConversation = (key: string): Conversation =>
   )
 
 /** Writes the conversation. A refusal (a private window, a full disk) is ignored: only the refresh loses it. */
-export const writeConversation = (key: string, conversation: Conversation) => {
+export const writeConversation: {
+  (key: string, conversation: Conversation): void,
+  (conversation: Conversation): (key: string) => void
+} = dual(2, (key: string, conversation: Conversation): void => {
   const text = encode(conversation)
   if (O.isNone(text)) return
   // Refused: kept in memory only.
   conversations.write(key, text.value)
-}
+})

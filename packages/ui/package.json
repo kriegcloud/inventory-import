@@ -91,6 +91,7 @@
     "./components/data-grid/data-grid-row": "./src/components/data-grid/data-grid-row.tsx",
     "./components/data-grid/data-grid-search": "./src/components/data-grid/data-grid-search.tsx",
     "./components/data-grid/data-grid-select-column": "./src/components/data-grid/data-grid-select-column.tsx",
+    "./components/data-grid/data-grid-state": "./src/components/data-grid/data-grid-state.ts",
     "./components/data-grid/data-grid-types": "./src/components/data-grid/data-grid-types.ts",
     "./components/data-grid/data-grid-utils": "./src/components/data-grid/data-grid-utils.ts",
     "./components/data-grid/data-grid": "./src/components/data-grid/data-grid.tsx",

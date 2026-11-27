@@ -78,7 +78,6 @@
         "packages/ui/src/components/data-grid/data-grid-search.tsx",
         "packages/ui/src/components/data-grid/data-grid.tsx",
         "packages/ui/src/components/data-grid/data-grid-utils.ts",
-        "packages/ui/src/components/data-grid/use-data-grid.ts",
         "packages/ui/src/components/data-table/data-table-config.ts",
         "packages/ui/src/components/data-table/data-table-features.ts",
         "packages/ui/src/components/data-table/data-table-filters.ts",

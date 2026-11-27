@@ -1,3 +1,11 @@
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 2); no longer as its registry has it.
+// A row's ref callback, which files its element by index for the grid, is kept for each index of each grid while a row
+// with that index is on screen (`rowRefOf`), so React sees the same function across draws and calls it anew only when
+// the row's index changes,
+// as upstream's `useCallback` did; composing it with a caller's own ref is kept the same way (`composedRefOf`), in place
+// of Radix's internal `useComposedRefs`. The utility cell's focus handler goes to a plain element, so it is a plain
+// function. `DataGridRowContext` stays React context, read with `useContext`: it carries what the grid was drawn with
+// down to its rows, which an atom could hold only if written during that draw or after it (batch 1, `faceted.tsx`).
 "use client"
 
 import type { VirtualItem } from "@tanstack/react-virtual"
@@ -15,8 +23,15 @@ import {
   type TableState
 } from "@tanstack/react-table"
 import { cn } from "cn"
-import { useComposedRefs } from "radix-ui/internal"
-import * as React from "react"
+import {
+  type ComponentProps,
+  createContext,
+  memo,
+  type Ref,
+  type RefCallback,
+  // oxlint-disable-next-line no-restricted-imports -- the rows read what the grid was drawn with (file header)
+  useContext
+} from "react"
 
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
 import type { CellPresence, ColumnWindow, RowHeightValue } from "@inventory/ui/components/data-grid/data-grid-types"
@@ -39,12 +54,82 @@ interface DataGridRowContextValue {
   stretchColumns: boolean
   adjustLayout: boolean
   readOnlyColumnIds: Set<string>
-  rowMapRef: React.RefObject<Map<number, HTMLDivElement>>
+  /** The grid's rows by index: a `useRef`, or any object of the grid's own whose `current` is that map. */
+  rowMapRef: RowMapRef
 }
 
-export const DataGridRowContext = React.createContext<DataGridRowContextValue | null>(null)
+interface RowMapRef {
+  readonly current: Map<number, HTMLDivElement>
+}
 
-interface DataGridRowProps<TData extends RowData> extends React.ComponentProps<"div"> {
+export const DataGridRowContext = createContext<DataGridRowContextValue | null>(null)
+
+type RowRef = (node: HTMLDivElement | null) => void
+
+const rowRefs = new WeakMap<RowMapRef, Map<number, RowRef>>()
+
+/**
+ * The ref callback that files row `index`'s element in the grid's map: the same function while a row with that index is
+ * on screen. It is kept from the moment it is attached until it is detached, so the cache holds only the rows on screen,
+ * not every index scrolled past. React detaches every old ref before it attaches the new ones, so a slot that takes
+ * over an index from another slot gets the callback that slot let go, and keeps it.
+ */
+function rowRefOf(rowMapRef: RowMapRef, index: number): RowRef {
+  const byIndex = rowRefs.get(rowMapRef) ?? new Map<number, RowRef>()
+  rowRefs.set(rowMapRef, byIndex)
+  const kept = byIndex.get(index)
+  if (kept !== undefined) return kept
+  const ref: RowRef = (node) => {
+    if (node) {
+      rowMapRef.current.set(index, node)
+      byIndex.set(index, ref)
+    } else {
+      rowMapRef.current.delete(index)
+      if (byIndex.get(index) === ref) byIndex.delete(index)
+    }
+  }
+  return ref
+}
+
+type Cleanup = () => void
+
+function setRef(ref: Ref<HTMLDivElement>, value: HTMLDivElement | null): Cleanup | undefined {
+  if (typeof ref === "function") {
+    const cleanup = ref(value)
+    return typeof cleanup === "function" ? cleanup : undefined
+  }
+  if (ref !== null) ref.current = value
+  return undefined
+}
+
+const composedRefs = new WeakMap<RowRef, WeakMap<object, RefCallback<HTMLDivElement>>>()
+
+/**
+ * The row's own ref and the caller's, as one ref callback: the same function while both are, as Radix's
+ * `useComposedRefs` gave. A cleanup one of them returns runs when the row goes; a ref that returned none is set to null.
+ */
+function composedRefOf(ref: Ref<HTMLDivElement> | undefined, own: RowRef): Ref<HTMLDivElement> {
+  if (ref === null || ref === undefined) return own
+  const byRef = composedRefs.get(own) ?? new WeakMap<object, RefCallback<HTMLDivElement>>()
+  composedRefs.set(own, byRef)
+  const kept = byRef.get(ref)
+  if (kept !== undefined) return kept
+  const refs: ReadonlyArray<Ref<HTMLDivElement>> = [ref, own]
+  const composed: RefCallback<HTMLDivElement> = (node) => {
+    const set = refs.map((each) => ({ ref: each, cleanup: setRef(each, node) }))
+    if (!set.some(({ cleanup }) => cleanup !== undefined)) return undefined
+    return () => {
+      for (const { ref: each, cleanup } of set) {
+        if (cleanup !== undefined) cleanup()
+        else setRef(each, null)
+      }
+    }
+  }
+  byRef.set(ref, composed)
+  return composed
+}
+
+interface DataGridRowProps<TData extends RowData> extends ComponentProps<"div"> {
   row: Row<DataGridFeatures, TData>
   leafColumns: Column<DataGridFeatures, TData>[]
   virtualItem: VirtualItem
@@ -52,7 +137,7 @@ interface DataGridRowProps<TData extends RowData> extends React.ComponentProps<"
   isScrolling: boolean
 }
 
-export const DataGridRow = React.memo(
+export const DataGridRow = memo(
   DataGridRowImpl,
   (prev, next) =>
     prev.row.id === next.row.id &&
@@ -161,18 +246,7 @@ function DataGridRowContent<TData extends RowData>({
     isRowSelected
   } = rowState
 
-  const onRowChange = React.useCallback(
-    (node: HTMLDivElement | null) => {
-      if (node) {
-        rowMapRef.current.set(virtualRowIndex, node)
-      } else {
-        rowMapRef.current.delete(virtualRowIndex)
-      }
-    },
-    [virtualRowIndex, rowMapRef]
-  )
-
-  const rowRef = useComposedRefs(ref, onRowChange)
+  const rowRef = composedRefOf(ref, rowRefOf(rowMapRef, virtualRowIndex))
 
   return (
     <div
@@ -265,7 +339,7 @@ function DataGridRowContent<TData extends RowData>({
 }
 
 function useDataGridRowContext() {
-  const context = React.use(DataGridRowContext)
+  const context = useContext(DataGridRowContext)
   if (!context) {
     throw new Error("`DataGridRow` must be rendered within `DataGrid`")
   }
@@ -285,7 +359,7 @@ interface DataGridUtilityCellProps<TData extends RowData> {
   showEndBorder: boolean
 }
 
-const DataGridUtilityCell = React.memo(DataGridUtilityCellImpl) as typeof DataGridUtilityCellImpl
+const DataGridUtilityCell = memo(DataGridUtilityCellImpl) as typeof DataGridUtilityCellImpl
 
 function DataGridUtilityCellImpl<TData extends RowData>({
   cell,
@@ -301,7 +375,7 @@ function DataGridUtilityCellImpl<TData extends RowData>({
 }: DataGridUtilityCellProps<TData>) {
   // Utility renderers read row state, like selection, through the stable `cell`.
   "use no memo"
-  const onFocus = React.useCallback(() => {
+  function onFocus() {
     const { table, row, column } = cell
     const ranges = table.atoms.cellSelection.get()
     const focusedCell = getFocusedCellPosition(ranges)
@@ -323,7 +397,7 @@ function DataGridUtilityCellImpl<TData extends RowData>({
     }
 
     table.setFocusedCell(row.id, column.id)
-  }, [cell])
+  }
 
   return (
     <div

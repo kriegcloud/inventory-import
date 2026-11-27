@@ -1,3 +1,7 @@
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 2); no longer as its registry has it.
+// The header's and the resizer's handlers were `useCallback`s that go to Radix's trigger and to a plain element, where
+// nothing compares them by identity, so they are plain functions. The resizer is still drawn again only when its memo's
+// compare says so, so its handlers close over the same header and table as upstream's did.
 "use client"
 
 import {
@@ -10,7 +14,7 @@ import {
   type Table
 } from "@tanstack/react-table"
 import { cn } from "cn"
-import * as React from "react"
+import { type ComponentProps, memo, type MouseEvent, type PointerEvent, type TouchEvent } from "react"
 
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
 
@@ -43,9 +47,7 @@ import {
   EyeOffIcon
 } from "lucide-react"
 
-interface DataGridColumnHeaderProps<TData extends RowData, TValue> extends React.ComponentProps<
-  typeof DropdownMenuTrigger
-> {
+interface DataGridColumnHeaderProps<TData extends RowData, TValue> extends ComponentProps<typeof DropdownMenuTrigger> {
   table: ReactTable<DataGridFeatures, TData, unknown>
   header: Header<DataGridFeatures, TData, TValue>
 }
@@ -77,21 +79,18 @@ function DataGridColumnHeaderContent<TData extends RowData, TValue>({
   // Local taste: no type icon per column. Pass `meta.icon` to show one deliberately.
   const ColumnIcon = meta?.icon
 
-  const onTriggerPointerDown = React.useCallback(
-    (event: React.PointerEvent<HTMLButtonElement>) => {
-      onPointerDown?.(event)
-      if (event.defaultPrevented) return
+  function onTriggerPointerDown(event: PointerEvent<HTMLButtonElement>) {
+    onPointerDown?.(event)
+    if (event.defaultPrevented) return
 
-      if (getIsEventOnScrollbar(event)) {
-        event.preventDefault()
-        return
-      }
+    if (getIsEventOnScrollbar(event)) {
+      event.preventDefault()
+      return
+    }
 
-      if (event.button !== 0) return
-      table.selectColumnCells(column.id)
-    },
-    [table, column.id, onPointerDown]
-  )
+    if (event.button !== 0) return
+    table.selectColumnCells(column.id)
+  }
 
   return (
     <>
@@ -264,7 +263,7 @@ interface DataGridColumnResizerProps<TData extends RowData, TValue> extends Data
   isNextColumnPinned: boolean
 }
 
-const DataGridColumnResizer = React.memo(
+const DataGridColumnResizer = memo(
   DataGridColumnResizerImpl,
   (prev, next) =>
     prev.isResizing === next.isResizing &&
@@ -283,47 +282,41 @@ function DataGridColumnResizerImpl<TData extends RowData, TValue>({
   const minSize = header.column.columnDef.minSize ?? defaultColumnDef.minSize ?? 0
   const maxSize = header.column.columnDef.maxSize ?? defaultColumnDef.maxSize ?? Number.POSITIVE_INFINITY
 
-  const onPointerDown = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+  function onPointerDown(event: PointerEvent<HTMLDivElement>) {
     event.currentTarget.setPointerCapture(event.pointerId)
-  }, [])
+  }
 
-  const onResizeStart = React.useCallback(
-    (event: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
-      if (event.type === "mousedown") event.preventDefault()
-      if (table.getEditingCell()) {
-        if (document.activeElement instanceof HTMLElement) {
-          document.activeElement.blur()
-        }
-        table.stopEditing()
+  function onResizeStart(event: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) {
+    if (event.type === "mousedown") event.preventDefault()
+    if (table.getEditingCell()) {
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur()
       }
-      header.getResizeHandler()(event)
-    },
-    [header, table]
-  )
+      table.stopEditing()
+    }
+    header.getResizeHandler()(event)
+  }
 
-  const onDoubleClick = React.useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      const column = header.column
-      const gridElement = event.currentTarget.closest<HTMLElement>('[role="grid"]')
-      const fitSize = gridElement
-        ? getColumnFitSize({
-            gridElement,
-            columnId: column.id,
-            minSize,
-            maxSize,
-            wrapperContentSize: getBadgeColumnContentSize(column, table)
-          })
-        : null
+  function onDoubleClick(event: MouseEvent<HTMLDivElement>) {
+    const column = header.column
+    const gridElement = event.currentTarget.closest<HTMLElement>('[role="grid"]')
+    const fitSize = gridElement
+      ? getColumnFitSize({
+          gridElement,
+          columnId: column.id,
+          minSize,
+          maxSize,
+          wrapperContentSize: getBadgeColumnContentSize(column, table)
+        })
+      : null
 
-      if (fitSize === null) {
-        column.resetSize()
-        return
-      }
+    if (fitSize === null) {
+      column.resetSize()
+      return
+    }
 
-      table.setColumnSizing((prev) => ({ ...prev, [column.id]: fitSize }))
-    },
-    [header.column, table, minSize, maxSize]
-  )
+    table.setColumnSizing((prev) => ({ ...prev, [column.id]: fitSize }))
+  }
 
   return (
     <div

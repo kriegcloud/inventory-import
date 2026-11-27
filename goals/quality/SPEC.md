@@ -66,8 +66,8 @@ which is why `from` names it; the other four rest on no exploration, and each sa
   the Alchemy packages, the skills, the vendored components, and beep-effect's kit, which is the four packages under
   `packages/foundation/` that hold a `vendor.json`. `@beep/csv`, `@beep/xlsx` and `@beep/vocabulary` are ours and are
   counted.
-- [ ] `wc -l CLAUDE.md` is under 400, `bun run docs:check` passes, and `grep -n "src/domain" .claude/agents/*.md`
-  finds nothing.
+- [ ] `grep -n "src/domain" .claude/agents/*.md` finds nothing. The length of `CLAUDE.md` moved to
+  [focus-and-friction](../focus-and-friction/SPEC.md) on 2026-11-26, at 200 lines.
 - [ ] `bun run docs:check` prints no warning; `.claude/settings.json` on `main` asks before a push; the explorations'
   README says where each one stands.
 - [ ] The alchemy-domain exploration has graduated into a goal of its own, that goal is `done`, and

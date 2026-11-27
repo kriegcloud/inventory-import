@@ -927,3 +927,18 @@ does not check; two answers for one kind of mistake. Reverse: a new decision by 
 
 Decided by the rule, for him to overrule. The member's id is the last segment of the live read's address (the
 library adds `?read=` itself, so it cannot be a query field); the site's Worker reads it there at web-02.
+
+### 2026-11-27 — Move 2, after the third round: the deploy token, the database's home, host-06
+
+| Question | Options, the recommended one first | Answer |
+| --- | --- | --- |
+| The provider's catalog has no permission group named for Workflows, and Cloudflare's reference accepts "Workers Scripts Write", which the deploy token holds, on the four Workflows calls a backfill makes. What does the token get? | Nothing more, confirmed by the first deploy that starts a backfill; "Workers Admin" as well; a name I read from the live list | "Leave it as it is" |
+| Both Workers bind one D1 database. Where is it declared? | `packages/infra`, as today; `apps/model`, which infra imports | "Stay in packages/infra" |
+| INVENTORY's host-06 says `bun run dev` starts both Workers under `alchemy dev`, which my answer "Keep Vite; dev:alchemy beside it" ended. How does it read? | "`bun run dev:alchemy` starts both Workers", the model's on its own local address; the same with no local address for the model's Worker | "Restate for dev:alchemy" |
+
+I chose; the agent recommended the same, all three. This replaces "add the Workflows permission in code first" of
+2026-11-26: there is no such group to name. If the first deploy that starts a backfill is refused, the permission is
+added then and I apply the stack. Under `dev:alchemy` the model's Worker answers on localhost:1338, its server
+prefix too; deployed it has no address of its own (`workersDev: false`). Rejected: a wider permission the reference
+does not ask for; moving a declared database; a harness that can reach the model's Worker only through the site's.
+Reverse: a new decision by him.

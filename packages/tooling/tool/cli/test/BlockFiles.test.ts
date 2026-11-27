@@ -17,7 +17,7 @@ const placed = {
   "packages/shop/model/src/Basket/Checkout.decision.ts": `${domain}export class Pay extends Domain.Command("Pay", {}) {}\nexport class Paid extends Domain.Event("Paid", {}) {}\nexport class Short extends Domain.Rejection("Short", {}) {}\nexport class Checkout extends Domain.Decision(Pay, {}) {}\n`,
   "packages/shop/model/src/Basket/Add.command.ts": `${domain}export class Add extends Domain.Command("Add", {}) {}\nexport class Added extends Domain.Event("Added", {}) {}\nexport class Full extends Domain.Rejection("Full", {}) {}\n`,
   "packages/shop/model/src/Basket/NotOpen.rejection.ts": `${domain}export class NotOpen extends Domain.Rejection("NotOpen", {}) {}\n`,
-  "packages/shop/model/src/Basket/BasketStore.store.ts": `${context}export class BasketStore extends Context.Service<BasketStore, {}>()("BasketStore") {}\n`,
+  "packages/shop/model/src/Basket/BasketStore.port.ts": `${context}export class BasketStore extends Context.Service<BasketStore, {}>()("BasketStore") {}\n`,
   "packages/shop/model/src/Basket/Watch.policy.ts": `${domain}export class Watch extends Domain.Policy("Watch", {}) {}\n`,
   "packages/shop/model/src/Basket/Totals.view.ts":
     'import * as View from "@alchemy.run/domain/View"\nexport class Totals extends View.make("Totals", {}) {}\n',
@@ -35,7 +35,7 @@ const placed = {
   // A contract's command beside its payload, its external system, and a gateway it keeps.
   "packages/shop/contract/src/Basket/Add.command.ts": `${domain}${schema}export const AddInput = S.Struct({})\nexport class Add extends Domain.Command("Add", { input: AddInput }) {}\n`,
   "packages/shop/contract/src/Pricing.external.ts": `${domain}export class Pricing extends Domain.ExternalSystem("Pricing", {}) {}\n`,
-  "packages/shop/contract/src/Allowance.gateway.ts": `${context}export class Allowance extends Context.Service<Allowance, {}>()("Allowance") {}\n`
+  "packages/shop/contract/src/Allowance.port.ts": `${context}export class Allowance extends Context.Service<Allowance, {}>()("Allowance") {}\n`
 }
 
 describe("laws block-files", () => {
@@ -43,7 +43,7 @@ describe("laws block-files", () => {
     Effect.gen(function* () {
       const report = yield* inTree(placed, Effect.map(blockFiles(), render(blockFilesSentence)))
       expect(printed(report)).toEqual([
-        "out: block-files:check OK  15 files in 2 model and contract packages, each block in the file its ending names"
+        "out: block-files:check OK  15 files in 2 packages of a context, each ending a kind its layer holds and each block in the file its ending names"
       ])
     })
   )
@@ -142,6 +142,7 @@ describe("laws block-files", () => {
       expect(printed(report).slice(1)).toEqual([
         "err:   packages/shop/contract/src/Basket/Basket.read.ts:2 declares Basket with Domain.Aggregate: a contract declares no Domain.Aggregate: move it to packages/shop/model/src/Basket/Basket.aggregate.ts",
         "err:   packages/shop/contract/src/Basket/Basket.read.ts:3 declares Opened with Domain.Event: a contract declares a Domain.Event only beside its command, in .command.ts: move it to the file of the command that records it",
+        "err:   packages/shop/contract/src/Watch.view.ts ends .view.ts, a kind a contract does not hold: move it to the model package of its context, or give it the ending of what it is",
         "err:   packages/shop/contract/src/Watch.view.ts:2 declares Watch with Domain.Policy: a contract declares no Domain.Policy: move it to packages/shop/model/src/Watch.policy.ts"
       ])
     })
@@ -158,7 +159,7 @@ describe("laws block-files", () => {
       )
       expect(report.failed).toBe(true)
       expect(printed(report)).toEqual([
-        "err: block-files:check FAIL  a block of a model is not in the file its ending names, or an ending is taken by something else. Write what each line says:",
+        "err: block-files:check FAIL  a file's ending is not a kind its layer holds, a block of a model is not in the file its ending names, or an ending is taken by something else. Write what each line says:",
         "err:   packages/shop/model/src/Basket/Thing.view.ts:3 declares Thing with Domain.Policy: rename the file to Thing.policy.ts"
       ])
     })
@@ -175,7 +176,7 @@ describe("laws block-files", () => {
         Effect.map(blockFiles(), render(blockFilesSentence))
       )
       expect(printed(report)).toEqual([
-        "err: block-files:check FAIL  a block of a model is not in the file its ending names, or an ending is taken by something else. Write what each line says:",
+        "err: block-files:check FAIL  a file's ending is not a kind its layer holds, a block of a model is not in the file its ending names, or an ending is taken by something else. Write what each line says:",
         "err:   packages/shop/contract/src/Basket/Add.command.ts ends .command.ts, which is kept for Domain.Command, and declares none: rename it to Add.payload.ts (a payload schema), or Add.port.ts if it is a hand-written Context.Service port"
       ])
     })
@@ -226,12 +227,12 @@ describe("laws block-files", () => {
       const report = yield* inTree(
         {
           ...placed,
-          "packages/shop/model/src/Ledger.store.ts": `${domain}import * as Context from "effect/Context"\nexport class Ledger extends Context.Service<Ledger, {}>()("Ledger") {}\nexport class Lines extends Domain.View("Lines", {}) {}\n`
+          "packages/shop/model/src/Ledger.port.ts": `${domain}import * as Context from "effect/Context"\nexport class Ledger extends Context.Service<Ledger, {}>()("Ledger") {}\nexport class Lines extends Domain.View("Lines", {}) {}\n`
         },
         Effect.map(blockFiles(), render(blockFilesSentence))
       )
       expect(printed(report).slice(1)).toEqual([
-        "err:   packages/shop/model/src/Ledger.store.ts:4 declares Lines with Domain.View: move it to Lines.view.ts, beside this file"
+        "err:   packages/shop/model/src/Ledger.port.ts:4 declares Lines with Domain.View: move it to Lines.view.ts, beside this file"
       ])
     })
   )
@@ -248,6 +249,7 @@ describe("laws block-files", () => {
       )
       expect(printed(report).slice(1)).toEqual([
         "err:   packages/shop/model/src/Computed.rules.ts:2 declares V with Domain.View: rename the file to Computed.view.ts",
+        "err:   packages/shop/model/src/Fixture.test-layer.ts ends .test-layer.ts, a kind a model does not hold: move it to the host package of its context, or give it the ending of what it is",
         "err:   packages/shop/model/src/Fixture.test-layer.ts:2 declares F with Domain.View: rename the file to Fixture.view.ts"
       ])
     })
@@ -332,7 +334,7 @@ describe("laws block-files", () => {
           ...placed,
           "packages/shop/model/src/Thing.view.mts": `${domain}export class Thing extends Domain.Policy("Thing", {}) {}\n`,
           "packages/shop/model/src/Empty.policy.cts": "export const nothing = 1\n",
-          "packages/shop/model/src/Lines.store.cts": `${domain}export class Lines extends Domain.View("Lines", {}) {}\nexport class Totals extends Domain.Query("Totals", {}) {}\n`,
+          "packages/shop/model/src/Lines.port.cts": `${domain}export class Lines extends Domain.View("Lines", {}) {}\nexport class Totals extends Domain.Query("Totals", {}) {}\n`,
           "packages/shop/model/src/Trial.test.mts": `${domain}export class Trial extends Domain.Saga("Trial", {}) {}\n`,
           "packages/shop/model/src/Shapes.d.mts": `${domain}export class Shape extends Domain.Saga("Shape", {}) {}\n`
         },
@@ -340,8 +342,8 @@ describe("laws block-files", () => {
       )
       expect(printed(report).slice(1)).toEqual([
         "err:   packages/shop/model/src/Empty.policy.cts ends .policy.cts, which is kept for Domain.Policy, and declares none: declare its Domain.Policy here, or give the file the ending of what it holds",
-        "err:   packages/shop/model/src/Lines.store.cts:2 declares Lines with Domain.View: move it to Lines.view.cts, beside this file",
-        "err:   packages/shop/model/src/Lines.store.cts:3 declares Totals with Domain.Query: move it to Totals.query.cts, beside this file",
+        "err:   packages/shop/model/src/Lines.port.cts:2 declares Lines with Domain.View: move it to Lines.view.cts, beside this file",
+        "err:   packages/shop/model/src/Lines.port.cts:3 declares Totals with Domain.Query: move it to Totals.query.cts, beside this file",
         "err:   packages/shop/model/src/Thing.view.mts:2 declares Thing with Domain.Policy: rename the file to Thing.policy.mts"
       ])
     })
@@ -381,7 +383,7 @@ describe("laws block-files", () => {
         Effect.map(blockFiles(), render(blockFilesSentence))
       )
       expect(printed(report)).toEqual([
-        "out: block-files:check OK  18 files in 2 model and contract packages, each block in the file its ending names"
+        "out: block-files:check OK  18 files in 2 packages of a context, each ending a kind its layer holds and each block in the file its ending names"
       ])
     })
   )
@@ -470,7 +472,64 @@ describe("laws block-files", () => {
         Effect.map(blockFiles(), render(blockFilesSentence))
       )
       expect(printed(report)).toEqual([
-        "out: block-files:check OK  1 file in 1 model or contract package, each block in the file its ending names"
+        "out: block-files:check OK  1 file in 1 package of a context, each ending a kind its layer holds and each block in the file its ending names"
+      ])
+    })
+  )
+
+  // Each case below passed before the law read the registry of kinds (goals/module-kinds, steps 1 and 2).
+  it.effect("refuses an ending that is no kind, a file with none, and one that says what another kind says", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        {
+          ...placed,
+          "packages/shop/model/src/Basket/Totals.thing.ts": "export const totals = 1\n",
+          "packages/shop/model/src/Basket/Helpers.ts": "export const help = 1\n",
+          "packages/shop/model/src/Basket/Ledger.store.ts": `${context}export class Ledger extends Context.Service<Ledger, {}>()("Ledger") {}\n`,
+          "packages/shop/contract/src/Rates.gateway.tsx": `${context}export class Rates extends Context.Service<Rates, {}>()("Rates") {}\n`,
+          "packages/shop/model/src/internal/anything.ts": "export const own = 1\n"
+        },
+        Effect.map(blockFiles(), render(blockFilesSentence))
+      )
+      expect(report.failed).toBe(true)
+      expect(printed(report).slice(1)).toEqual([
+        "err:   packages/shop/contract/src/Rates.gateway.tsx ends .gateway.tsx, which says what .port.tsx says: rename it to Rates.port.tsx",
+        "err:   packages/shop/model/src/Basket/Helpers.ts has no ending, so nothing says what kind of file it is: name it Helpers.<kind>.ts, with a kind the registry holds for a model (Kinds.schema.ts)",
+        "err:   packages/shop/model/src/Basket/Ledger.store.ts ends .store.ts, which says what .port.ts says: rename it to Ledger.port.ts",
+        "err:   packages/shop/model/src/Basket/Totals.thing.ts ends .thing.ts, which is no kind in the registry: give it the ending of a kind a model holds, or add the kind to the registry (Kinds.schema.ts)"
+      ])
+    })
+  )
+
+  it.effect("holds a host's and a web's files to the kinds of their layer, and reads no block in them", () =>
+    Effect.gen(function* () {
+      const held = {
+        ...placed,
+        "packages/shop/host/package.json": json({ name: "@x/shop-host", beep: { layer: "host" } }),
+        "packages/shop/host/src/BasketStore.adapter.ts": "export const live = 1\n",
+        "packages/shop/host/src/Shop.http.ts": `${domain}export class Stray extends Domain.View("Stray", {}) {}\n`,
+        "packages/shop/web/package.json": json({ name: "@x/shop-web", beep: { layer: "web" } }),
+        "packages/shop/web/src/Basket.screen.tsx": "export const Basket = () => null\n",
+        "packages/shop/web/src/Basket.atoms.ts": "export const basket = 1\n"
+      }
+      const report = yield* inTree(held, Effect.map(blockFiles(), render(blockFilesSentence)))
+      expect(printed(report)).toEqual([
+        "out: block-files:check OK  19 files in 4 packages of a context, each ending a kind its layer holds and each block in the file its ending names"
+      ])
+      const refused = yield* inTree(
+        {
+          ...held,
+          "packages/shop/web/src/BasketStore.adapter.ts": "export const live = 1\n",
+          "packages/shop/host/src/Basket.screen.tsx": "export const Basket = () => null\n",
+          "packages/shop/host/src/Basket.rules.ts": "export const rule = 1\n"
+        },
+        Effect.map(blockFiles(), render(blockFilesSentence))
+      )
+      expect(refused.failed).toBe(true)
+      expect(printed(refused).slice(1)).toEqual([
+        "err:   packages/shop/host/src/Basket.rules.ts ends .rules.ts, a kind a host does not hold: move it to the contract or the model package of its context, or give it the ending of what it is",
+        "err:   packages/shop/host/src/Basket.screen.tsx ends .screen.tsx, a kind a host does not hold: move it to the web package of its context, or give it the ending of what it is",
+        "err:   packages/shop/web/src/BasketStore.adapter.ts ends .adapter.ts, a kind a web does not hold: move it to the host package of its context, or give it the ending of what it is"
       ])
     })
   )

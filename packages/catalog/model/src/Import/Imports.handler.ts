@@ -20,8 +20,8 @@ import {
   noStoredDecisions,
   type StoredDecisions,
   TakeBackWrite
-} from "./ImportStore.store.ts"
-import { SuggestionStore } from "../Suggestion/SuggestionStore.store.ts"
+} from "./ImportStore.port.ts"
+import { SuggestionStore } from "../Suggestion/SuggestionStore.port.ts"
 import { suggest } from "../Suggestion/Suggestions.handler.ts"
 import { confirmPlan, plannedItems, PlannedRow } from "../Confirm/Confirm.rules.ts"
 import { Answerer } from "../Answer/Answerer.port.ts"

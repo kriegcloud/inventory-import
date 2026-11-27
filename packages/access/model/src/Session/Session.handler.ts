@@ -8,7 +8,7 @@ import { NotSignedIn } from "@inventory/kernel/AccessError"
 import { CurrentActor } from "@inventory/kernel/Actor"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
-import { MemberDirectory, type SignedInUser } from "./MemberDirectory.store.ts"
+import { MemberDirectory, type SignedInUser } from "./MemberDirectory.port.ts"
 import { noActorSentence, sessionStateOf, signInSentence } from "./Session.rules.ts"
 
 /**

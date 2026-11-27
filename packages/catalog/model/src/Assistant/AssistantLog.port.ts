@@ -11,4 +11,4 @@ export class AssistantLog extends Context.Service<
     /** Records that a model answered a request for a view. An answer from the rules is a read and leaves no line. */
     readonly record: (line: Activity) => Effect.Effect<void>
   }
->()("@inventory/catalog-model/Assistant/AssistantLog.store/AssistantLog") {}
+>()("@inventory/catalog-model/Assistant/AssistantLog.port/AssistantLog") {}

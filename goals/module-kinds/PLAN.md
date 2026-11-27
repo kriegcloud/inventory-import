@@ -9,13 +9,14 @@ from: explorations/module-taxonomy
 
 [SPEC](SPEC.md) holds the objective and acceptance. A step is one part of
 [the brief's](../../explorations/module-taxonomy/BRIEF.md) Map. Status is one of `todo`, `doing`, `done`, `closed`
-(tried, did not hold up, with the reason). The packet was written on 2026-11-27; nothing is built.
+(tried, did not hold up, with the reason). The packet was written on 2026-11-27; steps 1 to 3 were built the same
+day.
 
 | # | Step | Built on | Needs first | Status |
 | --- | --- | --- | --- | --- |
-| 1 | The registry as a schema and a table | NET-NEW in `packages/tooling/tool/cli/src/commands/Laws/`; the cut in `scratchpad/experiments/kind-registry/Kinds.registry.ts` | nothing | todo |
-| 2 | `block-files` reads the registry | `BlockFiles.rules.ts` and `test/BlockFiles.test.ts` | step 1 | todo |
-| 3 | Nine ports renamed to `.port.ts`, with their export entries and imports | the eight `.store.ts` files of the two models and `ModelAllowance.gateway.ts` | step 2 | todo |
+| 1 | The registry as a schema and a table | NET-NEW in `packages/tooling/tool/cli/src/commands/Laws/`; the cut in `scratchpad/experiments/kind-registry/Kinds.registry.ts` | nothing | done |
+| 2 | `block-files` reads the registry | `BlockFiles.rules.ts` and `test/BlockFiles.test.ts` | step 1 | done |
+| 3 | Nine ports renamed to `.port.ts`, with their export entries and imports | the eight `.store.ts` files of the two models and `ModelAllowance.gateway.ts` | step 2 | done |
 | 4 | `boundaries` asks the registry the kind of each import | `Boundaries.rules.ts`; `scratchpad/experiments/kind-registry/KindRegistry.test.ts` | steps 1 to 3 merged | todo |
 | 5 | `.event.ts`, `.state.ts`, `.transition.ts` and `.union.ts` as kinds; decision 2's three checks; decision 8's count | `Kinds.registry.ts`, `BlockFiles.rules.ts` | step 2 | todo |
 | 6 | The kinds of decisions 6, 7 and 9 to 11 in the registry (`.config.ts`, `.route.ts`, `.sealed.ts`, `.host.ts`, `.cron.ts`, `.singleton.ts`, a surface's four); `.handler.ts` and `.live.ts` retired; a model's merged Live in `<Model>.model.ts` | `Kinds.registry.ts`; the brief's placement table | step 2; before `alchemy-domain-uptake` builds the first of them | todo |
@@ -29,6 +30,27 @@ Steps 1 to 3, one pull request. It changes no code a proof reads, and `bun run c
 contexts' 173 files are refused by the experiment's registry today: the nine ports, the four with no ending and the
 three endings used once. Step 3 clears nine; steps 6 and 7 clear the rest, so until step 7 the registry lists the
 seven by name as known exceptions.
+
+## Choices made in the first slice
+
+- **The registry is `packages/tooling/tool/cli/src/commands/Laws/Kinds.schema.ts`**, 37 kinds by ending: the
+  experiment's 28 and the nine blocks `block-files` already placed (view, query, projection, stream, policy, saga,
+  external, rewrite, compaction). Each row is a `Kind` with what it declares, who holds it, who imports it, and for an
+  ending that names a block: what declares it, whether the file must declare it, and what else the file may hold.
+- **`block-files` derives five of its six tables from the registry** (`placed`, `reserved`, `holds`, `besideItsOwn`,
+  `homes`, and `declarers` but for two lines). An event and a relation have no ending yet, so what declares them
+  stays in the law until step 5 gives an event one.
+- **A command's and an external system's row is held by a contract too**, as decision 32 of `alchemy-domain` keeps
+  both endings there. The experiment's table had them in the model only.
+- **Who imports a kind is data nobody reads yet.** Step 4 reads it. A policy, a saga, a projection, a rewrite, a
+  compaction and an external system are closed to a screen there; a view, a query and a stream are open. The agent's
+  call, his to overturn before step 4.
+- **Seven files wait, listed by path in the registry** with the step that clears each: `Host.ts` in both hosts,
+  access's `Adapters.ts`, `Config.ts` and `SignIn.route.ts`, `ItemEditor.state.ts`, `ItemsOfRow.reference.ts`.
+- **Two refusals are new to the old fixtures**: a contract's `.view.ts` and a model's `.test-layer.ts` are each a
+  kind of another layer. No file of the repository was either.
+- **The export keys did not change** (decision 5): each of the nine keys names the same thing at its file's new
+  path. The ontology's enrolment names `ModelAllowance.port.ts` by path and was rewritten with it.
 
 ## Benjamin's
 

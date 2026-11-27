@@ -53,4 +53,4 @@ export class ItemStore extends Context.Service<
       (self: string, actor: Member, edit: ItemEdit): Effect.Effect<EditOutcome>
     }
   }
->()("@inventory/catalog-model/Item/ItemStore.store/ItemStore") {}
+>()("@inventory/catalog-model/Item/ItemStore.port/ItemStore") {}

@@ -257,7 +257,7 @@ not installed until move 2).
 | Sign here | Block | Check before proposing |
 | --- | --- | --- |
 | A handler that loads a record, checks its status, writes (`*.handler.ts`); a `revision` or `madeOn` compared in SQL | Aggregate with commands; `ctx.version` | Is the rule Benjamin's, written in `DECISIONS.md`? State stays under 8 MiB? |
-| A store port's writing methods in `*.store.ts` (`confirm`, `takeBack`), its in-memory twin, its D1 adapter in a host package | Commands on the model; the twin retired for stories; the adapter becomes a Projection's port | The brief's "The contract and the ports" |
+| A store port's writing methods in `*.port.ts` (`confirm`, `takeBack`), its in-memory twin, its D1 adapter in a host package | Commands on the model; the twin retired for stories; the adapter becomes a Projection's port | The brief's "The contract and the ports" |
 | An endpoint in a contract package's HttpApi group with `Schema.TaggedError` failures | Command and Rejection (with `httpApiStatus`) served by an Api | Decision 31; an upload's pieces stay HTTP |
 | `newRequestId()`, a key table, `ON CONFLICT DO NOTHING` for a retry | `commandId` | A rejection stores no receipt: a resend decides again |
 | An `Activity` row written beside a write | Events that carry who acted, and a projection that writes the `activity` line | Decision 36: the `activity` table stays the trail and answers the Activity page. The projection that writes a change to D1 writes its line in the same batch; for a command that changes no D1 row a projection writes the line after, no longer in one write with the change. No stream per model |

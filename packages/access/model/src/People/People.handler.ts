@@ -18,7 +18,7 @@ import * as O from "effect/Option"
 import * as Result from "effect/Result"
 import { alreadyMember, noAccount, sameAdd } from "./AddPerson.rules.ts"
 import { lastAdminSentence, personNotFoundSentence } from "./LastAdmin.rules.ts"
-import { AddWrite, PeopleStore, RemoveWrite, RoleWrite } from "./PeopleStore.store.ts"
+import { AddWrite, PeopleStore, RemoveWrite, RoleWrite } from "./PeopleStore.port.ts"
 
 /** The audit line of something `actor` did to their organization's people, stamped now. */
 const auditLine = Effect.fnUntraced(function* (

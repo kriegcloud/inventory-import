@@ -23,8 +23,9 @@
  *   a profile or a 1Password reference, set in the shell or the root `.env`, stops the run before its first tool;
  *   each profile's own account is read and compared with the one named before anything is made with it; and every
  *   question that makes something names the account, by id, that it is about.
- * - A run again changes nothing it was not asked to: production's sign-up list is the flag's or the one GitHub
- *   already holds, never a default.
+ * - A run again changes nothing it was not asked to: production's sign-up list and the emails that may open a
+ *   preview are 1Password items the stacks ask for themselves (Benjamin, 2026-11-26), never a default, and a run
+ *   without their references stops before step 1.
  * - Decision I4 holds until the owner says otherwise: production and the previews are two Cloudflare accounts, and
  *   a run that would give both roles to one account stops.
  *
@@ -85,6 +86,18 @@ export const previewPasswordName = "PREVIEW_TEST_ACCOUNT_PASSWORD"
 export const modelKeyName = "OPENROUTER_API_KEY"
 
 /**
+ * The variable of the emails that may open a preview, which the repository's stack writes to the `preview`
+ * environment (`previewAccessVariable` in `@beep/infra`, kept in step by hand: tooling may not import it).
+ */
+export const previewAccessName = "PREVIEW_ACCESS"
+
+/**
+ * The variable of production's sign-up list, which the repository's stack writes to the `production` environment
+ * and production's own stack reads (`signUpVariable` in `@beep/infra`, kept in step by hand).
+ */
+export const signUpName = "SIGN_UP"
+
+/**
  * The repository on GitHub whose settings the repository's stack writes (`repository` in
  * `packages/infra/src/GitHub.stack.ts`; kept in step by hand, since nothing in the tooling may import the stack).
  * Every question this command puts to GitHub names it, so an answer never comes from a fork or another remote.
@@ -110,6 +123,8 @@ export const outranking = (sizes: ReadonlyArray<SetupSize>): ReadonlyArray<strin
     ? [
         modelKeyName,
         previewPasswordName,
+        previewAccessName,
+        signUpName,
         previewTokenName,
         previewAccountIdName,
         "OP_SERVICE_ACCOUNT_TOKEN",
@@ -212,8 +227,6 @@ export interface SetupOptions {
   readonly productionProfile: string
   /** The GitHub login that approves a production deploy; his own when none is given. */
   readonly approver: O.Option<string>
-  /** Who may open an account in production: `closed`, or emails separated by commas. */
-  readonly signUp: O.Option<string>
 }
 
 /**
@@ -596,8 +609,6 @@ export interface Found {
   readonly approver: O.Option<string>
   /** Whether `op.env.local` names a token and an id for the previews' account: no login to it is then needed. */
   readonly previewByToken: boolean
-  /** Who may open an account in production, settled before the first step: the flag, or what GitHub already holds. */
-  readonly signUp: O.Option<string>
   /** The account that holds production's zone, when cf could tell: production's, whoever is asked. */
   readonly zoneHolder: O.Option<Account>
   /** The id of the account each role's profile deploys into, once read from the profile itself. */
@@ -609,7 +620,6 @@ const nothingFound: Found = {
   production: O.none(),
   approver: O.none(),
   previewByToken: false,
-  signUp: O.none(),
   zoneHolder: O.none(),
   held: { preview: O.none(), production: O.none() }
 }
@@ -642,8 +652,6 @@ export const givenFor = (input: {
   readonly options: SetupOptions
   readonly modelKey: ReferenceState
 }): Given => {
-  // Settled before the first step (`signUpFor`): never a default here, so a run again cannot close production.
-  const signUp: Given = O.match(input.found.signUp, { onNone: () => ({}), onSome: (value) => ({ SIGN_UP: value }) })
   const withoutKey: Given = input.modelKey === "reference" ? {} : { DEPLOY_WITHOUT_MODEL_KEY: "true" }
   return Target.match(input.target, {
     // A terminal is not proof of a person, so this command's deploy asks the stack to leave the minted password out.
@@ -658,17 +666,16 @@ export const givenFor = (input: {
         onSome: (account) => ({ PREVIEW_CLOUDFLARE_ACCOUNT_ID: account.id })
       }),
       ...O.match(input.found.approver, { onNone: () => ({}), onSome: (login) => ({ PRODUCTION_APPROVER: login }) }),
-      ...signUp,
       ...withoutKey
     }),
-    production: (): Given => ({ ...signUp, ...withoutKey })
+    production: (): Given => withoutKey
   })
 }
 
 const givenNames: Readonly<Record<Target, ReadonlyArray<string>>> = {
   "test-stage": [],
-  repository: ["PRODUCTION_CLOUDFLARE_ACCOUNT_ID", "PREVIEW_CLOUDFLARE_ACCOUNT_ID", "PRODUCTION_APPROVER", "SIGN_UP"],
-  production: ["SIGN_UP"]
+  repository: ["PRODUCTION_CLOUDFLARE_ACCOUNT_ID", "PREVIEW_CLOUDFLARE_ACCOUNT_ID", "PRODUCTION_APPROVER"],
+  production: []
 }
 
 /**
@@ -728,7 +735,7 @@ export const described = (options: SetupOptions): ((step: Step) => ReadonlyArray
         ...given,
         ...(step.target === "repository"
           ? [
-              `  the stack asks 1Password itself for the previews' password, the model key, and your own token and account id for the previews' account (${localEnvFile}); it writes that token to GitHub for previews and staging and makes none there`
+              `  the stack asks 1Password itself for the previews' password, the model key, ${previewAccessName} (who may open a preview), ${signUpName} (production's sign-up list), and your own token and account id for the previews' account (${localEnvFile}); it writes the two lists to GitHub as secrets, writes that token for previews and staging, and makes none there`
             ]
           : [])
       ]
@@ -755,6 +762,9 @@ export const filesStop = (input: {
   readonly committed: string
   readonly token: TakenLine
   readonly accountId: TakenLine
+  /** The lines the stacks take the emails that may open a preview, and production's sign-up list, from. */
+  readonly access: TakenLine
+  readonly signUp: TakenLine
   readonly previewByToken: boolean
   readonly sizes: ReadonlyArray<SetupSize>
 }): O.Option<string> => {
@@ -795,6 +805,34 @@ export const filesStop = (input: {
       `The repository's stack gives previews and staging your own token for the previews' account, and makes none there. Write ${previewTokenName}="op://<vault>/<item>/<field>" and ${previewAccountIdName}="op://<vault>/<item>/<field>" into ${localEnvFile} (git ignores it), then run this again. Nothing was started.`
     )
   }
+  // The two lists of emails are 1Password items the stacks ask for themselves (Benjamin, 2026-11-26): the repository's
+  // stack writes both to GitHub, production's own reads its sign-up list. Without a reference a run stops here, never
+  // with a default, so a run again cannot close production or leave the previews open.
+  const lists = A.filter(
+    [
+      [previewAccessName, input.access, has(input.sizes, "staging"), "the emails that may open a preview"],
+      [
+        signUpName,
+        input.signUp,
+        has(input.sizes, "staging") || has(input.sizes, "production"),
+        "production's sign-up list (emails, or closed)"
+      ]
+    ] as const,
+    ([, line, needed]) => needed && line.state !== "reference"
+  )
+  if (A.isReadonlyArrayNonEmpty(lists)) {
+    const lines = A.join(
+      A.map(lists, ([name]) => `${name}="op://<vault>/<item>/<field>"`),
+      " and "
+    )
+    const what = A.join(
+      A.map(lists, ([name, , , said]) => `${name}, ${said}`),
+      "; "
+    )
+    return O.some(
+      `The stacks ask 1Password for ${what}, on one line separated by commas. Make ${lists.length === 1 ? "a 1Password item whose field holds it" : "a 1Password item for each, whose field holds the list"}, write ${lines} into ${localEnvFile} (git ignores it), then run this again. Nothing was started; no line was printed.`
+    )
+  }
   return O.none()
 }
 
@@ -823,11 +861,6 @@ export const dryRun = (input: {
           `  and the previews' profile is connected with: op-human run --env-file ${localEnvFile} -- bunx alchemy profile edit --profile ${options.previewProfile} --add Cloudflare --method stored --set apiToken=env:${previewTokenName} --set accountId=env:${previewAccountIdName}`
         ]
       : []),
-    ...(has(options.sizes, "staging") || has(options.sizes, "production")
-      ? [
-          `Before step 1 too, when \`--sign-up\` is not given: gh variable get SIGN_UP --env production --repo ${gitHubRepository}`
-        ]
-      : []),
     ...A.flatMap(stepsFor(options.sizes), (step, index) => {
       const [first, ...rest] = described(options)(step)
       return [`${index + 1}. ${first ?? ""}`, ...rest]
@@ -848,38 +881,6 @@ export const strayLines = (text: string): ReadonlyArray<number> =>
     const reference = O.exists(Str.match(/^[A-Z][A-Z0-9_]*=(.*)$/)(line), (found) => isReference(`${found[1]}`))
     return reference ? [] : [index + 1]
   })
-
-/**
- * Who may open an account in production, settled before the first step: the flag, else what GitHub's production
- * environment already holds, else a stop. Never a default: a run again without the flag must not close production.
- */
-const signUpFor = Effect.fn("InfraSetup.signUpFor")(function* (options: SetupOptions) {
-  const workstation = yield* Workstation
-  if (!has(options.sizes, "staging") && !has(options.sizes, "production")) return O.none<string>()
-  if (O.isSome(options.signUp)) {
-    yield* workstation.say(`Sign-up in production: ${options.signUp.value} (\`--sign-up\`).`)
-    return options.signUp
-  }
-  const held = yield* workstation.ask("gh", [
-    "variable",
-    "get",
-    "SIGN_UP",
-    "--env",
-    "production",
-    "--repo",
-    gitHubRepository
-  ])
-  const value = Str.trim(held.stdout)
-  if (held.code !== 0 || value === "") {
-    return yield* stop(
-      `Say who may open an account in production with \`--sign-up\`: emails separated by commas (yours first), or \`closed\`. ${gitHubRepository} holds no list yet (or gh could not read it), and this command never picks one. Nothing was started.`
-    )
-  }
-  yield* workstation.say(
-    `Sign-up in production: ${value}, as the production environment of ${gitHubRepository} already holds it (no \`--sign-up\`). It is kept.`
-  )
-  return O.some(value)
-})
 
 /**
  * The names a `.env` file sets, whatever it sets them to.
@@ -1808,9 +1809,7 @@ const deploy = Effect.fn("InfraSetup.deploy")(function* (target: Target, options
       repository: () =>
         "Deployed the repository's stack. The next push to main that passes CI deploys staging; a pull request gets a preview. Both deploy with your own token: to rotate it, make a new one in the previews' account, put it in your 1Password item, and run this again.",
       production: () =>
-        O.exists(found.signUp, (value) => Str.trim(value) === "closed")
-          ? "Deployed production. Sign-up is closed there: nobody can open an account, you included, until this runs with `--sign-up <your email>`."
-          : "Deployed production. Open its address: an email on the sign-up list can open an account there."
+        `Deployed production. Open its address: an email on the sign-up list (your 1Password item for ${signUpName}) can open an account there; with \`closed\` in it, nobody can, you included.`
     })
   )
   return found
@@ -1865,7 +1864,9 @@ export const setup = Effect.fn("InfraSetup.setup")(function* (given: SetupOption
     accountId.state === "reference" &&
     token.file === localEnvFile &&
     accountId.file === localEnvFile
-  const stopsBefore = filesStop({ committed, token, accountId, previewByToken, sizes: options.sizes })
+  const access = referenceGiven({ committed, own, name: previewAccessName })
+  const signUp = referenceGiven({ committed, own, name: signUpName })
+  const stopsBefore = filesStop({ committed, token, accountId, access, signUp, previewByToken, sizes: options.sizes })
   if (options.dryRun) {
     const said = unsized ? ["No size was given, so these are the steps of all three sizes at once."] : []
     return yield* Effect.forEach([...said, ...dryRun({ options, previewByToken, stopsBefore })], workstation.say, {
@@ -1876,13 +1877,12 @@ export const setup = Effect.fn("InfraSetup.setup")(function* (given: SetupOption
   yield* ownerOnly
   yield* outside(options)
   if (O.isSome(stopsBefore)) return yield* stop(stopsBefore.value)
-  const signUp = yield* signUpFor(options)
   // Before the first step, so a token that will not do is said before anything is made with it or beside it.
   if (previewByToken) yield* tokenChecked
   const steps = stepsFor(options.sizes)
   yield* Effect.reduce(
     steps,
-    (): Found => ({ ...nothingFound, previewByToken, signUp }),
+    (): Found => ({ ...nothingFound, previewByToken }),
     (found, step, index) =>
       workstation.say(`\nStep ${index + 1} of ${steps.length}.`).pipe(
         Effect.andThen(perform(options, found)(step)),

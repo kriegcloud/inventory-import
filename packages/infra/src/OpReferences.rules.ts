@@ -71,13 +71,17 @@ export const referencesIn = (input: {
 }
 
 /**
- * The variables a stage's deploy reads as secrets: the model key where the plan names one, and the previews'
- * password where the stage's test accounts are given theirs.
+ * The variables a stage's deploy reads as secrets: the model key where the plan names one, the previews' password
+ * where the stage's test accounts are given theirs, the emails that may open a preview where its plan has a gate,
+ * and production's sign-up list. Staging reads a `SIGN_UP` too, but the line of that name is production's list, so
+ * staging never asks 1Password for it: deployed from a workstation it is closed unless the shell gives one.
  *
  * @example
- * secretNamesOf(planOfProd) // ["OPENROUTER_API_KEY"]
+ * secretNamesOf(planOfProd) // ["OPENROUTER_API_KEY", "SIGN_UP"]
  */
 export const secretNamesOf = (plan: StagePlan): ReadonlyArray<string> => [
   ...(plan.modelKey.from === "environment" ? [plan.modelKey.variable] : []),
-  ...(testPasswordOf(plan) === "given" ? [previewPasswordVariable] : [])
+  ...(testPasswordOf(plan) === "given" ? [previewPasswordVariable] : []),
+  ...(plan.access.from === "environment" ? [plan.access.variable] : []),
+  ...(plan.kind === "production" && plan.signUp.from === "environment" ? [plan.signUp.variable] : [])
 ]

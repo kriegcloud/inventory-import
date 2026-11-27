@@ -427,6 +427,17 @@ This narrows I8 for staging only: an email I name may be stored there. Known: st
 who can push a branch here can reach that person's account on staging; today only I can push. Rejected: share a
 test account's login. Reverse: delete the secret, deploy staging again, and delete the invited account.
 
+### 2026-11-26 — the lists of emails are written by the repository's stack
+
+Question: who may open a preview (`PREVIEW_ACCESS`) and production's sign-up list (`SIGN_UP`) were set by hand
+with `gh secret set`, outside the code. Should the repository's stack write them? I chose "Repository stack" and
+"Yes, both together"; the agent recommended the same. Each list is a field of a 1Password item, referenced from
+my `packages/infra/env/op.env.local`. `GitHub.stack.ts` asks 1Password for both and writes them as secrets of the
+`preview` and `production` environments. It stops without either one, and on a preview list that is not a list of
+emails. This supersedes the entry below on one point: the stack no longer writes the variable `SIGN_UP`, and the
+setup command's `--sign-up` flag is gone, so no email is in GitHub in the clear. Staging's own `SIGN_UP` secret is
+still set by hand. Reverse: put the `GitHub.Variable` and the flag back, and set both secrets by hand.
+
 ### 2026-11-25 — production's sign-up list is a secret
 
 Question: production read its sign-up list from a GitHub variable, which the public deploy log prints. Mine: keep

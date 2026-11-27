@@ -5,12 +5,15 @@ import { assertTrue } from "@effect/vitest/utils"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as O from "effect/Option"
+import * as Redacted from "effect/Redacted"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import { StagePlan } from "@beep/infra/Stage"
 import {
   accessEmailsFor,
+  givenPreviewAccess,
   givenPreviewToken,
+  givenSignUpList,
   telemetryFor,
   givenTestPassword,
   kindOf,
@@ -147,8 +150,9 @@ describe("the plan of a stage", () => {
       assertTrue(Result.isFailure(stopped), "Expected stopped to be a failure")
       expect(stopped.failure.message).toBe(
         'Stage "pr-42" has no list of who may open it: PREVIEW_ACCESS is not set, so the preview would answer anyone. ' +
-          "Set it in the preview environment, with the emails typed at the prompt and never on the command line: " +
-          "gh secret set PREVIEW_ACCESS --env preview"
+          "Make a 1Password item whose field holds the emails, separated by commas, write " +
+          'PREVIEW_ACCESS="op://<vault>/<item>/<field>" in packages/infra/env/op.env.local, and deploy the ' +
+          "repository's stack (bun run beep infra setup --staging), which writes it to the preview environment as a secret"
       )
     })
 
@@ -179,6 +183,29 @@ describe("the plan of a stage", () => {
         Result.succeed(O.none()),
         Result.succeed(O.none())
       ])
+    })
+  })
+
+  describe("the lists the repository's stack writes to GitHub", () => {
+    it("writes the previews' list as it was given, and only once it reads as emails", () => {
+      const given = Redacted.make("Ben@Example.test, qa@example.test")
+      expect(givenPreviewAccess(O.some(given))).toEqual(Result.succeed(given))
+      for (const text of ["", "ben@example.test,", "everyone"]) {
+        const stopped = Redacted.make(text).pipe(O.some, givenPreviewAccess)
+        assertTrue(Result.isFailure(stopped), `Expected "${text}" to be refused`)
+        expect(stopped.failure.message).toContain("PREVIEW_ACCESS is not a list of emails separated by commas")
+      }
+      const missing = givenPreviewAccess(O.none())
+      assertTrue(Result.isFailure(missing), "Expected a missing list to stop the stack")
+      expect(missing.failure.message).toContain("PREVIEW_ACCESS is not set")
+    })
+
+    it("stops without production's sign-up list, so a run again never closes production", () => {
+      expect(givenSignUpList(O.some("closed"))).toEqual(Result.succeed("closed"))
+      const stopped = givenSignUpList(O.none())
+      assertTrue(Result.isFailure(stopped), "Expected a missing list to stop the stack")
+      expect(stopped.failure.message).toContain("SIGN_UP is not set")
+      expect(stopped.failure.message).toContain("op.env.local")
     })
   })
 

@@ -71,10 +71,6 @@ const flags = {
       "The GitHub login that approves a production deploy; the one gh is logged in as when left out"
     ),
     Flag.optional
-  ),
-  signUp: Flag.String("sign-up").pipe(
-    Flag.withDescription("Who may open an account in production: emails separated by commas, or closed"),
-    Flag.optional
   )
 }
 
@@ -96,8 +92,7 @@ export const infraSetupCommand = Command.make("setup", flags, (args) =>
       productionAccount: args.productionAccount,
       previewProfile: args.previewProfile,
       productionProfile: args.productionProfile,
-      approver: args.approver,
-      signUp: args.signUp
+      approver: args.approver
     })
   }).pipe(
     Effect.catchTags({

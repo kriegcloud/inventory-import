@@ -17,8 +17,8 @@ pull request is merged, or, for a step with none, when its record below is writt
 | 3 | The person's session: prepared, run by Benjamin, written down | one for the record | todo |
 | 4 | `CLAUDE.md` as an index: which goal owns it, to what length, then the move | one | doing |
 | 5 | Measure `bun run check`: how long, and what a failure prints | the record below | done: 2026-11-26 |
-| 6 | One summary at the end of a failing check | one | doing |
-| 7 | `bun run check:changed` | one | todo |
+| 6 | One summary at the end of a failing check | 35 | done: 2026-11-26 |
+| 7 | `bun run check:changed` | one | doing |
 | 8 | A merge that finishes on its own | none, or one for the rule in `CLAUDE.md` | todo |
 | 9 | The worktrees and the main checkout | one for `CLAUDE.md` | todo |
 | 10 | Close: the closing note, `status: done`, `bun run check:full` on main | one | todo |
@@ -195,11 +195,54 @@ the summary adds nothing to a law's words.
 
 ## 7. `check:changed`
 
-**To do.** `bun run check:changed`: the file-reading laws on `git diff --name-only $(git merge-base HEAD origin/main)`,
-then `turbo run check lint test --affected` for the type-check and the fast tests of the packages those files touch.
-The target time comes from step 5. It is documented as the check before a commit, with `bun run check` still before
-every push. Whether `CLAUDE.md`'s "Run `bun run check` before every commit" becomes "`check:changed` before a commit,
-`check` before a push" is his; until he says so, the rule stays.
+**Decided 2026-11-26.** By dialog, as recommended: "Own tests only" — it type-checks and lints the changed packages
+and everything that depends on them, runs every root law, and runs tests only in the packages whose files changed;
+dependents' tests wait for `bun run check` before the push. `bun run check` is unchanged and still runs everything.
+
+**To do.** Build and measure `bun run check:changed` before a commit. Root laws run whole, rather than per changed
+file: they take seconds and most read the whole tree. The merge base with `origin/main` selects changed packages,
+including uncommitted and untracked files; type-check and lint include dependents, but tests and proofs belong to
+changed packages only. No package changed means root laws only. Shared root configuration runs all packages' own
+tests as well. Reuse the full check's runner and failure summary.
+
+**Built.** `check changed` reads the root laws from the root `check` script, and package names, scripts and dependency
+edges from workspace manifests. A schema-backed pure planner emits one turbo run, with explicit own `test` and
+`prove` tasks and the merge-base filter for type-check and lint. It shares `check run`'s runner, `--continue`,
+`--summarize`, failure summary and exit code. Extra arguments after `--` reach turbo. No scope-override option was
+added just for timing.
+
+Timed by hand before the build, with the same turbo line the planner writes, beside step 5's full check:
+
+| One comment line in | Full check (step 5) | The changed-only turbo line | Tasks in changed run |
+| --- | --- | --- | --- |
+| `packages/catalog/model/src/Item/Items.handler.ts` | 167 s | 68 s | 39 |
+| `apps/inventory/src/web/Workspace.tsx` | 10 s | 13 s | 32 |
+
+The model change avoids its dependents' long tests. The web change gains nothing: the app has no dependents, and
+the root laws run either way. The command itself was not timed on a one-file change: this branch changes the root
+`package.json`, which makes every run on it the global case. That timing is taken on main after the merge, and
+SPEC's acceptance stays unticked until then.
+
+End to end on this branch: `bun run check:changed`, with the root
+`package.json` changed, announced all 28 packages and passed 107 of 107 tasks, zero replayed, in 196.85 s wall time
+(turbo: 196.517 s). This is the global-change case, not an isolated one-file timing.
+
+**Probed.** On this checkout with turbo 2.11.13 and merge base `4043181f`, `turbo ls --filter=[B] --output=json`
+selected zero packages with no change, 28 after a whitespace edit to `turbo.json`, and zero after whitespace edits
+to each of `bun.lock`, root `package.json` and `tsconfig.base.json`. With this build's root script and CLI edits it
+selected only `@beep/repo-cli`. So the command also checks changed root paths explicitly: any of those four files
+runs every package's own tests and proofs, and says so. Every probe file was restored byte for byte.
+
+**Checked.** The CLI's type-check, lint and 740 fast tests passed, including the planner's leaf, dependent/proof,
+no-package and global-change cases and forwarding arguments through Bun. `config-sync:check` and `docs:check`
+passed. In a temporary root without `origin/main`, the command exited 1 with the instruction to
+`git fetch origin main`.
+
+Appending `export const scratchTwo = (xs: ReadonlyArray<string>) => xs[0]! ?? "x"` to
+`packages/catalog/model/src/Words.rules.ts`, then running `check:changed`, exited 1 in 54.42 s. Its final summary
+named both `//#assertions:check` and `//#defaults:check`: 2 of 107 tasks failed. The file was then restored byte for
+byte from its saved copy. The full `bun run check` then passed 107 of 107 tasks, 92 replayed, in 3.62 s wall time
+(turbo: 3.445 s). SPEC's acceptance remains unticked; step 7 stays `doing` until its pull request is merged.
 
 ## 8. A merge that finishes on its own
 
@@ -246,6 +289,5 @@ In short:
 - **Step 9.** An agent removes clean worktrees whose commit is in main. Dirty or unmerged ones, and the main checkout,
   are listed for him.
 
-**Open since step 5.** Does `check:changed` run only the changed packages' own tests, and leave their dependents'
-tests (for example `catalog-web`'s 163 s after a model change) to `bun run check` before the push? Recommended: yes,
-since the push still runs every test. Put to Benjamin when step 7 opens.
+**Answered in step 7.** Own tests only, decided by dialog on 2026-11-26 as recommended; dependents' tests wait for
+the full check before the push.

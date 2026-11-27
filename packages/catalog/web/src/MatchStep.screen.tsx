@@ -75,7 +75,7 @@ export function MatchStep(props: {
           }
         >
           <NativeSelectOption value="">None</NativeSelectOption>
-          {table.columns.map((column) => (
+          {A.map(table.columns, (column) => (
             <NativeSelectOption key={column.index} value={`${column.index}`}>
               {column.letter}: {column.label}
             </NativeSelectOption>

@@ -4,7 +4,7 @@ title: Module taxonomy
 description: Whether the per-unit module shape tried on RPCs in beep-effect (one unit, role-named files, a contract door and a handler door) gives @alchemy.run/domain blocks, and the rest of this repository, one consistent structure. A reading from source and two experiments run: a command in its own file proves as before, and a registry of kinds refuses sixteen of the two contexts' 173 files.
 status: active
 stage: shape
-next: he reads scratchpad/experiments/import-module and says whether that shape replaces decision 1; the brief matches as written (2026-11-27); decisions 2, 6 and 7 are open
+next: he says whether the import-module shape replaces decision 1, and whether the prover is patched to read a static of an event's class; the brief matches as written (2026-11-27); decisions 2, 6 and 7 are open
 goals: []
 ---
 
@@ -294,3 +294,7 @@ whether a block's name, tag and stem being equal is a law.
   lock. The transitions stay in the aggregate's file: moved, the lock refuses all 23. An `evolve` as a static of
   its event's class, which he asked for twice, is not read by the prover. This shape is not decision 1 as he answered
   it ("decide stays"); he has not been asked to change it.
+- 2026-11-27: he chose to size the prover change. About forty lines of the built interpreter, tried on a copy of the
+  library: with them `ColumnMatched: ColumnMatched.evolve` proves as the baseline does, and a broken static is
+  caught. `scratchpad/experiments/command-file/prover-static-member.patch`. Nothing in `node_modules` or
+  `packages/patches` was changed.

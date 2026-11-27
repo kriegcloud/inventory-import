@@ -41,7 +41,8 @@ twelve by a script (not kept) and formatted with the repository's settings. No l
 - **An `evolve` is an exported function, not a static of its event's class.** `ColumnMatched: ColumnMatched.evolve`
   type-checks and runs, and the prover answers `NotTranslated` for every rule of the command, with a plain static
   and with the `dual` one. The repository patches the prover already (`packages/patches/alchemy-domain.patch`);
-  following a static of a class would be one more change to that patch, not sized here.
+  following a static of a class is about forty more lines of it, tried on a copy of the library
+  (`../command-file/prover-static-member.patch`): with them the static form proves as the baseline does.
 - **Only the `decide`s cost mutants**: all 60 that name `Import.aggregate.ts` change a line of a `decide`.
 
 Not done: `laws block-files` has no `.state.ts` and no `.event.ts`, and was not run on these files; the stories were

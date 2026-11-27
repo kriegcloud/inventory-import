@@ -1,0 +1,55 @@
+--- a/lib/Prove/internal/Interpreter.js
++++ b/lib/Prove/internal/Interpreter.js
+@@ -455,6 +455,39 @@
+         name: fn.name,
+         call: (args) => Effect.succeed(applied(fn, args, "is opaque")),
+     });
++    /** The class a top-level name of a module is, through the imports that give it, with the module that declares it. */
++    const classAt = Effect.fnUntraced(function* (module, name, site) {
++        const declaration = module.declarations.get(name);
++        if (declaration?._tag === "Class")
++            return { module, node: declaration.node, name };
++        const imported = module.imports.get(name);
++        if (!imported || imported.imported === "*" || declaration)
++            return undefined;
++        const file = module.resolved.get(imported.specifier);
++        if (file === undefined)
++            return undefined;
++        return yield* classAt(yield* loadAt(file, site), imported.imported, site);
++    });
++    /** A static of a class with a value, read from its source: `static readonly evolve = (s, e) => ...`. */
++    const staticOf = Effect.fnUntraced(function* (name, key, env, site) {
++        for (let scope = env.scope; scope; scope = scope.parent)
++            if (scope.variables.has(name))
++                return undefined;
++        const found = yield* classAt(env.module, name, site);
++        if (!found)
++            return undefined;
++        const property = (found.node.body?.body ?? []).find((member) => member.type === "PropertyDefinition" &&
++            member.static &&
++            !member.computed &&
++            member.key.type === "Identifier" &&
++            member.key.name === key &&
++            member.value);
++        if (!property)
++            return undefined;
++        const made = yield* evaluate(property.value, moduleEnv(found.module));
++        const real = found.module.exports[found.name]?.[key];
++        return made._tag === "Fn" && typeof real === "function" ? { ...made, real: { name: `${found.name}.${key}`, call: real } } : made;
++    });
+     const lookup = Effect.fnUntraced(function* (name, env, site) {
+         for (let scope = env.scope; scope; scope = scope.parent) {
+             const local = scope.variables.get(name);
+@@ -1422,6 +1455,12 @@
+             case "FunctionExpression":
+                 return { _tag: "Fn", node, env, effectful: false };
+             case "MemberExpression": {
++                // `Event.evolve`: a static of a class a file exports is read where it is written.
++                if (!node.computed && node.object.type === "Identifier") {
++                    const held = yield* staticOf(node.object.name, node.property.name, env, site);
++                    if (held)
++                        return held;
++                }
+                 const object = yield* evaluate(node.object, env);
+                 if (object === SHORT)
+                     return SHORT;

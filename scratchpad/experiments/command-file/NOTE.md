@@ -87,6 +87,16 @@ sorted lines.
   package's lock, the lock unchanged. The same shape, alone and formatted, is
   [import-module](../import-module/NOTE.md).
 
+- **The prover can be taught to read a static of an event's class in about forty lines**
+  (`prover-static-member.patch`, against the library's built `lib/Prove/internal/Interpreter.js` at `e1c3e6d` with
+  the repository's patch applied). Where code says `Name.key` and `Name` is a class a file of the model declares,
+  through the imports that give it, the change reads the static's value from the source, as it reads an exported
+  function. Tried on a copy of the library, not on `node_modules`, and the copy is not kept: with it
+  `split-evolve` (`static readonly evolve` written with `dual`, `ColumnMatched: ColumnMatched.evolve`) stands as the
+  baseline does, and with `matching: e.matching` dropped from the static, `AMatchIsTheNextOne` is `Violated`. Not
+  tried: the whole model's verify, a decision, a static `decide`, and the same change to `src/` (which bun reads; the
+  repository's patch carries both).
+
 Not tried here: the stories; `laws block-files` and `laws model-inputs` on the new files. The model's mutants name a file, an
 anchor and the exact text of a line with its indentation (60 of the 192 name `src/Import/Import.aggregate.ts`), so
 moving a decide means writing those again; moving only a command and its event leaves every decide where its mutants

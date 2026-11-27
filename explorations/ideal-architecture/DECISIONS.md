@@ -2210,6 +2210,26 @@ Reverse: 1, the pause ends early by a dated line here; 2, the session moves to a
 or to the other place; 5, `CLAUDE.md` asks for `bun run check` before every commit again; 6, both settings off; 7,
 removal asks first.
 
+### 2026-11-26 — focus and friction: the commit check's tests, and the worktrees left
+
+Asked by dialog once steps 3, 4 and 9 of `goals/focus-and-friction` were open (pull requests 36, 37 and 39).
+
+1. **After a change in one package, does `bun run check:changed` run only that package's own tests?** I chose; the
+   agent recommended the same. Yes: the tests of the packages that depend on it (`catalog-web`'s 163 s after a model
+   change, step 5) are left to `bun run check` before the push, which still runs every test. Rejected: the
+   dependents' tests too, which keeps a model change near three minutes before each commit.
+2. **The changed `.claude/worktrees/wf_*` worktrees left by Workflow runs?** I chose; the agent recommended the same.
+   An agent compares each one's changes with main and removes those whose every change main already holds; any with a
+   difference is listed for me with its files. Rejected: leaving them all.
+3. **`.claude/worktrees/integration` and `sean-demo/rebuild`, clean and in main?** I chose; the agent recommended the
+   same. Both stay: the first holds an ignored `.alchemy/` folder and `packages/infra/env/op.env.local`, the second
+   sits in another project's folder. Rejected: removing both; removing `integration` only.
+
+Next: step 7 is built on answer 1; step 9 compares and removes on answer 2.
+
+Reverse: 1, `check:changed` adds the dependents' tests; 2, removal of a changed worktree asks first again; 3, either
+is removed by a dated line here.
+
 ### 2026-11-26 — Alchemy uptake: the goal's edges
 
 After the sweep in [research 05](research/05-alchemy-unused.md) I asked for a goal that makes use of all of it:

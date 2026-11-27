@@ -356,8 +356,8 @@ export class Fix extends S.Opaque<Fix, { readonly brand: unique symbol }>()(
     confidence: S.Option(Confidence).pipe(
       S.annotateKey({
         description:
-          "How sure the source is, in a word, never a percentage. A `low` fix is a question: the person picks " +
-          "between `to` and `why.alternatives`, and it is never accepted for a group in one press."
+          "How sure the source is, in a word, never a percentage. A `low` fix, and one with none, is a question: the " +
+          "person picks between `to` and `why.alternatives`, and it is never accepted for a group in one press."
       })
     ),
     kind: S.String.pipe(S.annotateKey({ description: "The problem kind this change settles." })),

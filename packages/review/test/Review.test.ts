@@ -792,6 +792,19 @@ describe("a model's weak guess", () => {
   })
 })
 
+describe("a fix with no confidence", () => {
+  // Benjamin, 2026-11-26: as a stored proposal with none, it is asked, never applied in one press or for a group.
+  const fix = (confidence: O.Option<string>) => ({ to: "pcs", confidence, why: { alternatives: ["each"] } })
+  it("is a question between its value and the alternatives, as a low one is", () => {
+    expect(choicesOf(fix(O.none()))).toEqual(O.some(["pcs", "each"]))
+    expect(choicesOf(fix(O.some("low")))).toEqual(O.some(["pcs", "each"]))
+  })
+  it("while a medium or high one stays a single press", () => {
+    expect(choicesOf(fix(O.some("medium")))).toEqual(O.none())
+    expect(choicesOf(fix(O.some("high")))).toEqual(O.none())
+  })
+})
+
 describe("a quantity in the review", () => {
   it("is shown in its row's unit, and only a plain number takes one", () => {
     const onHand = { display: identity, unitFrom: O.some("uom") }

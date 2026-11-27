@@ -47,10 +47,10 @@ it is done when all of it is on `main`.
 
 ## Acceptance
 
-- [ ] The rulings' pull request is merged, and each of the three screen changes was seen on screen: what was typed
-      and what was read is in [PLAN](PLAN.md). Merged as pull request 17; one of the three seen (the empty Quantity on
-      hand box). "Not recorded" and a suggestion with no confidence are not seen on screen: a fresh import records an
-      author and a confidence for every decision, so neither is reached without a row edited by hand.
+- [x] The rulings' pull request is merged, and each of the three screen changes was seen on screen: what was typed
+      and what was read is in [PLAN](PLAN.md). Merged as pull request 17. The empty Quantity on hand box was seen on
+      a fresh import; "Not recorded" and a suggestion with no confidence were seen on rows edited by hand, as Benjamin
+      chose on 2026-11-26, since a fresh import records an author and a confidence for every decision.
 - [x] `bun run --cwd packages/catalog/web test` passes with `Draft.machine.test.ts` replayed on both seeds, and PLAN
       says which of the machine and the property was wrong.
 - [x] A test in `packages/review/test` draws the facet control on a table with rows and fails on the commit before
@@ -63,8 +63,6 @@ it is done when all of it is on `main`.
 ## Decisions
 
 Recorded in the root `DECISIONS.md` (product) and in
-[the exploration's](../../explorations/ideal-architecture/DECISIONS.md) (architecture). Open on 2026-11-26:
-
-- A fix with no confidence in the review region is offered as a one-press answer today. The ruling on stored
-  proposals says "asked, never applied". Whether the region follows it is Benjamin's; the import always records a
-  confidence, so no row reaches that path now.
+[the exploration's](../../explorations/ideal-architecture/DECISIONS.md) (architecture). None is open. The last,
+answered on 2026-11-26: a fix with no confidence in the review region follows the ruling on stored proposals, asked
+and never applied, as a `low` one is.

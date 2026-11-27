@@ -111,7 +111,7 @@ export class ConfirmWrite extends S.Opaque<ConfirmWrite, { readonly brand: uniqu
       S.annotateKey({ description: "One id per row the plan creates, in the plan's order, made by the handler" })
     ),
     audit: Activity.pipe(
-      S.annotateKey({ description: "\"Imported items\": its detail is filled in by the batch from what it counted" })
+      S.annotateKey({ description: '"Imported items": its detail is filled in by the batch from what it counted' })
     )
   })
     // A store pairs the rows the plan creates with the ids in order, and a pairing stops at the shorter list: with
@@ -122,8 +122,7 @@ export class ConfirmWrite extends S.Opaque<ConfirmWrite, { readonly brand: uniqu
       })
     )
     .annotate({ identifier: "ConfirmWrite", description: "One confirm of an import, as it is written" })
-) {
-}
+) {}
 
 /** What a confirm's write did. */
 export const ConfirmedKind = LiteralKit(["confirmed", "closed", "moved", "itemsChanged"]).annotate({
@@ -137,16 +136,14 @@ class ConfirmWritten extends S.Opaque<ConfirmWritten, { readonly brand: unique s
     identifier: "ConfirmWritten",
     description: "This write confirmed the import"
   })
-) {
-}
+) {}
 
 class ConfirmClosed extends S.Opaque<ConfirmClosed, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("closed") }).annotate({
     identifier: "ConfirmClosed",
     description: "Another confirm won, or the import was not open: nothing was written"
   })
-) {
-}
+) {}
 
 class ConfirmMoved extends S.Opaque<ConfirmMoved, { readonly brand: unique symbol }>()(
   S.Struct({
@@ -156,8 +153,7 @@ class ConfirmMoved extends S.Opaque<ConfirmMoved, { readonly brand: unique symbo
     identifier: "ConfirmMoved",
     description: "The draft is open at another revision than the confirm was made on: nothing was written"
   })
-) {
-}
+) {}
 
 class ConfirmItemsChanged extends S.Opaque<ConfirmItemsChanged, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("itemsChanged") }).annotate({
@@ -165,8 +161,7 @@ class ConfirmItemsChanged extends S.Opaque<ConfirmItemsChanged, { readonly brand
     description:
       "A stored item the confirm's judgement read was edited, replaced, created or taken back since, or the import's created rows or suggestions changed: nothing was written, and the confirm is judged again"
   })
-) {
-}
+) {}
 
 /**
  * Whether a confirm's write was the one that confirmed the import. Told apart with `Confirmed.match` or its `guards`:
@@ -199,11 +194,10 @@ export class TakeBackWrite extends S.Opaque<TakeBackWrite, { readonly brand: uni
       S.annotateKey({ description: "The confirms the person was shown; only those still in force are reversed" })
     ),
     audit: Activity.pipe(
-      S.annotateKey({ description: "\"Took back an import\": its detail is filled in by the batch from what it counted" })
+      S.annotateKey({ description: '"Took back an import": its detail is filled in by the batch from what it counted' })
     )
   }).annotate({ identifier: "TakeBackWrite", description: "One take-back of an import, as it is written" })
-) {
-}
+) {}
 
 /** What a take-back's write did. */
 export const TookBackKind = LiteralKit(["tookBack", "nothingInForce"]).annotate({
@@ -216,16 +210,14 @@ class TakenBack extends S.Opaque<TakenBack, { readonly brand: unique symbol }>()
     identifier: "TakenBack",
     description: "At least one of the confirms was in force and is taken back"
   })
-) {
-}
+) {}
 
 class NothingInForce extends S.Opaque<NothingInForce, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("nothingInForce") }).annotate({
     identifier: "NothingInForce",
     description: "None of the confirms was in force any more (a second press): nothing was written"
   })
-) {
-}
+) {}
 
 /** Whether a take-back's write reversed anything. */
 export const TookBack = TookBackKind.mapMembers(() => Tuple.make(TakenBack, NothingInForce)).pipe(
@@ -252,16 +244,14 @@ class DecisionsSaved extends S.Opaque<DecisionsSaved, { readonly brand: unique s
     revision: S.Int.pipe(S.annotateKey({ description: "The draft's revision after the save" })),
     changed: S.Boolean.pipe(S.annotateKey({ description: "Whether this save is what moved the draft there" }))
   }).annotate({ identifier: "DecisionsSaved", description: "The save was written, or changed nothing" })
-) {
-}
+) {}
 
 class DecisionsClosed extends S.Opaque<DecisionsClosed, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("closed") }).annotate({
     identifier: "DecisionsClosed",
     description: "The import was no longer open: nothing was saved"
   })
-) {
-}
+) {}
 
 class DecisionsRematched extends S.Opaque<DecisionsRematched, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("rematched") }).annotate({
@@ -269,8 +259,7 @@ class DecisionsRematched extends S.Opaque<DecisionsRematched, { readonly brand: 
     description:
       "A column was matched again since the draft was read: its decisions were judged against choices it no longer has, and nothing was saved"
   })
-) {
-}
+) {}
 
 class DecisionsMoved extends S.Opaque<DecisionsMoved, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("moved") }).annotate({
@@ -278,8 +267,7 @@ class DecisionsMoved extends S.Opaque<DecisionsMoved, { readonly brand: unique s
     description:
       "The draft moved on from the revision the save's rows that waited were compared at (somebody saved, matched or confirmed in between): nothing was saved"
   })
-) {
-}
+) {}
 
 class DecisionsItemsChanged extends S.Opaque<DecisionsItemsChanged, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("itemsChanged") }).annotate({
@@ -287,8 +275,7 @@ class DecisionsItemsChanged extends S.Opaque<DecisionsItemsChanged, { readonly b
     description:
       "A stored item the save's judgement of a Replace or Keep-stored read was edited, replaced, created or taken back since, or the import's created rows or suggestions changed: nothing was saved"
   })
-) {
-}
+) {}
 
 /**
  * What a save of decisions did: written (at which revision, and whether it moved the draft), or why not. Told apart
@@ -641,5 +628,4 @@ export class ImportStore extends Context.Service<
     /** Every item of the organization, by SKU. */
     readonly items: (organizationId: OrganizationId) => Effect.Effect<ReadonlyArray<StoredItem>>
   }
->()("@inventory/catalog-model/Import/ImportStore.store/ImportStore") {
-}
+>()("@inventory/catalog-model/Import/ImportStore.store/ImportStore") {}

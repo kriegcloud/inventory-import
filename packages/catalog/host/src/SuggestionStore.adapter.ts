@@ -10,7 +10,8 @@ import {
   SuggestionKind,
   SuggestionByKind,
   suggestionFromStored,
-  suggestionToStored, Suggestion
+  suggestionToStored,
+  Suggestion
 } from "@inventory/catalog-contract/Suggestion"
 import { Field } from "@inventory/catalog-contract/Staged"
 import * as A from "effect/Array"

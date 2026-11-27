@@ -427,6 +427,17 @@ This narrows I8 for staging only: an email I name may be stored there. Known: st
 who can push a branch here can reach that person's account on staging; today only I can push. Rejected: share a
 test account's login. Reverse: delete the secret, deploy staging again, and delete the invited account.
 
+### 2026-11-26 — the lists of emails are written by the repository's stack
+
+Question: who may open a preview (`PREVIEW_ACCESS`) and production's sign-up list (`SIGN_UP`) were set by hand
+with `gh secret set`, outside the code. Should the repository's stack write them? I chose "Repository stack" and
+"Yes, both together"; the agent recommended the same. Each list is a field of a 1Password item, referenced from
+my `packages/infra/env/op.env.local`. `GitHub.stack.ts` asks 1Password for both and writes them as secrets of the
+`preview` and `production` environments. It stops without either one, and on a preview list that is not a list of
+emails. This supersedes the entry below on one point: the stack no longer writes the variable `SIGN_UP`, and the
+setup command's `--sign-up` flag is gone, so no email is in GitHub in the clear. Staging's own `SIGN_UP` secret is
+still set by hand. Reverse: put the `GitHub.Variable` and the flag back, and set both secrets by hand.
+
 ### 2026-11-25 — production's sign-up list is a secret
 
 Question: production read its sign-up list from a GitHub variable, which the public deploy log prints. Mine: keep
@@ -2198,6 +2209,52 @@ Next: steps 4 to 7 and 9 of `goals/focus-and-friction` start; 6 waits on me; 3 w
 Reverse: 1, the pause ends early by a dated line here; 2, the session moves to a stage; 3 and 4, the text moves back
 or to the other place; 5, `CLAUDE.md` asks for `bun run check` before every commit again; 6, both settings off; 7,
 removal asks first.
+
+### 2026-11-26 — Alchemy uptake: the goal's edges
+
+After the sweep in [research 05](research/05-alchemy-unused.md) I asked for a goal that makes use of all of it:
+`goals/alchemy-uptake`. Four questions decided what it holds.
+
+1. **Is the Worker as an Alchemy Effect part of it?** I chose; the agent recommended the same. No: infra I1 stands,
+   and the host change stays with move 2 of `explorations/alchemy-domain`. Rejected: as the goal's last step; a
+   proof only.
+2. **`alchemy dev`, against the infra brief's no-go?** I chose; the agent recommended the same. A trial beside
+   `bun run dev` (`bun run dev:alchemy`), compared and written up; `bun run dev` stays until I decide from the
+   result. Rejected: replacing `bun run dev`; leaving it out.
+3. **An Access gate on previews?** I chose; the agent recommended the same. Yes, on `pr-<number>` stages only, with a
+   service token for the deploy workflow's smoke check. I8's rejection of Access was for public sign-up and stands.
+   Rejected: previews and `test_<user>` stages; no gate.
+4. **Where may the stack tests run?** I chose; the agent recommended the same. On Alchemy's local providers only, in
+   `bun run check:full`; no agent deploys anything. Rejected: local and live in CI; deciding after a trial.
+
+Open, each blocking one step of the goal: the limiter's rule, who may open a preview, where telemetry goes, and
+where a database dump is kept.
+
+Reverse: 1, the goal gains a last step and I1 is reversed; 2, the trial is dropped or `bun run dev` replaced; 3,
+the policy is taken off the preview plan; 4, a workflow job runs the suite against a throwaway stage.
+
+### 2026-11-26 — Alchemy uptake: the four open decisions
+
+Asked as the goal's first two steps finished (the plan before a deploy, and the trial of `alchemy dev`).
+
+1. **The coarse limiter's rule?** I chose; the agent recommended the same. One counter for each visitor address over
+   sign-in, sign-up and the model's endpoints: 30 in 60 seconds, then the app's own 429 sentence. Looser than Better
+   Auth's exact limits (10 sign-ins and 5 sign-ups a minute, in D1), which stay, as does the model's 40 calls a day;
+   when the binding itself fails the request goes on to them. Rejected: refusing when the binding fails; the account
+   as the model's key; no binding.
+2. **Who may open a preview?** I chose; the agent recommended the same. The emails in the preview environment's
+   secret `PREVIEW_ACCESS`, read as `SIGN_UP` is and never written in the repository, which is public. I make the
+   Access login in the previews' account by hand. Rejected: a domain; no gate.
+3. **Where does Cloudflare's own telemetry go?** I chose; the agent recommended the same. `staging` and `prod` read a
+   collector's address and its header from their environment; unset, nothing is declared and nothing is sent.
+   Previews and test stages never send. I name a collector later. Rejected: Grafana Cloud now; leaving it in the
+   dashboard only.
+4. **Where is a database dump kept?** I chose; the agent recommended the same. Only I take one, at my terminal, into
+   a file outside the repository that only I can read; nothing uploads it and nothing deletes it for me. Rejected:
+   an R2 bucket with a 30-day lifecycle; a 1Password document.
+
+Reverse: 1, the check and the binding come out of the Worker and the stack; 2, the policy comes off the preview's
+plan; 3, the two settings come out of the stack; 4, the command writes somewhere else.
 
 ### 2026-11-26 — CI speed: the split, the seeds, the cache and the run counts
 

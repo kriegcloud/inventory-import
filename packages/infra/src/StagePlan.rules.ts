@@ -12,9 +12,12 @@
  */
 import * as A from "effect/Array"
 import * as O from "effect/Option"
+import * as Redacted from "effect/Redacted"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import {
+  AccessEmails,
+  CollectorAddress,
   NotGiven,
   OnWorkersDev,
   PersonalPlan,
@@ -77,6 +80,13 @@ export const kindOf = (stage: string): Result.Result<StageKind, UnknownStage> =>
 
 const nowhere = NotGiven.make({})
 
+// Decision of 2026-11-26: staging and production read a collector from their environment; unset, nothing is sent.
+const collector = {
+  to: "collector",
+  address: "TELEMETRY_COLLECTOR_URL",
+  authorization: "TELEMETRY_COLLECTOR_AUTHORIZATION"
+} as const
+
 /**
  * The plan of a stage.
  *
@@ -91,7 +101,9 @@ export const planFor = (stage: string): Result.Result<StagePlan, UnknownStage> =
       address: OnWorkersDev.make({}),
       seeds: ["organizations", "accounts"] as const,
       modelKey: nowhere,
-      signUp: nowhere
+      signUp: nowhere,
+      access: nowhere,
+      telemetry: { to: "nowhere" } as const
     }
     return StageKind.match(kind, {
       production: () =>
@@ -99,11 +111,20 @@ export const planFor = (stage: string): Result.Result<StagePlan, UnknownStage> =
           address: { at: "hostname", ...production },
           seeds: [],
           modelKey: { from: "environment", variable: "OPENROUTER_API_KEY" },
-          signUp: { from: "environment", variable: "SIGN_UP" }
+          signUp: { from: "environment", variable: "SIGN_UP" },
+          access: nowhere,
+          telemetry: collector
         }),
-      preview: () => PreviewPlan.make(rehearsal),
+      // Decision of 2026-11-26: a preview answers only the emails its environment names, behind Cloudflare Access.
+      preview: () =>
+        PreviewPlan.make({ ...rehearsal, access: { from: "environment", variable: previewAccessVariable } }),
       staging: () =>
-        StagingPlan.make({ ...rehearsal, stage: "staging", signUp: { from: "environment", variable: "SIGN_UP" } }),
+        StagingPlan.make({
+          ...rehearsal,
+          stage: "staging",
+          signUp: { from: "environment", variable: "SIGN_UP" },
+          telemetry: collector
+        }),
       test: () => TestPlan.make(rehearsal),
       personal: () => PersonalPlan.make(rehearsal)
     })
@@ -176,6 +197,202 @@ export const givenTestPassword = <Password>(input: {
     onNone: () => Result.fail(MissingPreviewPassword.make({ stage: input.stage, variable: previewPasswordVariable })),
     onSome: Result.succeed
   })
+
+/**
+ * The variable a preview's deploy reads the emails that may open it from: the `preview` environment's secret, which
+ * the repository's stack writes from a 1Password item (Benjamin, 2026-11-26: "Repository stack"). A secret, never a
+ * variable, because the repository and its logs are public.
+ *
+ * @category rules
+ */
+export const previewAccessVariable = "PREVIEW_ACCESS"
+
+/**
+ * The variable production's sign-up list is read from: emails separated by commas, `closed` or `open`. In a
+ * workflow it is the `production` environment's secret, which the repository's stack writes from a 1Password item
+ * (Benjamin, 2026-11-26: "Yes, both together"); on a workstation the line of this name in `env/op.env.local` is
+ * production's list, and only production's plan asks 1Password for it, so staging never takes it.
+ *
+ * @category rules
+ */
+export const signUpVariable = "SIGN_UP"
+
+/**
+ * The repository's stack deployed with no sign-up list for production. Stopped: writing none, or `closed` in its
+ * place, would close production to everyone on a run again that only lost the line.
+ *
+ * @category errors
+ */
+export class MissingSignUpList extends S.TaggedError<MissingSignUpList, { readonly brand: unique symbol }>(
+  $I`MissingSignUpList`
+)(
+  "MissingSignUpList",
+  { variable: S.String.pipe(S.annotateKey({ description: "The variable that should hold the list" })) },
+  $I.annoteError<MissingSignUpList>("MissingSignUpList", {
+    description: "The repository's stack deployed without production's sign-up list"
+  })
+) {
+  /** What is missing and where its reference is written. */
+  override get message(): string {
+    return (
+      `Production has no sign-up list: ${this.variable} is not set. Make a 1Password item whose field holds the ` +
+      `emails that may open an account, separated by commas (or closed), write ` +
+      `${this.variable}="op://<vault>/<item>/<field>" in packages/infra/env/op.env.local, and deploy the ` +
+      `repository's stack again (bun run beep infra setup --staging).`
+    )
+  }
+}
+
+/**
+ * Production's sign-up list as the repository's stack writes it: the one it was given, or the deploy stops.
+ *
+ * @example givenSignUpList(O.none()) // Result.fail(MissingSignUpList)
+ *
+ * @category rules
+ */
+export const givenSignUpList = <List>(given: O.Option<List>): Result.Result<List, MissingSignUpList> =>
+  O.match(given, {
+    onNone: () => Result.fail(MissingSignUpList.make({ variable: signUpVariable })),
+    onSome: Result.succeed
+  })
+
+/**
+ * A preview deployed with no list of who may open it, or with one that is no list of emails. Stopped: a preview
+ * without its gate would answer anyone with the shared test password.
+ *
+ * @category errors
+ */
+export class MissingPreviewAccess extends S.TaggedError<MissingPreviewAccess, { readonly brand: unique symbol }>(
+  $I`MissingPreviewAccess`
+)(
+  "MissingPreviewAccess",
+  {
+    stage: S.String.pipe(S.annotateKey({ description: "The stage being deployed" })),
+    variable: S.String.pipe(S.annotateKey({ description: "The variable that should hold the emails" })),
+    given: S.Boolean.pipe(S.annotateKey({ description: "Whether the variable held anything at all" }))
+  },
+  $I.annoteError<MissingPreviewAccess>("MissingPreviewAccess", {
+    description: "A preview deployed without a readable list of the emails that may open it"
+  })
+) {
+  override get message(): string {
+    const what = this.given
+      ? `${this.variable} is not a list of emails separated by commas`
+      : `${this.variable} is not set`
+    return (
+      `Stage "${this.stage}" has no list of who may open it: ${what}, so the preview would answer anyone. Make a ` +
+      `1Password item whose field holds the emails, separated by commas, write ` +
+      `${this.variable}="op://<vault>/<item>/<field>" in packages/infra/env/op.env.local, and deploy the ` +
+      `repository's stack (bun run beep infra setup --staging), which writes it to the preview environment as a secret`
+    )
+  }
+}
+
+/**
+ * The emails a stage's Access policy lets in: none for a stage whose plan names no policy, and for a preview the
+ * list it was given, or the reason the deploy stops. The message never repeats what was given.
+ *
+ * @example
+ * accessEmailsFor({ stage: "pr-42", source: { from: "environment", variable: "PREVIEW_ACCESS" }, given: O.none() })
+ * // Failure(MissingPreviewAccess): "... PREVIEW_ACCESS is not set ..."
+ *
+ * @category rules
+ */
+export const accessEmailsFor = (input: {
+  readonly stage: string
+  readonly source: StagePlan["access"]
+  readonly given: O.Option<string>
+}): Result.Result<O.Option<AccessEmails>, MissingPreviewAccess> => {
+  if (input.source.from === "nowhere") return Result.succeed(O.none())
+  const { variable } = input.source
+  const stopped = (given: boolean) => Result.fail(MissingPreviewAccess.make({ stage: input.stage, variable, given }))
+  return O.match(input.given, {
+    onNone: () => stopped(false),
+    onSome: (text) =>
+      O.match(S.decodeOption(AccessEmails)(text), {
+        onNone: () => stopped(true),
+        onSome: (emails) => Result.succeed(O.some(emails))
+      })
+  })
+}
+
+/**
+ * The emails that may open a preview, as the repository's stack writes them to the `preview` environment: what it
+ * was given, once it reads as a list of emails, or the reason it stops. Checked as a preview's deploy checks it
+ * (`accessEmailsFor`), so a list that would stop every preview stops this one run instead.
+ *
+ * @example givenPreviewAccess(O.some(Redacted.make("ben@example.test"))) // Result.succeed(that same value)
+ *
+ * @category rules
+ */
+export const givenPreviewAccess = (
+  given: O.Option<Redacted.Redacted<string>>
+): Result.Result<Redacted.Redacted<string>, MissingPreviewAccess> =>
+  O.match(given, {
+    onNone: () =>
+      Result.fail(MissingPreviewAccess.make({ stage: "pr-<number>", variable: previewAccessVariable, given: false })),
+    onSome: (value) =>
+      value.pipe(Redacted.value, S.decodeOption(AccessEmails), O.isSome)
+        ? Result.succeed(value)
+        : Result.fail(MissingPreviewAccess.make({ stage: "pr-<number>", variable: previewAccessVariable, given: true }))
+  })
+
+/**
+ * A stage's collector address that is not an `https` address. Stopped: Cloudflare would refuse it at the deploy, or
+ * send a stage's traces somewhere a typing mistake names.
+ *
+ * @category errors
+ */
+export class UnreadableCollector extends S.TaggedError<UnreadableCollector, { readonly brand: unique symbol }>(
+  $I`UnreadableCollector`
+)(
+  "UnreadableCollector",
+  {
+    stage: S.String.pipe(S.annotateKey({ description: "The stage being deployed" })),
+    variable: S.String.pipe(S.annotateKey({ description: "The variable that holds the address" }))
+  },
+  $I.annoteError<UnreadableCollector>("UnreadableCollector", {
+    description: "A collector address that is not an https address"
+  })
+) {
+  override get message(): string {
+    return (
+      `Stage "${this.stage}" names a telemetry collector that cannot be used: ${this.variable} is not an https ` +
+      `address without a query (for example https://otel.example.com/otlp). Correct the variable in the stage's ` +
+      `environment, or remove it to send nothing.`
+    )
+  }
+}
+
+/**
+ * Where Cloudflare sends a stage's traces and logs: nowhere for a stage whose plan names no collector, nowhere when
+ * the address is unset, and otherwise the collector's two OTLP paths with the header it asks for, when one is given.
+ *
+ * @example
+ * telemetryFor({ stage: "staging", source: plan.telemetry, address: O.some("https://otel.example.test/"), authorization: O.none() })
+ * // Success(Some({ traces: "https://otel.example.test/v1/traces", logs: "https://otel.example.test/v1/logs", ... }))
+ *
+ * @category rules
+ */
+export const telemetryFor = <Secret>(input: {
+  readonly stage: string
+  readonly source: StagePlan["telemetry"]
+  readonly address: O.Option<string>
+  readonly authorization: O.Option<Secret>
+}): Result.Result<
+  O.Option<{ readonly traces: string; readonly logs: string; readonly authorization: O.Option<Secret> }>,
+  UnreadableCollector
+> => {
+  if (input.source.to === "nowhere" || O.isNone(input.address)) return Result.succeed(O.none())
+  const { address: variable } = input.source
+  return O.match(S.decodeOption(CollectorAddress)(input.address.value), {
+    onNone: () => Result.fail(UnreadableCollector.make({ stage: input.stage, variable })),
+    onSome: (address) =>
+      Result.succeed(
+        O.some({ traces: `${address}/v1/traces`, logs: `${address}/v1/logs`, authorization: input.authorization })
+      )
+  })
+}
 
 /**
  * The variable of the Cloudflare token every preview's and staging's deploy job takes: the owner's own account-owned

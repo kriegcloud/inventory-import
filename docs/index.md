@@ -23,6 +23,7 @@ Paths here that start `src/`, `test/`, `migrations/`, `public/` or `scripts/` ar
 * [For the authors of @alchemy.run/domain: let the prover read a schema's own guards](upstream-prover-schema-guards.md) - The report to send upstream with the third patch to the prover: what it reads now and how exactly, what it still does not, and how it was tested.
 * [Patching a dependency](patches.md) - When the repository patches a dependency and how: one file a defect, its header, the test that fails without it, the three checks, and what a re-pin and a dependency update do with a patch.
 * [Releasing and deploying](releasing.md) - How a change reaches people: work lands on main, which deploys staging; a release is a branch cut from main and a tag on its head, pushed together, which deploys production once CI passed on the branch and Benjamin approves; a fix to a released version is cherry-picked from main and tagged with the next patch.
+* [Looking at a deployed stage](operations.md) - For one stage: how to read its plan, its drift, its logs and its state, each with the exact command; what the deploy workflow's plan step and its guard do; and what none of these commands may be run by.
 * [Trying an idea in the scratchpad](scratchpad.md) - How to try an idea against the repository's own packages without touching them: one folder for each experiment, from a template whose test already runs, apart from the check, the build and a deploy, and ended by graduating its code into a package or dropping it.
 
 # Evidence written while building

@@ -166,7 +166,8 @@ const contextMay = (a: Kind, b: Kind): boolean => {
  *
  * Nothing depends on `tooling`: the repository's own commands are run by the root, never imported by a package.
  * Nothing depends on `infra` either: it declares what is deployed, so nothing that is deployed may import it, the
- * app included. An `infra` package itself may use the foundation and nothing else.
+ * app included; the app's stack test is the one exception, made outside this table (`localStackEntry`). An `infra`
+ * package itself may use the foundation and nothing else.
  *
  * Nothing depends on `ontology` either, the app included (decision 9; report 14 section 7.2): it projects the
  * vocabulary into generated files and holds the ontology's gates, so it is run, never imported. The rule has no
@@ -190,6 +191,17 @@ export const allowed =
     if (a.family === "context") return contextMay(a, b)
     return false
   }
+
+/**
+ * The one exception to "nothing depends on infra" (Benjamin, 2026-11-26; goals/alchemy-uptake, step 4): the app's
+ * stack test deploys the stack of `bun run dev:alchemy` on Alchemy's local providers, and drives it with the app's
+ * own API client and upload helpers. So an app may declare an infra package in its devDependencies, never in its
+ * dependencies, and a file under the app's `test` folder may import that package's `InventoryDev` entry and no other.
+ * Its `src` still may not: nothing that is deployed imports what deploys it.
+ *
+ * @category rules
+ */
+export const localStackEntry = "InventoryDev"
 
 const Declared = S.optionalKey(S.Record(S.String, S.String))
 /** The part of the root manifest this rule reads: what it declares for every workspace. */
@@ -314,9 +326,17 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
       const forCode = R.keys({ ...workspace.manifest.dependencies, ...workspace.manifest.peerDependencies })
       const forTests = A.appendAll(forCode, R.keys({ ...workspace.manifest.devDependencies }))
       const declared = A.filter(forTests, (dependency) => R.has(byName, dependency))
+      // The stack test's exception (`localStackEntry`): an infra package, declared by an app for its tests only.
+      const isInfra = (other: string): boolean =>
+        R.get(byName, other).pipe(
+          O.map(kindOf),
+          O.exists((other) => other.family === "infra")
+        )
+      const forStackTest = (dependency: string): boolean =>
+        kind.family === "app" && isInfra(dependency) && !A.contains(forCode, dependency)
       const fromManifest = A.appendAll(
         A.flatMap(declared, (dependency) =>
-          may(dependency)
+          may(dependency) || forStackTest(dependency)
             ? A.empty<BoundariesFinding>()
             : A.of(BoundariesFinding.cases.DeclaredAgainstRow.make({ name, dependency }))
         ),
@@ -398,6 +418,9 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
                   }
                   if (!A.contains(declared, imported)) {
                     return A.of(BoundariesFinding.cases.Undeclared.make({ where, imported, name }))
+                  }
+                  if (!code && forStackTest(imported) && specifier === `${imported}/${localStackEntry}`) {
+                    return A.empty<BoundariesFinding>()
                   }
                   if (testOnly(imported)) return testOnlyFinding(imported)
                   return may(imported)

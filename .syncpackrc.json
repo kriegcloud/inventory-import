@@ -27,6 +27,11 @@
       "isIgnored": true
     },
     {
+      "label": "Alchemy's test harness, the one package of the library taken from npm: the library's registry never builds it (its pkg.yml leaves packages/alchemy-test out), so it cannot be kept as files with the rest (goals/alchemy-uptake, step 4). Held at the npm release whose version the kept set carries. To move: after a re-pin, `bun info @alchemy.run/test versions`; write in apps/inventory/package.json the one whose version matches the kept `alchemy` (vendor/alchemy/sources.json), `bun install`, then `bun run check:full`, which runs the stack test",
+      "dependencies": ["@alchemy.run/test"],
+      "isIgnored": true
+    },
+    {
       "label": "A beta pinned as one set to one commit of its library and kept as files (vendor/alchemy). Re-pinned together, never one package at a time from the registry. To move: `bun run alchemy:repin -- main` moves the pin to the head of the library's main (a commit's first seven characters in place of main for that commit): it replaces the files, the overrides and the version each package.json asks for, installs, checks the pin and runs the full check, and commits nothing. `bun run alchemy:check` checks the pin as it is",
       "dependencies": ["alchemy", "@alchemy.run/**", "@distilled.cloud/**"],
       "isIgnored": true

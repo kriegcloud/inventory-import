@@ -37,6 +37,7 @@ import { type Member } from "@inventory/kernel/Member"
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
+import { AddressLimit } from "../../../src/server/AddressLimit.ts"
 import { makeApp, makeRoutes, servicesWith, toServe } from "../../../src/server/App.ts"
 import { BetterAuthTest } from "@beep/better-auth/BetterAuthTest"
 import { Handlers } from "../../../src/server/handlers.ts"
@@ -143,7 +144,8 @@ export const TestApp = makeApp({
   auth: TestAuth({ ...authStart }),
   production: false,
   docs: false,
-  http: noNetwork
+  http: noNetwork,
+  limit: AddressLimit.open
 }).pipe(Layer.provideMerge(DevToolsWhenAsked), Layer.provide(settingsLayer(testSettings)))
 
 /**
@@ -189,13 +191,16 @@ const InMemoryStorage = Layer.mergeAll(
  * The API's routes and middleware on in-memory storage, acting as `member`, with the given model layer: the fast
  * way to test a rule that lives in the HTTP layer (roles, payload validation, cross-site writes, headers).
  */
-export const inMemoryApp = <E, R>({
+export const inMemoryAppLimited = <E, R>({
   ai,
   docs,
   http,
+  limit,
   member,
   settings
 }: {
+  /** The coarse limit's counter (src/server/AddressLimit.ts): a test about the limit supplies its own. */
+  readonly limit: Layer.Layer<AddressLimit>
   readonly member: Member
   readonly ai: Layer.Layer<OpenRouter, E, R>
   /** Mount the API reference page, as a development build does. */
@@ -205,7 +210,7 @@ export const inMemoryApp = <E, R>({
   /** The settings the app reads, as the Worker's `env` would give them. The caller supplies its starting settings. */
   readonly settings: Record<string, string>
 }) =>
-  makeRoutes({ docs, identity: HeaderIdentity }).pipe(
+  makeRoutes({ docs, identity: HeaderIdentity, limit }).pipe(
     Layer.provide(http),
     Layer.provide(InMemoryStorage.pipe(Layer.provide(Layer.mergeAll(InMemoryAccess(member), ai)))),
     Layer.provide(InMemoryAccess(member)),
@@ -216,6 +221,15 @@ export const inMemoryApp = <E, R>({
     Layer.provideMerge(DevToolsWhenAsked),
     Layer.provide(settingsLayer(settings))
   )
+
+/** `inMemoryAppLimited` with no limit: what every test that is not about the coarse limit runs on. */
+export const inMemoryApp = <E, R>(options: {
+  readonly member: Member
+  readonly ai: Layer.Layer<OpenRouter, E, R>
+  readonly docs: boolean
+  readonly http: Layer.Layer<HttpClient.HttpClient>
+  readonly settings: Record<string, string>
+}) => inMemoryAppLimited({ ...options, limit: AddressLimit.open })
 
 /** The handlers and every middleware they declare, on in-memory storage, for `HttpApiTest.groups` (a typed client). */
 export const inMemoryHandlers = <E, R>({
@@ -386,14 +400,19 @@ export const SeededAccounts = D1Test.seed(new URL("../../../seeds/accounts.sql",
 )
 
 /** Starting sign-in app settings for a fixture. */
-export const signInStart = { settings: {}, production: false }
+export const signInStart = { settings: {}, production: false, limit: AddressLimit.open }
 
 /**
  * Sign-in end to end: the app exactly as the Worker builds it (the session identity, Better Auth's routes beside the
  * HttpApi), on a fresh test database with the test accounts, rate limits on, the breach check off unless the settings
  * turn it on, and a development build unless `production` says otherwise.
  */
-export const signInApp = (options: { readonly settings: Record<string, string>; readonly production: boolean }) =>
+export const signInApp = (options: {
+  readonly settings: Record<string, string>
+  readonly production: boolean
+  /** The coarse limit's counter: none in `signInStart`; a test about the limit supplies its own. */
+  readonly limit: Layer.Layer<AddressLimit>
+}) =>
   TestFetch.layer(
     // One layer, so the database, Better Auth and the seeding share one test database.
     Layer.merge(
@@ -403,7 +422,8 @@ export const signInApp = (options: { readonly settings: Record<string, string>; 
         auth: TestAuth({ ...authStart, rateLimit: true, production: options.production }),
         production: options.production,
         docs: false,
-        http: noNetwork
+        http: noNetwork,
+        limit: options.limit
       }),
       SeededAccounts
     ).pipe(Layer.provide(settingsLayer({ ...testSettings, PWNED_PASSWORD_CHECK: "false", ...options.settings })))

@@ -5,7 +5,7 @@ description: What inventory-import becomes as a model-first Turborepo of deep pa
 status: active
 stage: shape
 next: step 8, `@beep/xlsx`; goals ui-packages and contexts are built
-goals: [workspace-and-strictness, beep-csv, kernel-drivers, ui-packages, contexts, ci-speed]
+goals: [workspace-and-strictness, beep-csv, kernel-drivers, ui-packages, contexts, alchemy-uptake, ci-speed]
 ---
 
 # Ideal architecture
@@ -19,6 +19,7 @@ each report lists what it could not verify.
 | [02 Alchemy infrastructure](research/02-alchemy-infra.md) | Alchemy can declare, test and ship the app end to end. Keep D1 with raw SQL. No cluster, Drizzle or R2 yet. |
 | [03 Effect v4 modules](research/03-effect-modules.md) | `Model.Class` for stored rows and `@effect/ai-openrouter` are clear wins. Atoms are possible but costly. GraphQL adds nothing. |
 | [04 beep-effect direction](research/04-beep-direction.md) | Two contexts in the model-first shape, nineteen packages and one app. `@beep/csv` first, `@beep/xlsx` last. |
+| [05 Alchemy, unused](research/05-alchemy-unused.md) | Eight things Alchemy offers that the repository does by hand or not at all, outside the domain library; the Worker as an Effect is the large one, deferred. Read from source, none run. |
 
 The brief for `beep-csv` (step 4) is [BRIEF.md](BRIEF.md); Benjamin said it matches, and the goal is open at
 [goals/beep-csv](../../goals/beep-csv/SPEC.md). Each later goal's brief is its own file, `BRIEF-<goal>.md`; the first
@@ -93,6 +94,9 @@ Each step ends with the full check and an import of the messy sample in a browse
   tests and the checks ([AUDIT](../../goals/ci-speed/AUDIT.md)): a run is about 11 minutes, replays nothing in its
   check job and carries everything on two slots. Nothing built; its decisions answered the same day in three
   rounds, the cache on beep-effect's Worker with the workstation writing ([PLAN](../../goals/ci-speed/PLAN.md)).
+- 2026-11-26: [goals/alchemy-uptake](../../goals/alchemy-uptake/SPEC.md) written from
+  [research 05](research/05-alchemy-unused.md): eight things Alchemy offers that the repository does by hand or not
+  at all. Nothing built; four decisions open, each blocking one step ([PLAN](../../goals/alchemy-uptake/PLAN.md)).
 - 2026-11-19: [goals/infra](../../goals/infra/SPEC.md) built as far as this machine allows: the seeds out of the
   migration, closed sign-up, `@beep/infra` with the stage plan and the two stacks, `deploy.yml`. Nothing deployed;
   the next step is Benjamin's login and `alchemy state bootstrap` ([PLAN](../../goals/infra/PLAN.md)).

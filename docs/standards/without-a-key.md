@@ -7,7 +7,7 @@ status: stable
 ---
 
 - **The app works with no AI key.** Each AI feature has a rules path that does the job alone, and the screen says
-  which path produced a result. Check: run without the key (`CLAUDE.md` "Running without the AI key"); the sample
+  which path produced a result. Check: run without the key (`docs/commands.md` "Running with AI turned off"); the sample
   import still finishes correctly.
 - **Someone without a key still sees the AI path**: one real model run (input and structured output) saved as a
   file and replayed when there is no key, labelled with its date, model id and "recorded, not live". Check: with

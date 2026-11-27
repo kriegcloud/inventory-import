@@ -30,7 +30,7 @@ Check, in this order:
    organization's data as `elena@sample-supply.test`. Both must be refused or empty. Send the server a row the preview
    refused.
 8. **Without the AI key**: every AI feature has a working non-AI path and says so. Run a second copy with no key
-   as `CLAUDE.md` describes ("Running without the AI key"); never read or edit `.dev.vars`.
+   as `docs/commands.md` describes ("Running with AI turned off"); never read or edit `.dev.vars`.
 9. **Claims**: take each claim in the write-up ("Where it stands" in `DECISIONS.md` when there is one, and the
    README) and try to make it false.
 10. **Read the diff** for anything that trusts input without decoding it, a query without `organizationId`, a write

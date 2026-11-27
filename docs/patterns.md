@@ -122,7 +122,7 @@ Model I/O is `effect/ai` with `@effect/ai-openrouter`, behind the `OpenRouter` s
   they could be read. Ask it to explain or pick, never to count. A different size or colour is not a match
   (null). Drop any key it returns that is not in your list.
 - `OPENROUTER_API_KEY` in `.dev.vars` is the OpenRouter key, the one provider. `AI_ENABLED=false` turns AI off with a
-  key set (in development, appended to a backed-up `.dev.vars`: `CLAUDE.md`, "Running with AI turned off"). Pattern 9 for settings.
+  key set (in development, appended to a backed-up `.dev.vars`: `docs/commands.md`, "Running with AI turned off"). Pattern 9 for settings.
 - Tests script the model with `@beep/openrouter/OpenRouterTest`: `off("noKey", model)`, `scripted(replies, { model })`
   (replies or `AiError`s played in order through the real call path, with an attempt count), and `overHttp(settings,
   respond)` (OpenRouter's real client over a scripted transport), as the driver's own `test/OpenRouter.test.ts` does

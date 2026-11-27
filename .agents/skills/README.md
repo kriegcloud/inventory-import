@@ -19,7 +19,7 @@ layout. The paths they name that are not here, and what stands in (checked 2026-
 
 | Named in the skill | Here |
 | --- | --- |
-| `standards/effect-first-development.md` (`effect-first-development`, `schema-first-development`, `crispen`) | `CLAUDE.md` "Effect (version 4)" and `docs/standards/effect-imports.md` |
+| `standards/effect-first-development.md` (`effect-first-development`, `schema-first-development`, `crispen`) | `docs/building.md` "Effect (version 4)" and `docs/standards/effect-imports.md` |
 | `standards/schema-first.inventory.jsonc`, an inventory of accepted exceptions | none on purpose: `defaults-baseline.json`, whose numbers only fall, and the law's `exemptions` (`packages/tooling/tool/cli/src/commands/Laws/Defaults.rules.ts`), each Benjamin's decision |
 | `packages/tooling/tool/cli/src/commands/Lint/SchemaFirst.ts`, the schema-first lint | `bun run beep laws defaults` (`defaults:check` in `bun run check`), with `docs/standards/schema-first.md` (SF-1 to SF-9) for the standard |
 | `standards/architecture/DECISIONS.md` | `explorations/ideal-architecture/DECISIONS.md` for architecture, `DECISIONS.md` at the root for product |

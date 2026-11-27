@@ -10,7 +10,7 @@ Moved here from `CLAUDE.md` word for word on 2026-11-26 (goals/focus-and-frictio
 
 Each law's command and what it refuses are in [Commands](commands.md), the row for `bun run check`.
 
-### What the type-check enforces
+## What the type-check enforces
 
 One profile for the whole repository: the root `tsconfig.base.json`, beep-effect's compiler flags and Effect
 language-service severities copied verbatim (the source commit is in its header comment). Every Effect diagnostic is

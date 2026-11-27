@@ -10,15 +10,15 @@ Your brief is three lines: Build (what, for whom, the one rule that must not bre
 contract, and `DECISIONS.md` "What the data does" for row rules) and Done, and Decided and Open (the decisions the
 person made, and the ones not decided: build nothing for those, not even a default that holds rows back; if the work
 cannot go on without one, stop there and say so in your hand-back; never decide one yourself). The rules live in
-`CLAUDE.md` ("Rules for an import", "Adding a feature: follow the Records example", "Effect (version 4)", "What
-the type-check enforces", "Tests", "Platform: Cloudflare Workers and D1", "Identity and permissions") and
-`docs/standards/`. Read those sections once before your first edit; a brief does not repeat them. This file is the
-short list of what goes wrong most.
+`CLAUDE.md` ("Rules for an import"), `docs/building.md` ("Adding a feature: follow the Items example", "Effect
+(version 4)", "Tests", "Platform: Cloudflare Workers and D1", "Identity and permissions"), `docs/laws.md` ("What
+the type-check enforces") and `docs/standards/`. Read those sections once before your first edit; a brief does not
+repeat them. This file is the short list of what goes wrong most.
 
 ## Order
 
 Schema in `src/domain`, then the contract in `src/api`, then the service and handler in `src/server`, then the test.
-Copy the shape of the Records example (`src/domain/Item.ts`, `ItemQuery.ts`, `src/server/Items.ts`, a
+Copy the shape of the Items example (`src/domain/Item.ts`, `ItemQuery.ts`, `src/server/Items.ts`, a
 `D1.statement` from `@beep/d1/D1` for every write). Do not start from a handler. When the Schemas and the contract are already
 committed, start from them and change them only if the brief says so: the screens are being built against them.
 

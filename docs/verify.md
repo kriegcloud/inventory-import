@@ -405,7 +405,7 @@ it, named as ours"): "no hand-written assertions" means no hand-written list of 
 
 ## Before changing the model
 
-`CLAUDE.md`, "The model's blocks: what Verify reads", has the rules the code is written to: that a block is built with `.make`,
+`docs/building.md`, "The model's blocks: what Verify reads", has the rules the code is written to: that a block is built with `.make`,
 how a case is told and a state built so that the prover reads them, why a rule is one comparison, why the rules about
 who may change a row or a group are stated on each decision, and the 4,096 paths past which nothing is proved. The
 library itself is pinned to one commit and kept as files (`vendor/alchemy/`), with the repository's patches to it

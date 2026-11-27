@@ -1,4 +1,4 @@
-// SIGN-IN. Better Auth through @beep/better-auth, with this app's options (internal/authOptions.ts) and settings (Config.ts),
+// SIGN-IN. Better Auth through @beep/better-auth, with this app's options (internal/authOptions.ts) and settings (Auth.config.ts),
 // and its routes at /api/auth/* beside the HttpApi (never versioned: it is Better Auth's contract, and its browser
 // client's base path). Handlers never call it: they read `CurrentActor`, which SessionIdentity.adapter.ts resolves from the
 // session it looks up. A write another site asked the browser to send is refused here first, by the same rule as the
@@ -18,7 +18,7 @@ import * as HttpServerResponse from "effect/http/HttpServerResponse"
 import { CrossSiteRequest } from "@inventory/kernel/AccessError"
 import { mayCreateAccount } from "@inventory/access-model/SignUp"
 import { passwordToVerify } from "@inventory/access-model/StagePassword"
-import { authSettings } from "./Config.ts"
+import { authSettings } from "./Auth.config.ts"
 import * as R from "effect/Record"
 import { authOptions } from "./internal/authOptions.ts"
 import { testAccountPassword } from "./internal/TestAccounts.ts"

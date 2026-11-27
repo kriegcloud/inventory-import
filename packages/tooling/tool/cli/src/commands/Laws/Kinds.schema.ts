@@ -5,8 +5,7 @@
  * decisions 3 and 4).
  *
  * One record by ending. `laws block-files` reads every ending and layer from it. An ending that says what another
- * kind says is listed under `renamed` until its files have moved, and a file whose ending waits on a later step of
- * the goal is listed under `waiting`, by its path, with the step that clears it. The packages outside a context
+ * kind says is listed under `renamed`, so the refusal names the ending to write. The packages outside a context
  * (the kernel, the drivers, the client, the app) have no row: they have not been counted.
  *
  * @packageDocumentation
@@ -188,6 +187,13 @@ export const kinds: Readonly<Record<string, Kind>> = {
     holds: ["decision"],
     beside: itsCommands
   }),
+  // A handler's own default. Never a `.context.ts`: the model's proofs read every one of those, and a default
+  // imports the rule it defaults to (Benjamin, 2026-11-26 and 2026-11-27).
+  reference: Kind.make({
+    declares: "one Context.Reference and its default",
+    heldBy: ["model"],
+    importedBy: everyone
+  }),
   context: Kind.make({
     declares: "one Domain.RequestContext",
     heldBy: ["model"],
@@ -268,20 +274,6 @@ export const kinds: Readonly<Record<string, Kind>> = {
 export const renamed: Readonly<Record<string, string>> = { store: "port", gateway: "port" }
 
 /**
- * Files the registry does not ask yet, by path from the root, each with the step of goals/module-kinds that gives it
- * an ending the registry knows. A step that clears one takes its line out.
- *
- * @category constants
- */
-export const waiting: Readonly<Record<string, string>> = {
-  "packages/catalog/host/src/Host.ts": "step 7: renamed Catalog.host.ts (decision 10a)",
-  "packages/access/host/src/Host.ts": "step 7: renamed Access.host.ts (decision 10a)",
-  "packages/access/host/src/Adapters.ts": "step 7: folded into the host file (decision 6)",
-  "packages/access/host/src/Config.ts": "step 7: renamed Auth.config.ts (decision 6)",
-  "packages/catalog/model/src/Review/ItemsOfRow.reference.ts": "step 7: renamed ItemsOfRow.context.ts (decision 7)"
-}
-
-/**
  * What the registry says of one file a layer holds.
  *
  * @category schemas
@@ -316,13 +308,12 @@ export const endingOf = (file: string): O.Option<string> =>
   O.flatMap(Str.match(/\.([a-z-]+)\.(m|c)?tsx?$/)(A.lastNonEmpty(Str.split("/")(file))), (found) => A.get(found, 1))
 
 /**
- * What the registry says of a file a layer holds. A file under `internal/` is its package's own and is not asked, and
- * neither is one listed under `waiting`.
+ * What the registry says of a file a layer holds. A file under `internal/` is its package's own and is not asked.
  *
  * @category rules
  */
 export const place = ({ file, layer }: { readonly file: string; readonly layer: Layer }): Placement =>
-  Str.includes("/internal/")(file) || R.has(waiting, file)
+  Str.includes("/internal/")(file)
     ? Placement.cases.Held.make({})
     : O.match(endingOf(file), {
         onNone: () => Placement.cases.NoEnding.make({}),

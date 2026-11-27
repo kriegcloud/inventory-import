@@ -8,7 +8,7 @@
   "sideEffects": [],
   "exports": {
     "./package.json": "./package.json",
-    "./Host": "./src/Host.ts",
+    "./Host": "./src/Catalog.host.ts",
     "./Http": "./src/Catalog.http.ts",
     "./ImportStoreD1": "./src/ImportStore.adapter.ts",
     "./ItemStoreD1": "./src/ItemStore.adapter.ts",

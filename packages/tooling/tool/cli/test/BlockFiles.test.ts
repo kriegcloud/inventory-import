@@ -621,6 +621,7 @@ describe("laws block-files", () => {
         "packages/shop/model/src/Basket/Basket.transition.ts": "export const opens = 1\n",
         "packages/shop/model/src/Basket/BasketEvent.union.ts": "export const BasketEvent = 1\n",
         "packages/shop/model/src/Buyer/Email.sealed.ts": "export const Email = 1\n",
+        "packages/shop/model/src/Basket/LinesOf.reference.ts": "export const LinesOf = 1\n",
         "packages/shop/host/package.json": json({ name: "@x/shop-host", beep: { layer: "host" } }),
         "packages/shop/host/src/Shop.host.ts": "export const live = 1\n",
         "packages/shop/host/src/Nightly.cron.ts": "export const nightly = 1\n",

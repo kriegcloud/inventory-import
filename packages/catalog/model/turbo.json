@@ -24,7 +24,7 @@
     // replayed until one of them changes, or the limits and retries its vitest config takes from the root: an edit to
     // a handler, a store or a rule (`.rules.ts`) of this package does not run the proofs again. That holds because no
     // file with one of those endings imports a rule: a handler's own default is a `.reference.ts`
-    // (`Review/ItemsOfRow.reference.ts`), never a `.context.ts` (Benjamin, 2026-11-26).
+    // (`Review/ItemsOfRow.reference.ts`), never a `.context.ts` (Benjamin, 2026-11-26, and again on 2026-11-27).
     "prove": {
       "dependsOn": ["//#patches:installed", "@inventory/kernel#transit"],
       "inputs": [

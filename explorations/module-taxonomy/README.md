@@ -377,3 +377,5 @@ rest of 6, and 7, are open.
   (decision 7); a model's merged Live sits in `<Model>.model.ts` (decision 13). No decision is open.
 - 2026-11-27: he chose to graduate. The goal is [module-kinds](../../goals/module-kinds/SPEC.md), seeded from the
   brief; its first slice is the registry, `block-files` reading it and the nine ports.
+- 2026-11-27: the goal's step 7 met his ruling of 2026-11-26 that `ItemsOfRow` is never a `.context.ts`. He kept
+  `.reference.ts` as a kind; decision 7 is corrected and no file is renamed for it.

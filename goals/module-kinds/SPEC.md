@@ -67,8 +67,8 @@ code does what it did before.
       (`git diff --stat main -- packages/catalog/model/test/Catalog.lock.json` prints nothing).
 - [ ] The model's mutants that name a moved line are written again and each is still caught
       (`bun run check:full`).
-- [ ] `packages/access/host/src` has `Auth.config.ts` and no `Config.ts` or `Adapters.ts`, and
-      `packages/catalog/model/src/Review/ItemsOfRow.context.ts` replaces the `.reference.ts` file.
+- [ ] `packages/access/host/src` has `Access.host.ts` and `Auth.config.ts` and no `Host.ts`, `Config.ts` or
+      `Adapters.ts`, `packages/catalog/host/src` has `Catalog.host.ts`, and the registry names no file by its path.
 - [ ] The messy sample imported through Confirm on a fresh database stores 155 items, seen on screen after step 9.
 - [ ] `bun run check`, `bun run check:full` and `bun run docs:check` pass after each step.
 

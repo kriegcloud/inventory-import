@@ -1,7 +1,9 @@
 /** Reads turbo's record and logs after a run. A failed task always has something to read, even with an unfamiliar log. */
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Num from "effect/Number"
 import * as O from "effect/Option"
+import * as Order from "effect/Order"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo, type Entry } from "../../Repo.service.ts"
@@ -23,11 +25,20 @@ const clean = (text: string) =>
   Str.trim(Str.replace(/^[@\w/-]+:[a-z][\w:-]*: /i, "")(Str.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "")(text)))
 // The runner's echo of the command (`$ bun ...`) and its closing `error: script "x" exited` say nothing to fix.
 const noise = (text: string) => /^\$ |^error: script "/.test(text)
+// A runner's own verdict on what failed: Vitest's `FAIL` and `×`, an assertion, a TypeScript error, a falsified
+// property. These lead, so a slow suite's logged warnings, printed first, never push the failure out of the ten.
+const verdict = (text: string) =>
+  /^(?:FAIL\b|×|✗|✘)|\bAssertionError\b|\berror TS\d+|\bProperty falsified\b|^Error: /.test(text)
+// A logger's warning, Vitest's `stdout |` and `stderr |` headings and a passing test's `✓` name a file and line but
+// report no failure.
+const quiet = (text: string) => /\bWARN\b|\bwarn(?:ing)?:|^(?:stdout|stderr) \| |^[✓√]/i.test(text)
+const rank = Order.mapInput(Num.Order, (text: string) => (verdict(text) ? 0 : quiet(text) ? 2 : 1))
 const diagnostic = (text: string) =>
   !noise(text) &&
-  (/error|FAIL|AssertionError|❯|\bholds\b|\bWrite:|\bPut\b|\bUse\b|\bexpected\b|\brefus|\bhelp:|\bhint:|\bConsider\b|\bFormat issues\b|\bRun without\b/i.test(
-    text
-  ) ||
+  (verdict(text) ||
+    /error|FAIL|AssertionError|❯|\bholds\b|\bWrite:|\bPut\b|\bUse\b|\bexpected\b|\brefus|\bhelp:|\bhint:|\bConsider\b|\bFormat issues\b|\bRun without\b/i.test(
+      text
+    ) ||
     /\.(?:tsx?|jsx?|mjs|cjs|py|jsonc?|mdx?|css|s[ac]ss|ya?ml|toml|sql|sh|html|graphql|ttl)(?::\d+|\(\d+|\s|$)/.test(
       text
     ))
@@ -63,7 +74,9 @@ export const checkSummary = Effect.fn("Check.summary")(function* (run?: string) 
         onSome: () => repo.text(repo.join(repo.root, log)).pipe(Effect.orElseSucceed(() => "Log could not be read"))
       })
       const all = A.filter(A.map(Str.split(/\r?\n/)(text), clean), (line) => line !== "" && !noise(line))
-      const matches = A.filter(all, diagnostic)
+      // Vitest prints a failure twice (where it happened and again at the end), so a line is kept once. Sorting is
+      // stable: within a rank, the log's order stands.
+      const matches = A.sort(A.dedupe(A.filter(all, diagnostic)), rank)
       const selectedLines = matches.length === 0 ? A.takeRight(all, 8) : A.take(matches, 10)
       const lines = A.map(selectedLines.length === 0 ? ["Log is empty"] : selectedLines, (text) => {
         const location =

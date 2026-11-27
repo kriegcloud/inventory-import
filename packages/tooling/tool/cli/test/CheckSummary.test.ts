@@ -133,6 +133,49 @@ describe("check summary", () => {
     )
   )
 
+  it.effect("puts the failing test before logged warnings, and a failure printed twice once", () =>
+    inTree(
+      {
+        ".turbo/runs/001.json": record([task("test:slow", 1, "apps/inventory")], 1, 1),
+        ".turbo/test:slow.log": A.join(
+          [
+            ...A.flatMap(
+              A.makeBy(6, (n) => n),
+              (n) => [
+                `stderr | test/server/Auth.slow.test.ts:${n + 10} > sign-in > case ${n}`,
+                `2026-11-27T05:14:44.520Z WARN [Better Auth]: Base URL is not set. Set the baseURL option, or use a dynamic baseURL (${n})`
+              ]
+            ),
+            " ✓  slow  test/server/QueryPlans.slow.test.ts (1 test) 1065ms",
+            " × a replace keeps a copy 22662ms",
+            " FAIL  slow  test/server/ItemChecks.slow.test.ts:90 > a replace keeps a copy",
+            "Error: Property falsified after 38 run(s) and 0 shrink(s)",
+            "Failure: AssertionError: expected false to be true",
+            " ❯ test/server/ItemChecks.slow.test.ts:103:42",
+            " FAIL  slow  test/server/ItemChecks.slow.test.ts:90 > a replace keeps a copy",
+            "Error: Property falsified after 38 run(s) and 0 shrink(s)"
+          ],
+          "\n"
+        )
+      },
+      Effect.gen(function* () {
+        const findings = yield* checkSummary()
+        const failure = A.findFirst(findings, CheckFinding.guards.TaskFailed)
+        const failurePresent = O.isSome(failure)
+        assert(failurePresent)
+        expect(A.map(A.take(failure.value.lines, 5), (line) => line.text)).toEqual([
+          "× a replace keeps a copy 22662ms",
+          "FAIL  slow  test/server/ItemChecks.slow.test.ts:90 > a replace keeps a copy",
+          "Error: Property falsified after 38 run(s) and 0 shrink(s)",
+          "Failure: AssertionError: expected false to be true",
+          "❯ test/server/ItemChecks.slow.test.ts:103:42"
+        ])
+        expect(failure.value.shown).toBe(18)
+        expect(A.every(A.drop(failure.value.lines, 5), (line) => /stderr \||WARN|✓/.test(line.text))).toBe(true)
+      })
+    )
+  )
+
   it.effect("reports NoRun when no record exists", () =>
     inTree(
       {},

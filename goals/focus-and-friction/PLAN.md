@@ -12,18 +12,18 @@ pull request is merged, or, for a step with none, when its record below is writt
 
 | # | Step | Pull request | Status |
 | --- | --- | --- | --- |
-| 1 | This packet | | doing |
+| 1 | This packet | 28 | done: 2026-11-26 |
 | 2 | Benjamin's ruling on what waits for the person's session | none: a decision | done: 2026-11-26 (below) |
 | 3 | The person's session: prepared, run by Benjamin, written down | one for the record | doing: prepared |
-| 4 | `CLAUDE.md` as an index: which goal owns it, to what length, then the move | one | doing |
+| 4 | `CLAUDE.md` as an index: which goal owns it, to what length, then the move | 39 | done: 2026-11-26 |
 | 5 | Measure `bun run check`: how long, and what a failure prints | the record below | done: 2026-11-26 |
 | 6 | One summary at the end of a failing check | 35 | done: 2026-11-26 |
 | 7 | `bun run check:changed` | 40 | done: 2026-11-26 |
 | 8 | A merge that finishes on its own | none, or one for the rule in `CLAUDE.md` | todo |
-| 9 | The worktrees and the main checkout | one for `CLAUDE.md` | done: #36, 2026-11-26 |
+| 9 | The worktrees and the main checkout | 36 | done: 2026-11-26 |
 | 10 | Close: the closing note, `status: done`, `bun run check:full` on main | one | todo |
 
-Every question was answered on 2026-11-26 ("Decided", below). Step 5 is done. Steps 4, 6, 7 and 9 can start. Step 8 waits on Benjamin's change to the settings, and step 3 on a person he brings.
+Every question was answered on 2026-11-26 ("Decided", below). Steps 1, 2 and 4 to 7 and 9 are done. Step 3 is prepared and waits on a person Benjamin brings; step 8 waits on his change to the repository's settings (`allow_auto_merge` and `delete_branch_on_merge` were both `false` at 03:55 UTC on 2026-11-27); step 10 waits on both.
 
 ## 2. What waits
 

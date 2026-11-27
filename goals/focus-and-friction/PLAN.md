@@ -59,7 +59,7 @@ quality's place), and the layout to `docs/architecture.md`, which exists. What s
 import's rules, the UI's rules in short, and one line for each moved section with its link. The pull request lists
 every moved rule and where it now is.
 
-**Done, 2026-11-26.** `CLAUDE.md` went from 800 lines to 165 (the limit is 200). It keeps the header, "What this is",
+**Done, 2026-11-26.** `CLAUDE.md` went from 800 lines to 166 (the limit is 200). It keeps the header, "What this is",
 "How we work", "Rules for an import", a short "UI, in short", and "Where the rest is", a table that names each moved
 section and its file. Every moved section kept its heading, so a pointer elsewhere that reads `CLAUDE.md`, "Commands"
 finds the section through that table. No pointer had to change, except the two that said `CLAUDE.md` holds the skills

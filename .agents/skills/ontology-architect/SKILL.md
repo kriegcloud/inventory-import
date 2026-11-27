@@ -24,19 +24,19 @@ write scratch copies.
 ## In this repository
 
 Read `../_shared/project-profile.md` first; where it and this file disagree, it wins. Every term fact has one
-hand-written home, `packages/kernel/src/Terms.vocab.ts` (7 classes, 9 properties, 2 schemes, 4 concepts), with helpers
+hand-written home, `packages/kernel/src/Terms.vocab.ts` (17 classes, 62 properties, 9 schemes, 28 concepts), with helpers
 in `Terms.pointer.ts`. The projector in `packages/ontology` writes the Turtle (`bun run ontology:write`; decisions 2 and 5).
 This skill still writes no OWL file: a change is a proposed edit of the module, for Benjamin, then regeneration. Any
-term beyond the thread's 22, an alignment row and the party slice are not built.
+term beyond the module's, an alignment row and the slices after the party slice are not built.
 
 | Upstream step or output | Here |
 | --- | --- |
 | Step 1 profile, Step 7 reasoner | The projector writes the Turtle. The reasoner is ROBOT v1.9.11 with HermiT under Java 17 (decisions 25, 112 to 114): task `reason` in `bun run check:full` and the CI job `reason`. Report it only when that task ran |
 | Step 2 header | Written by the projector from the module: `example.org` namespace, the version from the module, no clock date, no ORCID |
-| Step 3 ROBOT template, Step 4 KGCL, Step 5 OWLAPY or rdflib | One entry per term in the module: IRI, label (`skos:prefLabel`) and definition (`skos:definition`) (decision 11), parent, disjointness, kind or role tag (until its values are decided, the ratified `candidate_category` of the auditor's identity card; a property carries none), scheme. Alignment rows are not built |
-| A required field, datatype, pattern or allowed value | A proposed change to the record schema (Effect Schema) in the context's contract package; for a term with no record yet (a party), which context owns it is Benjamin's question |
+| Step 3 ROBOT template, Step 4 KGCL, Step 5 OWLAPY or rdflib | One entry per term in the module: IRI, label (`skos:prefLabel`) and definition (`skos:definition`) (decision 11), parent, disjointness, kind or role tag (one of decision 18's nine values, on classes only; a property carries none), scheme. Alignment rows are not built |
+| A required field, datatype, pattern or allowed value | A proposed change to the record schema (Effect Schema) in the context's contract package; for a term with no record yet (a party), the party context owns it once its first record is built (decision 37) |
 | Step 6 LinkML, ODK | Do not apply |
-| Step 7 reason, report, SHACL; the handoff checklist | The projector, the generated Turtle, CQ-P06 and CQ-P11 and the reasoner step are built. SHACL over the stored rows is not built: say "not built", never "passed". Report a built gate only when its command ran |
+| Step 7 reason, report, SHACL; the handoff checklist | The projector, the generated Turtle, CQ-P06, CQ-P11 and the party questions, and the reasoner step are built. SHACL over the stored rows is not built: say "not built", never "passed". Report a built gate only when its command ran |
 | Outputs and handoff files | A section of `explorations/erp-ontology/research/NN-title.md` (frontmatter `type`, `title`, `description`; then `bun run docs:check`), data in `assets/`; never `docs/` or `ontologies/{name}/` |
 
 Top classes go only under the gist projection (`../_shared/gist-categories.md`); an IOF, ISA-95, schema.org, W3C ORG,
@@ -274,7 +274,7 @@ The LinkML file is then the source: regenerate the generated files rather than e
 axioms in a separate file that imports the generated OWL.
 
 ### Step 7: Verify (after structural changes)
-> Here: the projector, the generated Turtle, CQ-P06 and CQ-P11 and the reasoner step are built. SHACL over the stored rows of the messy sample is not built, so report that gate as "not built". Report a built gate only when its command ran. ROBOT is not on the PATH. The reasoner script fetches the jar; a skill does not download it.
+> Here: the projector, the generated Turtle, CQ-P06, CQ-P11 and the party questions, and the reasoner step are built. SHACL over the stored rows of the messy sample is not built, so report that gate as "not built". Report a built gate only when its command ran. ROBOT is not on the PATH. The reasoner script fetches the jar; a skill does not download it.
 
 Reasoning strategy depends on context:
 

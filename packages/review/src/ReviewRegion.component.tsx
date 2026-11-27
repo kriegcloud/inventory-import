@@ -1,3 +1,4 @@
+import { ReviewText } from "./internal/ReviewText.rules.ts"
 import * as S from "effect/Schema"
 import { facetColumn } from "./internal/facetColumn.ts"
 import { platform, byId } from "./internal/browser.ts"
@@ -401,7 +402,7 @@ function RegionBody(props: WithTable & { readonly regionTable: RegionTable }) {
     A.findFirst(work, (item) => O.contains(activeKind, item.kind.id)),
     (item) => item.kind.label
   )
-  const statusCaption = `${props.title}: ${(filter === "auto" ? words.auto : words[filter]).toLowerCase()}`
+  const statusCaption = `${props.title}: ${ReviewText.word(filter === "auto" ? words.auto : words[filter])}`
   const countCaption = `${whole.format(ordered.length)} ${ordered.length === 1 ? props.noun[0] : noun}`
   const caption = O.match(activeLabel, {
     onNone: () => `${statusCaption}, ${countCaption}`,
@@ -464,7 +465,7 @@ function RegionBody(props: WithTable & { readonly regionTable: RegionTable }) {
         label={O.match(lastStep, { onNone: () => "Undo", onSome: (step) => `Undo: ${step.label}` })}
         tip={O.match(lastStep, {
           onNone: () => "Nothing to undo",
-          onSome: (step) => `Undo: ${step.label.toLowerCase()} (${undoKeys})`
+          onSome: (step) => `Undo: ${ReviewText.word(step.label)} (${undoKeys})`
         })}
         narrow={narrow}
         disabled={O.isNone(lastStep)}
@@ -476,7 +477,7 @@ function RegionBody(props: WithTable & { readonly regionTable: RegionTable }) {
         label={O.match(nextRedo, { onNone: () => "Redo", onSome: (step) => `Redo: ${step.label}` })}
         tip={O.match(nextRedo, {
           onNone: () => "Nothing to redo",
-          onSome: (step) => `Redo: ${step.label.toLowerCase()} (${redoKeys})`
+          onSome: (step) => `Redo: ${ReviewText.word(step.label)} (${redoKeys})`
         })}
         narrow={narrow}
         disabled={O.isNone(nextRedo)}

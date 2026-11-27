@@ -27,7 +27,9 @@ Read `../_shared/project-profile.md` first; it wins over everything below.
 The thin thread is built. Its questions are CQ-P06 and CQ-P11
 (`packages/ontology/test/Questions.test.ts`, queries in `packages/ontology/fixtures/cq/`), answered over a
 hand-written two-organization fixture and the lift of two member rows, not over the stored rows of the messy sample.
-The vocabulary module is `packages/kernel/src/Terms.vocab.ts`. A new question, and the party slice, are not built:
+The party slice is built too: CQ-P01 to CQ-P05, CQ-P07 and CQ-P09's party half run in the same file, their queries
+and `test_` fixtures in `explorations/erp-ontology/assets/requirements/cq/` (decision 148).
+The vocabulary module is `packages/kernel/src/Terms.vocab.ts`. A new question is not built:
 draft them here, from what the app's records, screens and import rules (`CLAUDE.md`, "Rules
 for an import") and the Sutton mapping must answer. The scope and the CQ file always
 go to `explorations/erp-ontology/assets/requirements/scope.md` (OKF frontmatter) and
@@ -39,10 +41,10 @@ report summarises them. Run `bun run docs:check` after adding a `.md`.
 | Step 1 `scope.md` | `assets/requirements/scope.md`; `Upper ontology: gist (projection)`, decision 4 |
 | Step 1.5 use cases | From the app's screens and import rules; `assets/use-cases.yaml` |
 | Steps 2 to 5 CQs | `assets/requirements/competency-questions.yaml`; queries use `inv:` from `namespaces.json` (example only), never the bare `:` example; labels are `skos:prefLabel` (decision 11) |
-| Step 5 `sample_answer` | Rows of the messy sample as stored (155 items) for an item term. A term no stored row instantiates (a party: vendors are only names in `item.vendors`) uses named `test_` fixtures, said in the CQ entry; what data proves the party model is Benjamin's |
+| Step 5 `sample_answer` | Rows of the messy sample as stored (155 items) for an item term. A term no stored row instantiates (a party: vendors are only names in `item.vendors`) uses named `test_` fixtures in the packet, said in the CQ entry (decision 36) |
 | Closed-world CQs | A CQ that reads a missing flag or a `NOT EXISTS` as false records its closure assumption (for example "flags are always stated true or false by the record schema") and puts it to Benjamin |
 | Step 6 pre-glossary | `assets/pre-glossary.csv`; candidates only, never a term fact |
-| Step 7 test suite | CQ-P06 and CQ-P11 are built and run in `Questions.test.ts`. A new question is drafted only (query, fixture, must-fail case) and is "not built" until it is a test. Do not say the thread's tests ran unless that file ran. They do not run over the messy sample's stored rows |
+| Step 7 test suite | CQ-P06, CQ-P11 and the party questions are built and run in `Questions.test.ts`. A new question is drafted only (query, fixture, must-fail case) and is "not built" until it is a test. Do not say the thread's tests ran unless that file ran. They do not run over the messy sample's stored rows |
 | Step 8 traceability | `assets/traceability-matrix.csv`; the term column names candidates or vocabulary-module keys |
 | Parse check | Runs today on a drafted query (command below) |
 | ROBOT commands | Do not apply here. ROBOT is not on the PATH. The reasoner script fetches its jar for task `reason` only. Do not download it unasked |
@@ -209,7 +211,7 @@ Output as `ontologies/{name}/docs/pre-glossary.csv` with columns:
 
 ### Step 7: Test Suite Generation
 
-> Here: CQ-P06 and CQ-P11 run in `packages/ontology/test/Questions.test.ts` (Oxigraph) over the generated graph. Draft a new question's query, fixture and must-fail case in the packet, and report that question as "not built" until it is a test. Do not report it as run. The thread's questions do not run over the stored rows of the messy sample.
+> Here: CQ-P06, CQ-P11 and the party questions run in `packages/ontology/test/Questions.test.ts` (Oxigraph) over the generated graph and their fixtures. Draft a new question's query, fixture and must-fail case in the packet, and report that question as "not built" until it is a test. Do not report it as run. The thread's questions do not run over the stored rows of the messy sample.
 
 For each formalized CQ:
 - Generate a `.sparql` file in `ontologies/{name}/tests/`
@@ -271,7 +273,7 @@ Rules:
 
 ### Writing SPARQL test files
 
-> Here: write a new query under `explorations/erp-ontology/assets/cq/`, with the `inv:` prefix from `namespaces.json`. The base is `https://example.org/inventory-import/ontology/` (decision 10), an `example.org` placeholder (decision 7); never a real domain. The thread's queries are in `packages/ontology/fixtures/cq/`.
+> Here: write a new query under `explorations/erp-ontology/assets/requirements/cq/` (decision 148), with the `inv:` prefix from `namespaces.json`. The base is `https://example.org/inventory-import/ontology/` (decision 10), an `example.org` placeholder (decision 7); never a real domain. The thread's queries are in `packages/ontology/fixtures/cq/`.
 
 ```bash
 # Write individual test queries
@@ -306,7 +308,7 @@ print("Valid")
 
 ### Running a CQ test against its fixture
 
-> Here: CQ-P06 and CQ-P11 load the generated graph in `packages/ontology/test/Questions.test.ts` (Oxigraph). This rdflib command is for a drafted query. Do not report it as the suite. Over the stored rows of the messy sample: not built.
+> Here: CQ-P06, CQ-P11 and the party questions load the generated OWL file and their fixtures in `packages/ontology/test/Questions.test.ts` (Oxigraph). This rdflib command is for a drafted query. Do not report it as the suite. Over the stored rows of the messy sample: not built.
 
 Arguments: the query, the expected result (a CSV with a header row for
 SELECT, `true` or `false` for ASK), then the graphs to load. Exit code 0 is
@@ -377,7 +379,7 @@ This skill produces:
 
 **Handoff checklist**:
 - [ ] All Must-Have CQs have formalized SPARQL queries
-> Here: each item is passed, failed or not built; a not-built gate is never ticked. A new draft reads "drafted; run: not built". CQ-P06 and CQ-P11 count as run only when `packages/ontology/test/Questions.test.ts` ran.
+> Here: each item is passed, failed or not built; a not-built gate is never ticked. A new draft reads "drafted; run: not built". CQ-P06, CQ-P11 and the party questions count as run only when `packages/ontology/test/Questions.test.ts` ran.
 
 - [ ] Every CQ test has a fixture, an expected result and a must-fail case, and was run
 - [ ] Pre-glossary covers all terms mentioned in CQs

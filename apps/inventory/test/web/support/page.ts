@@ -1,3 +1,4 @@
+import { StorageTwin } from "@inventory/ui/StorageTwin"
 // A browser's page for the app's own atoms, in Node: the window, its storage and its locks, and a server that answers
 // who is signed in when the test says. Opened before anything of the app's is imported: the session is asked for as the
 // app starts.
@@ -20,7 +21,7 @@ interface Page {
 }
 
 const storage = (of: Record<string, string>) => ({
-  getItem: (key: string) => of[key] ?? null,
+  getItem: (key: string) => StorageTwin.getItem(of, key),
   setItem: (key: string, value: string) => {
     of[key] = value
   },

@@ -116,7 +116,16 @@ table and the stored rows agree.
 - **Product decisions are Benjamin's.** What a rule means, which outcome a kind of row gets, who may do what, a
   threshold, how an ambiguous value is read, what a second load does to a changed record: each is his, not a default,
   even one that only holds rows back.
-- **Never** commit a secret, push or deploy unless Benjamin asks in that message.
+- **Finished work becomes a pull request, without being asked** (Benjamin, 2026-11-26). Work is done on a branch,
+  never on `main`. When it is done and `bun run check` passes, push the branch (`git push -u origin <branch>`) and
+  open a pull request into `main` with `gh pr create`: a title in the commit style, and a body that says what
+  changed, what was checked and what was not. A branch that already has a pull request is pushed again, not given a
+  second one. A branch built on another unmerged branch says so in its body. Say the pull request's address in the
+  hand-back. Opening one starts CI and, by the deploy workflow, the pull request's preview (`docs/releasing.md`):
+  that is the workflow's deploy, not the agent's. A sub-agent given a lane of a split commits and hands back; the
+  agent that owns the branch pushes and opens the pull request.
+- **Never** commit a secret. Never push to `main` or a `release/*` branch, force-push, push a tag, merge a pull
+  request or deploy unless Benjamin asks in that message.
 
 ## Skills
 
@@ -337,7 +346,7 @@ packages/ontology/       @inventory/ontology: what is made from the vocabulary a
                         writer (generated/ holds the OWL and SKOS Turtle, never edited by hand: `bun run
                         ontology:write`), the lift of a record to triples, the competency questions and their fixtures,
                         and seven of the vocabulary's nine gates as tests, the last a reasoner (`scripts/reason.ts`,
-                        pinned in `robot.lock.json`); the other two are the type-check and the `ontology-terms` law. Nothing imports it. Its goal is goals/erp-vocabulary.
+                        pinned in `robot.lock.json`); the other two are the type-check and the `ontology-terms` law. Nothing imports it. Its goals are goals/erp-vocabulary and goals/party-slice.
 packages/infra/          @beep/infra: what is deployed, per stage. The stage plan as a schema and a pure function
                         (`StagePlan.rules.ts`: what each stage gets, decided from its name), the app's Alchemy stack
                         (`Inventory.stack.ts`: one D1 database, one Worker) and the repository's (`GitHub.stack.ts`:
@@ -530,7 +539,8 @@ profile, its copied tests included, with no override.
   `O.getOrUndefined` or `O.getOrNull`, no `.trim()`, `Str.trim`, `toLowerCase` or `toUpperCase` outside a schema, and
   in a `.ts` file no default on a parameter or a destructured name (`(n = 0) =>`). Two things stay on purpose
   (Benjamin, 2026-11-23). A React component's optional prop stays `?:` and takes its default in the destructuring
-  (`{ size = "sm" }`), never with `??` in the body; `Option` is for data that came through a schema. And a cell of a
+  (`{ size = "sm" }`), never with `??` in the body. A strict `=== undefined` or `!== undefined`
+  comparison on that component's own props in `.tsx` may distinguish omission from explicit null; `Option` is for data that came through a schema. And a cell of a
   file the person reviews keeps its reader: its trim or change of case is a proposal shown as before and after, so
   code that reads a cell lives in a file the law names (`exemptions` in `Laws/Defaults.rules.ts`, each with its
   kinds and its reason) and nowhere else. Adding a file to that list is Benjamin's decision.

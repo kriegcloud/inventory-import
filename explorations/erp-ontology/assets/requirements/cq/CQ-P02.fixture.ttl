@@ -1,0 +1,54 @@
+# The fixture of CQ-P02 (report 04 section 3.1, report 18 section 10). test_ExampleWorks holds a record of a dormant
+# company with both flags false; the open reading, a record of test_OpenCo that states no flag; a record that states
+# one flag false and the other not at all; a record of a buyer; a record of a retired person with both flags false;
+# and a record of its own workspace, which states neither flag (decision 168). test_SecondOrg holds its own record of
+# test_OpenCo with both flags false. Nothing here is a record of this app, and every name starts `test_`.
+@base <https://example.org/inventory-import/> .
+@prefix inv: <https://example.org/inventory-import/ontology/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<data/test_ExampleWorks/Tenant/test_ExampleWorks> a inv:Tenant .
+<data/test_SecondOrg/Tenant/test_SecondOrg> a inv:Tenant .
+
+<fixture/Organization/test_DormantCo> a inv:Organization .
+<fixture/Organization/test_OpenCo> a inv:Organization .
+<fixture/Organization/test_HalfKnownCo> a inv:Organization .
+<fixture/Organization/test_BuyerCo> a inv:Organization .
+<fixture/Person/test_Retiree> a inv:Person .
+
+<fixture/SourceRecord/test_WorksDormantCo> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:recordOf <fixture/Organization/test_DormantCo> ;
+  inv:isCustomer false ;
+  inv:isVendor false .
+
+<fixture/SourceRecord/test_WorksOpenCo> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:recordOf <fixture/Organization/test_OpenCo> .
+
+<fixture/SourceRecord/test_WorksHalfKnownCo> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:recordOf <fixture/Organization/test_HalfKnownCo> ;
+  inv:isCustomer false .
+
+<fixture/SourceRecord/test_WorksBuyerCo> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:recordOf <fixture/Organization/test_BuyerCo> ;
+  inv:isCustomer true ;
+  inv:isVendor false .
+
+<fixture/SourceRecord/test_WorksRetiree> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:recordOf <fixture/Person/test_Retiree> ;
+  inv:isCustomer false ;
+  inv:isVendor false .
+
+<fixture/SourceRecord/test_WorksOwnWorkspace> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:recordOf <data/test_ExampleWorks/Tenant/test_ExampleWorks> .
+
+<fixture/SourceRecord/test_SecondOpenCo> a inv:SourceRecord ;
+  inv:inTenant <data/test_SecondOrg/Tenant/test_SecondOrg> ;
+  inv:recordOf <fixture/Organization/test_OpenCo> ;
+  inv:isCustomer false ;
+  inv:isVendor false .

@@ -100,7 +100,7 @@ const optionsOf = <Row,>(rows: ReadonlyArray<Row>, value: (row: Row) => string |
   const counts: Record<string, number> = {}
   for (const row of rows) {
     const text = String(value(row))
-    counts[text] = (Object.hasOwn(counts, text) ? (counts[text] ?? 0) : 0) + 1
+    counts[text] = O.match(R.get(counts, text), { onNone: () => 1, onSome: (count) => count + 1 })
   }
   return Object.entries(counts)
     .sort(([a], [b]) => a.localeCompare(b))

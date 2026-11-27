@@ -1,0 +1,104 @@
+# The fixture sutton-party.ttl (report 18 sections 4 and 9, decision 130): one test_ record of each Sutton type the
+# coverage table places, a Company, a Contact, an Address, an Organization (the workspace), an OrganizationMember with
+# its UserProfile and a User, each stating the properties the table places on it. No question reads it: guard 3 reads
+# it for the properties no question's fixture states, and gate 9 runs on it from step 13. The contact's and the
+# workspace's records state neither flag, since their source has no trading-role field (decision 168). Every contact
+# point is written by hand, its IRI its record's or membership's and the Sutton field's (decisions 159 and 175). The
+# records state their type and id and no source system: what that holds for Sutton is not decided (report 18 section
+# 12). The member names no person and holds no grant, which no field places (decisions 131 and 133). Only Sutton's
+# type, field and enum names appear (decision 123); nothing here is a record of a Sutton workspace, and every record's
+# IRI starts `test_`.
+@base <https://example.org/inventory-import/> .
+@prefix inv: <https://example.org/inventory-import/ontology/> .
+
+<data/test_ExampleWorks/Tenant/test_ExampleWorks> a inv:Tenant .
+
+# Company, of kind company: its record is about an organization, and its type gives both flags (decisions 35 and 168).
+<fixture/Organization/test_HarborSupply> a inv:Organization .
+<fixture/SourceRecord/test_HarborCompany> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:sourceType "Company" ;
+  inv:sourceId "S0001" ;
+  inv:recordOf <fixture/Organization/test_HarborSupply> ;
+  inv:isCustomer true ;
+  inv:isVendor false ;
+  inv:name "test_Harbor Supply" ;
+  inv:accountStatus inv:AccountStatusScheme-active ;
+  inv:hasPostalAddress <fixture/PostalAddress/test_HarborDock> ;
+  inv:primaryContact <fixture/SourceRecord/test_HarborContact> .
+
+# Address, on the company: its title as its name, its two lines, its type as two purposes, one default flag true.
+<fixture/PostalAddress/test_HarborDock> a inv:PostalAddress ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:name "Dock 4" ;
+  inv:addressLines "1 Example Way\nUnit 2" ;
+  inv:locality "Springfield" ;
+  inv:region "MA" ;
+  inv:postalCode "01101" ;
+  inv:countryCode "US" ;
+  inv:addressPurpose inv:ContactPurposeScheme-shipping , inv:ContactPurposeScheme-ship_from ;
+  inv:defaultFor inv:ContactPurposeScheme-shipping .
+
+# Contact: its record is about a person, with the names, job title, type and owner the record states, and its email
+# and phone as two points.
+<fixture/Person/test_Lee> a inv:Person .
+<fixture/SourceRecord/test_HarborContact> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:sourceType "Contact" ;
+  inv:sourceId "S0002" ;
+  inv:recordOf <fixture/Person/test_Lee> ;
+  inv:name "Lee Example" ;
+  inv:givenName "Lee" ;
+  inv:familyName "Example" ;
+  inv:jobTitle "Buyer" ;
+  inv:hasContactPoint <fixture/SourceRecord/test_HarborContact/email> , <fixture/SourceRecord/test_HarborContact/phone> ;
+  inv:contactAt <fixture/SourceRecord/test_HarborCompany> ;
+  inv:contactType inv:ContactTypeScheme-customer ;
+  inv:contactOwner <fixture/Member/test_SuttonMember> .
+<fixture/SourceRecord/test_HarborContact/email> a inv:ContactPoint ;
+  inv:contactPointKind inv:ContactPointKindScheme-email ;
+  inv:contactValue "test_lee@example.org" .
+<fixture/SourceRecord/test_HarborContact/phone> a inv:ContactPoint ;
+  inv:contactPointKind inv:ContactPointKindScheme-phone ;
+  inv:contactValue "+1 555 0100" ;
+  inv:extension "12" .
+
+# Organization, the workspace: a record of the tenant's own organization, held by the tenant (decision P1).
+<fixture/SourceRecord/test_SuttonWorkspace> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:sourceType "Organization" ;
+  inv:sourceId "S0003" ;
+  inv:recordOf <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:name "test_Example Works" .
+
+# OrganizationMember with its UserProfile: a membership of this tenant naming the workspace it lets its person act in
+# (decision 154), with the profile's stage, names, job title, points, image and text on it (decisions 162, 163, 172).
+<fixture/Member/test_SuttonMember> a inv:Member ;
+  inv:membershipIn <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:membershipWorkspace <fixture/SourceRecord/test_SuttonWorkspace> ;
+  inv:memberAccount <fixture/SignInAccount/test_SuttonUser> ;
+  inv:membershipStatus inv:MembershipStatusScheme-active ;
+  inv:name "Kim Example" ;
+  inv:givenName "Kim" ;
+  inv:middleName "Ann" ;
+  inv:familyName "Example" ;
+  inv:jobTitle "Planner" ;
+  inv:memberContactPoint <fixture/Member/test_SuttonMember/personalEmail> ,
+    <fixture/Member/test_SuttonMember/phoneNumber> ,
+    <fixture/Member/test_SuttonMember/personalPhoneNumber> ;
+  inv:profileImage "https://example.org/test_kim.png" ;
+  inv:profileText "Plans the weekly runs." .
+<fixture/Member/test_SuttonMember/personalEmail> a inv:ContactPoint ;
+  inv:contactPointKind inv:ContactPointKindScheme-email ;
+  inv:contactValue "test_kim.home@example.org" .
+<fixture/Member/test_SuttonMember/phoneNumber> a inv:ContactPoint ;
+  inv:contactPointKind inv:ContactPointKindScheme-phone ;
+  inv:contactValue "+1 555 0101" ;
+  inv:extension "7" .
+<fixture/Member/test_SuttonMember/personalPhoneNumber> a inv:ContactPoint ;
+  inv:contactPointKind inv:ContactPointKindScheme-phone ;
+  inv:contactValue "+1 555 0102" .
+
+# User: the sign-in account the member signs in with, its email as CurrentUser gives it (decision 164).
+<fixture/SignInAccount/test_SuttonUser> a inv:SignInAccount ;
+  inv:accountEmail "test_kim@example.org" .

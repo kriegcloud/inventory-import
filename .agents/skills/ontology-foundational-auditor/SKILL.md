@@ -50,14 +50,14 @@ what it proposes and who decides are not.
 | Commits in steps 1 and 2, pinning | Benjamin's. The packet is in the repository. `--repo` reads the commit that holds the adapter snapshot, the golden fixture and the CQ and scope files: until he commits those, it refuses, unless he waives the pin (`pin_waived`, his reason). `bun run check` reads every code file git would commit outside `.agents/` and `scratchpad/`, so run it with the adapter copy in place before asking (not verified). A prose-only run (no code declares the term) still needs one `adapters` entry, and no route is tested: ask him, and stop at step 1 |
 | Step 4, identity | Report 01's "tenant and a source id" is a `reidentification_key` of a tenant's record; `identity_criterion` stays `unresolved: <the question to Benjamin>` until he says what makes two companies one |
 | Step 5, reuse | gist first (`../_shared/gist-categories.md`). IOF, ISA-95, schema.org, W3C ORG and Sutton matches are alignment rows, never parents. `foundational.gufo_alignment` stays a UFO analysis tag |
-| Step 6, proposal | The module is built at `packages/kernel/src/Terms.vocab.ts` (the thread's 22 terms, naming decision 111, not a `rat-` record). A term beyond those 22 is a TypeScript sketch in a research report. `proposed_iri` under `example.org`. No inverse property, no `owl:sameAs` merge, identity never a SKU or a name |
+| Step 6, proposal | The module is built at `packages/kernel/src/Terms.vocab.ts` (the thread's 22 terms, naming decision 111, and the party slice's, naming decision 176; neither a `rat-` record). A term beyond the module's is a TypeScript sketch in a research report. `proposed_iri` under `example.org`. No inverse property, no `owl:sameAs` merge, identity never a SKU or a name |
 | Step 7, seats | Launched as the session's rules allow (`CLAUDE.md` "Sub-agents", the user's routing rules). `codex exec` is one launcher. Each seat is a fresh context with only its inputs |
 | Step 8, steward | Benjamin, through `AskUserQuestion`, one proposal per question, recommended answer first. Without that tool (a subagent, a workflow child) hand the questions back in "Needs the person" and write no `rat-` record |
 | Outputs, Handoff | The `rat-` file in `$ONT/governance/ratifications/` is the ratification; add a one-line mirror to the packet's `DECISIONS.md`. The conceptualizer, architect, mapper and curator read the `rat-` file |
 | Validator | Run from the repository root; `effect` and `yaml` resolve from the root `node_modules` (`yaml` 2.9.1 is only a devDependency of `@beep/repo-cli`, hoisted; `effect` 4.1.5). `scripts/validate_artifacts.test.ts` (`bun:test`) and `scripts/parity-fixtures.json` (beep-effect trees) do not apply here |
 
 Does not apply: editing any `.ttl`, `.owl` or SHACL file, BFO, writing under `docs/` or `ontologies/`, minting an IRI
-under a real domain. The thin thread is built (the module, the projector, the generated Turtle, CQ-P06 and CQ-P11). SHACL, alignments, terms beyond the 22 and the party slice are not built. This skill does not run those gates.
+under a real domain. The thin thread and the party slice are built (the module, the projector, the generated Turtle, CQ-P06 and CQ-P11, the party questions). SHACL, alignments, terms beyond the module's and the slices after the party slice are not built. This skill does not run those gates.
 
 ## When to Activate
 
@@ -181,7 +181,7 @@ against the CQ file itself under `--repo`; an asserted count is not a count.
    `reuse.exact_reuse_found: true` + the mapping — IdentityCard and
    semantic-compatibility justification still required, adversarial pass
    still applies (a reused class must actually match the intended semantics).
-6. > Here: a proposal for a new term targets an edit of `packages/kernel/src/Terms.vocab.ts` (the thread's 22 are already there), with `proposed_iri` under `example.org`; no `owl:inverseOf`, no `owl:sameAs`.
+6. > Here: a proposal for a new term targets an edit of `packages/kernel/src/Terms.vocab.ts` (the thread's and the party slice's terms are already there), with `proposed_iri` under `example.org`; no `owl:inverseOf`, no `owl:sameAs`.
 
    **Propose** (`prompts/synthesis.md`). Emit `OntologyTermProposal`
    records. Warrant rules: decision terms cite CQs the term is REQUIRED to

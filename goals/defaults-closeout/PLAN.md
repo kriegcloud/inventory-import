@@ -15,10 +15,10 @@ pull request is merged, not when it is opened.
 | 1 | The five rulings, and this packet | 17 | done: merged 2026-11-26 |
 | 2 | The draft machine's failing property | 19 | done: merged 2026-11-26. The machine was wrong in both orderings, not the property (below) |
 | 3 | A test of the facet filter on a table with rows | 18 | done: merged 2026-11-26 |
-| 4, 5 | `packages/review` src and tests: 110 places to 64 | 21 | doing: open, `bun run check` 107 of 107, seen on screen (below) |
+| 4, 5 | `packages/review` src and tests: 110 places to 64 | 21 | done: merged 2026-11-26 |
 | 6, 7 | Outside the review package: 48 places to 36 | 20 | done: merged 2026-11-26 |
-| 7b | What is left, 104 places in 30 files, by Benjamin's four rulings of 2026-11-26 (below) | `feat/defaults-last` | doing: a Codex lane |
-| 8 | Close: both goals' closing notes and `status: done`; the merged worktrees and branches removed | | todo |
+| 7b | What was left, 104 places in 30 files, by Benjamin's rulings of 2026-11-26 (below): the baseline names no file | 22 | done: merged 2026-11-26, seen on screen (below) |
+| 8 | Close: both goals' closing notes and `status: done`; `bun run check:full` on main; the merged worktrees and branches removed | 25 | done: `bun run check:full` passes on `main` at `e71f2b5d` and on this pull request's branch, which also carries pull request 22's review fix (closing note, below). Six merged worktrees and their local branches removed on Benjamin's word, 2026-11-26; `defaults-last`, where this pull request was made, after it merges |
 
 ## The failing property (step 2)
 
@@ -36,6 +36,11 @@ exactly, though a match may leave only part of it. Both seeds are replayed in th
 - Another library handing back nothing (the table, the virtual list, an atom's first read of itself, a portal
   target, the Web Locks default): each behind a small adapter file of ours, and only those files exempted. About 17
   places in 5 files.
+- The three public APIs that run `Effect.runSync` (`stringify`, the one Reactivity, the workbook writer): their three
+  files on the exemptions list. 3 places.
+- `TotalCells.text` returns an Option, and the screen decides at its last step. 1 place.
+- The four starting values the lane kept (`CountStart`, `FacetStart`, and in test support `TabIdentity` and
+  `WriterStart`): ratified as they were.
 - A lane may lower a strict ceiling: the earlier lanes put seven good moves back because they were told not to.
 
 ## Seen on screen
@@ -58,11 +63,65 @@ Dana Whitfield.
 - Not seen on screen: "Not recorded" and a suggestion with no confidence. A fresh import records an author and a
   confidence for every decision, so neither can be reached without a row edited by hand.
 
+2026-11-26, on the branch of pull request 22 (the adapters and the Option reader), a fresh database, port 5174,
+signed in as Dana Whitfield. No error in the browser's console.
+
+- Pressed "Use items_messy.csv". It read "Stopped before it was saved" again, as on the first look; pressed
+  Continue. The steps sat in the top bar beside the breadcrumb. Review read: "200 rows read · 20 values fixed for
+  you", Needs a decision 24, Cannot import 21, Ready 155, All 200.
+- Pressed "All 200": row 2 read "Fiberglass Crate, XRR-0266, Ready", row 4 "Oak Cutting Oil, YDR-8742, SKU clash
+  row 10". Pressed the Category filter: Component 1, components 38, Finished Good 2, finished-goods 29, Misc 2,
+  packaging 34, raw-materials 44, supplies 50, which add to 200. Picked "Misc 2": two rows, 40 Steel Planter and
+  116 Rubber Sheet 4x8.
+- Pressed "Import 155, skip 45", then "Import 155 items". Result read: Not imported 45, Imported 155, Already there
+  0, All 200. The Items page read "155 items", 20 rows, "Page 1 of 8".
+- Activity read Decisions 20, Events 2, Imports 1. People read "3 people", and its Role filter Admin 1, Editor 1,
+  Viewer 1.
+- Not seen on screen: a column a row does not hold, the case the reader's None is for. No file reaches it.
+
 ## Blocker
 
 None.
 
+## Closing note
+
+2026-11-26. Everything the defaults sweep left open is on `main`, in pull requests 17 to 22 and 25, which carries 22's review fix
+(below). The baseline
+names no file: `defaults-baseline.json` holds `files: {}`, and `bun run beep laws defaults` passes on `main` at
+`e71f2b5d`.
+
+What changed. The five rulings reached the screens and `DECISIONS.md`. The draft machine was wrong, not its
+property, and both seeds are replayed. The facet filter has a test on a table with rows. Of the last 162 places,
+58 moved onto schemas in pull requests 20 and 21. The other 104 went by the rulings (above): the law stopped
+counting a component's check of its own optional prop; each library that hands back nothing sits behind one small
+adapter file of ours; the tests' storage stand-in is one shared file; `TotalCells.text` is an Option; and the four
+starting values the last lane kept are schemas (`CountStart`, `FacetStart`, `TabIdentity`, `WriterStart`). The files left on
+`exemptions` are each there by Benjamin's word, with its reason in `Defaults.rules.ts`.
+
+What was learned. The law reading a component's own prop had to learn where a prop's name stops being the prop: a
+static computed key is a prop, a renderer factory is not a component, and a `catch` or loop that binds the same
+name ends it (CodeRabbit found the three on pull request 22; the tests are in `Defaults.test.ts`). That fix was
+pushed to 22's branch after 22 had merged, so it reached `main` only with pull request 25: a pull request is merged
+at the commit GitHub had when the button was pressed, and a push after that goes nowhere. And a lane told
+not to lower a strict ceiling puts good moves back: seven were, until the ruling let a lane lower one.
+
+Checked: `bun run check:full` on `main` at `e71f2b5d` (114 of 114 tasks, 93 replayed by turbo from runs on the same inputs), and again on pull request 25's branch at `89da8db6`, `main` at `64885a89` with 22's review fix, 114 of 114 with none replayed; SF-3's, SF-4's and SF-5's `rg` lines over every swept
+package find only schema definitions and files on `exemptions`; the messy sample on screen on the branch of each
+pull request that changed what the browser sends (above). "Stopped before it was saved" on a dev server just
+started was the dev server reloading the page, and is fixed in this pull request (below).
+
 ## Choices made along the way
+
+- 2026-11-26. "Use items_messy.csv" on a dev server just started read "Stopped before it was saved" on both looks,
+  and Continue went on. Diagnosed on this pull request's branch, each run on a fresh database with Vite's cache
+  cleared. A production build (`bun run preview`, signed in as Dana Whitfield): one press read "200 rows read · 20
+  values fixed for you", Needs a decision 24, Cannot import 21, Ready 155, All 200, and no "Stopped". A dev server on
+  port 5174: the press logged `dependency optimized: effect/MutableList` and `optimized dependencies changed.
+  reloading`, and the page read "Stopped before it was saved". The readers took `effect/MutableList` and
+  `effect/MutableRef` in `436478d2` (every property readonly), and the list of the worker's modules in
+  `vite.config.ts` did not name them. The list is gone: the worker is now one of Vite's scan entries, so whatever it
+  imports is ready at start. Pressed again on a cold dev server: no reload, and Review read Needs a decision 24,
+  Cannot import 21, Ready 155, All 200.
 
 - 2026-11-26. The stored change's `confidence` and a left-out row's `name` became optional on the wire, so absence
   is carried as absence. Stored columns are unchanged.

@@ -1,0 +1,24 @@
+# CQ-P03: Which people are contacts at an organization, for which purpose?
+# Each row is one contact assignment of a tenant: the account, the person to reach there, the purpose and the contact
+# point's text, each read from the assignment itself, never joined on the person or the point alone, which would mix
+# the accounts (report 04). An assignment with no purpose is a row with none. The account is a party, an organization
+# or a person (decisions 12 and 125). The record that gives the point is not read (report 18 section 10).
+# Each type step walks down the subclasses (decision 27), so a node typed by a subclass is found too.
+PREFIX inv: <https://example.org/inventory-import/ontology/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?tenant ?account ?person ?purpose ?value
+WHERE {
+  ?assignment rdf:type/rdfs:subClassOf* inv:ContactAssignment ;
+              inv:inTenant ?tenant ;
+              inv:contactAccount ?account ;
+              inv:contactPerson ?person ;
+              inv:assignmentPoint ?point .
+  ?account rdf:type/rdfs:subClassOf* inv:Party .
+  ?person rdf:type/rdfs:subClassOf* inv:Person .
+  ?point rdf:type/rdfs:subClassOf* inv:ContactPoint ;
+         inv:contactValue ?value .
+  OPTIONAL { ?assignment inv:servesPurpose ?purpose }
+}
+ORDER BY ?tenant ?account ?person ?purpose

@@ -1,0 +1,109 @@
+# The fixture of CQ-P04 and CQ-P05 (report 04 section 4, report 18 section 10). test_ExampleWorks holds six source
+# records, test_AcmeA to test_AcmeF, records and not organizations. At 09:00 UTC on 2026-11-01 test_Dana decides that
+# A and B record the same party, citing the evidence "same tax id". C and D have no decision and share only a name,
+# "Acme Industrial" (decision 179), which makes them no pair. At 10:00 test_Decision2 joins E and F, and at 11:00
+# test_Decision3 reverses it. In test_SecondOrg, test_Kim decides at noon that its own two records are one party and at
+# 13:00 that they are two. Every record states its source keys and every piece of evidence its tenant. No owl:sameAs is
+# stated here: CQ-P05's fixture holds the one a must-fail case adds. Nothing here is a record of this app, and every
+# node's name starts `test_`.
+@base <https://example.org/inventory-import/> .
+@prefix inv: <https://example.org/inventory-import/ontology/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<data/test_ExampleWorks/Tenant/test_ExampleWorks> a inv:Tenant .
+<data/test_SecondOrg/Tenant/test_SecondOrg> a inv:Tenant .
+
+<fixture/Member/test_Dana> a inv:Member ;
+  inv:membershipIn <data/test_ExampleWorks/Tenant/test_ExampleWorks> .
+<fixture/Member/test_Kim> a inv:Member ;
+  inv:membershipIn <data/test_SecondOrg/Tenant/test_SecondOrg> .
+
+<fixture/SourceRecord/test_AcmeA> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:sourceSystem "test_Ledger" ;
+  inv:sourceType "Company" ;
+  inv:sourceId "A0001" .
+
+<fixture/SourceRecord/test_AcmeB> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:sourceSystem "test_Ledger" ;
+  inv:sourceType "Company" ;
+  inv:sourceId "A0002" .
+
+<fixture/SourceRecord/test_AcmeC> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:sourceSystem "test_Ledger" ;
+  inv:sourceType "Company" ;
+  inv:sourceId "A0003" ;
+  inv:name "Acme Industrial" .
+
+<fixture/SourceRecord/test_AcmeD> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:sourceSystem "test_Ledger" ;
+  inv:sourceType "Company" ;
+  inv:sourceId "A0004" ;
+  inv:name "Acme Industrial" .
+
+<fixture/SourceRecord/test_AcmeE> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:sourceSystem "test_Ledger" ;
+  inv:sourceType "Company" ;
+  inv:sourceId "A0005" .
+
+<fixture/SourceRecord/test_AcmeF> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:sourceSystem "test_Ledger" ;
+  inv:sourceType "Company" ;
+  inv:sourceId "A0006" .
+
+<fixture/SourceRecord/test_SecondAcmeA> a inv:SourceRecord ;
+  inv:inTenant <data/test_SecondOrg/Tenant/test_SecondOrg> ;
+  inv:sourceSystem "test_Ledger" ;
+  inv:sourceType "Company" ;
+  inv:sourceId "A0001" .
+
+<fixture/SourceRecord/test_SecondAcmeB> a inv:SourceRecord ;
+  inv:inTenant <data/test_SecondOrg/Tenant/test_SecondOrg> ;
+  inv:sourceSystem "test_Ledger" ;
+  inv:sourceType "Company" ;
+  inv:sourceId "A0002" .
+
+<fixture/IdentityEvidence/test_SameTaxId> a inv:IdentityEvidence ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:evidenceText "same tax id" .
+
+<fixture/IdentityDecision/test_Decision1> a inv:IdentityDecision ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:decidesOn <fixture/SourceRecord/test_AcmeA> , <fixture/SourceRecord/test_AcmeB> ;
+  inv:identityOutcome inv:IdentityOutcomeScheme-sameParty ;
+  inv:decidedBy <fixture/Member/test_Dana> ;
+  inv:eventTime "2026-11-01T09:00:00Z"^^xsd:dateTime ;
+  inv:citesEvidence <fixture/IdentityEvidence/test_SameTaxId> .
+
+<fixture/IdentityDecision/test_Decision2> a inv:IdentityDecision ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:decidesOn <fixture/SourceRecord/test_AcmeE> , <fixture/SourceRecord/test_AcmeF> ;
+  inv:identityOutcome inv:IdentityOutcomeScheme-sameParty ;
+  inv:decidedBy <fixture/Member/test_Dana> ;
+  inv:eventTime "2026-11-01T10:00:00Z"^^xsd:dateTime .
+
+<fixture/IdentityDecision/test_Decision3> a inv:IdentityDecision ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:decidesOn <fixture/SourceRecord/test_AcmeE> , <fixture/SourceRecord/test_AcmeF> ;
+  inv:identityOutcome inv:IdentityOutcomeScheme-differentParties ;
+  inv:decidedBy <fixture/Member/test_Dana> ;
+  inv:eventTime "2026-11-01T11:00:00Z"^^xsd:dateTime .
+
+<fixture/IdentityDecision/test_Decision4> a inv:IdentityDecision ;
+  inv:inTenant <data/test_SecondOrg/Tenant/test_SecondOrg> ;
+  inv:decidesOn <fixture/SourceRecord/test_SecondAcmeA> , <fixture/SourceRecord/test_SecondAcmeB> ;
+  inv:identityOutcome inv:IdentityOutcomeScheme-sameParty ;
+  inv:decidedBy <fixture/Member/test_Kim> ;
+  inv:eventTime "2026-11-01T12:00:00Z"^^xsd:dateTime .
+
+<fixture/IdentityDecision/test_Decision5> a inv:IdentityDecision ;
+  inv:inTenant <data/test_SecondOrg/Tenant/test_SecondOrg> ;
+  inv:decidesOn <fixture/SourceRecord/test_SecondAcmeA> , <fixture/SourceRecord/test_SecondAcmeB> ;
+  inv:identityOutcome inv:IdentityOutcomeScheme-differentParties ;
+  inv:decidedBy <fixture/Member/test_Kim> ;
+  inv:eventTime "2026-11-01T13:00:00Z"^^xsd:dateTime .

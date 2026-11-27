@@ -210,6 +210,67 @@ const testGuard = (node: Node, ancestors: ReadonlyArray<Node>): boolean => {
   return false
 }
 
+// A component's first parameter owns its props, including reads captured by callbacks. A callback
+// parameter or local declaration that binds the same name cuts off that outer prop's scope.
+const bindingHas = (node: Node, name: string): boolean => {
+  if (named(node, name)) return true
+  if (node.type === "AssignmentPattern") return O.exists(child(node, "left"), (left) => bindingHas(left, name))
+  if (node.type === "Property") return O.exists(child(node, "value"), (value) => bindingHas(value, name))
+  if (node.type === "ObjectPattern" || node.type === "ArrayPattern" || node.type === "RestElement")
+    return A.some(children(node), (child) => bindingHas(child, name))
+  return false
+}
+const functions = ["ArrowFunctionExpression", "FunctionExpression", "FunctionDeclaration"]
+// A function draws when its own body holds JSX. JSX inside a function it makes is that function's: a factory that
+// returns a renderer is no component.
+const drawsJsx = (node: Node): boolean =>
+  node.type === "JSXElement" ||
+  node.type === "JSXFragment" ||
+  A.some(children(node), (inner) => !A.contains(functions, inner.type) && drawsJsx(inner))
+const declares = (statement: Node, name: string): boolean =>
+  statement.type === "VariableDeclaration" &&
+  A.some(children(statement), (declaration) =>
+    O.exists(child(declaration, "id"), (binding) => bindingHas(binding, name))
+  )
+// A name a `catch` or a loop binds is that clause's own, as a block's declaration is.
+const rebinds = (scope: Node, name: string): boolean =>
+  (scope.type === "BlockStatement" && A.some(children(scope), (statement) => declares(statement, name))) ||
+  (scope.type === "CatchClause" && O.exists(child(scope, "param"), (param) => bindingHas(param, name))) ||
+  (scope.type === "ForStatement" && O.exists(child(scope, "init"), (init) => declares(init, name))) ||
+  ((scope.type === "ForInStatement" || scope.type === "ForOfStatement") &&
+    O.exists(child(scope, "left"), (left) => declares(left, name)))
+// `props.title` and `props["aria-label"]` read a prop; `props[key]` reads whatever `key` holds.
+const propRead = (value: Node): boolean =>
+  value.type === "MemberExpression" &&
+  (value["computed"] !== true ||
+    O.exists(child(value, "property"), (key) => key.type === "Literal" && P.isString(key["value"])))
+const ownProp = (value: Node, ancestors: ReadonlyArray<Node>): boolean => {
+  const reference = propRead(value) ? child(value, "object") : O.some(value)
+  const localName = O.flatMap(reference, (node) => (node.type === "Identifier" ? text(node, "name") : O.none()))
+  if (O.isNone(localName)) return false
+  const name = localName.value
+  for (const { index, node: scope } of A.reverse(A.map(ancestors, (node, index) => ({ index, node })))) {
+    if (rebinds(scope, name)) return false
+    if (!A.contains(functions, scope.type)) continue
+    const params = scope["params"]
+    if (!A.isArray(params)) continue
+    const bindings = A.filter(params, isNode)
+    if (!A.some(bindings, (binding) => bindingHas(binding, name))) continue
+    const owner = ancestors[index - 1]
+    const component = O.orElse(child(scope, "id"), () =>
+      isNode(owner) && owner.type === "VariableDeclarator" ? child(owner, "id") : O.none()
+    )
+    if (!O.exists(component, (node) => O.exists(text(node, "name"), (name) => /^[A-Z]/.test(name))) || !drawsJsx(scope))
+      return false
+    return O.exists(
+      A.head(bindings),
+      (param) =>
+        bindingHas(param, name) && (param.type === "Identifier" ? propRead(value) : value.type === "Identifier")
+    )
+  }
+  return false
+}
+
 const kindOf = (
   node: Node,
   screen: boolean,
@@ -284,6 +345,13 @@ const kindOf = (
       O.flatMap(child(node, "right"), (right) => {
         const one = bare(left)
         const other = bare(right)
+        if (
+          screen &&
+          (is("===") || is("!==")) &&
+          ((named(one, "undefined") && ownProp(other, ancestors)) ||
+            (named(other, "undefined") && ownProp(one, ancestors)))
+        )
+          return O.none()
         return isMissing(one) || isMissing(other) || isTypeofMissing(one, other) || isTypeofMissing(other, one)
           ? O.some<DefaultsKind>("absence")
           : O.none()

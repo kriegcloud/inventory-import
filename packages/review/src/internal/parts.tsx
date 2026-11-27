@@ -1,3 +1,4 @@
+import { ReviewText } from "./ReviewText.rules.ts"
 import { refCallback } from "./browser.ts"
 import { identity } from "effect/Function"
 import { CellMark } from "@inventory/review/ReviewTypes"
@@ -386,7 +387,7 @@ export function CellValue(props: {
       // that only loses the spaces around it. The proposed value stands alone.
       // A short value that loses its spaces is shown in quotation marks beside the new one (“Foot ” → Foot), so the
       // change can be seen; a long one (a name) would not fit twice and stands alone.
-      const spacesOnly = mark.from !== "" && mark.from.trim() === mark.to
+      const spacesOnly = mark.from !== "" && ReviewText.comparison(mark.from) === mark.to
       const alone = spacesOnly && mark.to.length > longValue
       if (isCellMarkProposed(mark) && ((mark.from === "" && props.stated === true) || alone)) {
         return (
@@ -515,11 +516,13 @@ function CutBody(props: CutTextProps) {
           )}
           {...(cut ? { tabIndex: 0, onClick: () => setOpen((before) => !before) } : {})}
         >
-          {props.children ?? props.text}
+          {O.match(O.fromNullishOr(props.children), { onNone: () => props.text, onSome: identity })}
         </span>
       </HoverCardTrigger>
       <HoverCardContent align="start" className="w-auto max-w-sm">
-        <div className="text-sm break-words whitespace-normal">{props.card ?? props.text}</div>
+        <div className="text-sm break-words whitespace-normal">
+          {O.match(O.fromNullishOr(props.card), { onNone: () => props.text, onSome: identity })}
+        </div>
       </HoverCardContent>
     </HoverCard>
   )

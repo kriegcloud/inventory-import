@@ -23,12 +23,12 @@ or target ontologies — that is the architect's or curator's job.
 ## In this repository
 
 Read `../_shared/project-profile.md` first; it wins over this file. The vocabulary module is
-`packages/kernel/src/Terms.vocab.ts` (7 classes, 9 properties, 2 schemes, 4 concepts). Alignment rows in that
+`packages/kernel/src/Terms.vocab.ts` (17 classes, 62 properties, 9 schemes, 28 concepts). Alignment rows in that
 module are not built. SSSOM is only the candidate and review format here.
 
 | Upstream step or output | Here |
 | --- | --- |
-| Source ontology | The terms in `packages/kernel/src/Terms.vocab.ts`. Alignment rows are not built: match a thread term from the module by hand, or say "not built" |
+| Source ontology | The terms in `packages/kernel/src/Terms.vocab.ts`. Alignment rows are not built: match a term from the module by hand, or say "not built" |
 | Target ontology | A local file of the external ontology (for gist, the pinned 14.1.0 `gistCore.ttl`, profile "What exists"), never a `sqlite:obo:` adapter. oaklib finds no `skos:prefLabel` labels: a zero-row lexmatch is "not run", not "no candidates"; derive candidates by hand or with an rdflib query over `skos:prefLabel` |
 | Step 1-3 candidate files | `explorations/erp-ontology/assets/mappings/{source}-to-{target}-proposed.sssom.tsv` |
 | Steward ratification | Benjamin's answer, scribed as a `rat-` file under `assets/audit/<name>/governance/ratifications/` and mirrored in `DECISIONS.md` |
@@ -67,7 +67,7 @@ before beginning work:
 
 ### Step 1: Candidate Generation (Lexical Matching)
 
-> Here: run on local files only; write output under `explorations/erp-ontology/assets/mappings/`, not `ontologies/{name}/mappings/`. The source terms are the vocabulary module. Alignment rows are not built: say "not built", or match a thread term from the module by hand. On gist the rules below match nothing (labels are `skos:prefLabel`): a zero-row result is "not run".
+> Here: run on local files only; write output under `explorations/erp-ontology/assets/mappings/`, not `ontologies/{name}/mappings/`. The source terms are the vocabulary module. Alignment rows are not built: say "not built", or match a term from the module by hand. On gist the rules below match nothing (labels are `skos:prefLabel`): a zero-row result is "not run".
 
 `{source}` and `{target}` are ontology files (`.obo`, `.owl`, `.ttl`) or OAK
 selectors such as `sqlite:obo:hp`. `--add` is an option of `runoak` itself,
@@ -200,7 +200,7 @@ both across every graph that loads it.
 
 ### Step 5: Validate
 
-> Here: validate the candidate file under `explorations/erp-ontology/assets/`. "Entity existence" for a thread term is a check against `packages/kernel/src/Terms.vocab.ts`. A term beyond those 22, or an alignment row, is not built.
+> Here: validate the candidate file under `explorations/erp-ontology/assets/`. "Entity existence" for a term of ours is a check against `packages/kernel/src/Terms.vocab.ts`. A term beyond the module's, or an alignment row, is not built.
 
 ```bash
 # Validate SSSOM schema conformance

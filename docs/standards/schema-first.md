@@ -109,6 +109,10 @@ tagged union instead (SF-6).
 Check: no decoded type has an optional property: `rg -n 'S\.optionalKey\(|S\.optional\(' <package>/src` finds only
 encoded-side keys wrapped by an `OptionFrom*` or a decoding default.
 
+A React component's own optional props stay `?:`, with defaults in destructuring. In `.tsx`, strict
+`=== undefined` and `!== undefined` comparisons on its props (including destructured names) may distinguish
+omission from explicit null. The defaults law still counts `??`, null comparisons and non-prop absence checks.
+
 ## SF-5. Starting values and missing-input values live on the schema
 
 Ask of every field what it starts as and what it is when the input leaves it out. When one value answers both, put it

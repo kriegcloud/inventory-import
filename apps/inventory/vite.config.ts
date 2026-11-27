@@ -126,52 +126,6 @@ const usedSourcesOnly = (): Plugin => ({
   }
 })
 
-// The effect modules the file reader's worker imports, for @beep/csv and @beep/xlsx (see optimizeDeps below).
-const readerModules = [
-  "effect/Array",
-  "effect/Boolean",
-  "effect/ByteSize",
-  "effect/Cause",
-  "effect/Channel",
-  "effect/Clock",
-  "effect/Context",
-  "effect/Data",
-  "effect/DateTime",
-  "effect/Effect",
-  "effect/Equal",
-  "effect/Exit",
-  "effect/FileSystem",
-  "effect/HashMap",
-  "effect/HashSet",
-  "effect/Layer",
-  "effect/Match",
-  "effect/Number",
-  "effect/Option",
-  "effect/Path",
-  "effect/PlatformError",
-  "effect/Predicate",
-  "effect/Random",
-  "effect/Record",
-  "effect/RegExp",
-  "effect/Result",
-  "effect/SchemaIssue",
-  "effect/SchemaParser",
-  "effect/SchemaTransformation",
-  "effect/Stream",
-  "effect/String",
-  "effect/Struct",
-  "effect/Tuple",
-  "effect/TxQueue",
-  "effect/TxRef",
-  "effect/Utils",
-  "effect/MutableHashMap",
-  "effect/MutableHashSet",
-  "effect/Order",
-  "effect/Schema",
-  "effect/encoding/Xml",
-  "effect/encoding/Zip"
-]
-
 export default defineConfig(({ mode }) => {
   const settings = buildSettings(mode)
   const https =
@@ -195,11 +149,11 @@ export default defineConfig(({ mode }) => {
     // origin access, and neither do the servers in front of it.
     server: { port: 5173, strictPort: false, cors: false, ...(https === undefined ? {} : { https }) },
     preview: { cors: false },
-    // The file reader loads on the first file, so Vite found its dependencies only then, optimised them and reloaded the
-    // page: the first file on a cold dev server was lost. Listed here, they are ready at start: the effect modules
-    // @beep/csv, @beep/xlsx and the vendored kit reach (workspace source, which Vite serves as it is, so their own
-    // imports are what it would otherwise discover late).
-    optimizeDeps: { include: readerModules },
+    // The file reader's worker is reached only through `new URL(..., import.meta.url)`, which Vite's scan of the page
+    // does not follow, so its modules were found on the first file, optimised and the page reloaded: the first file
+    // on a cold dev server stopped before it was saved. The worker is a scan entry beside the page, so whatever it
+    // imports is ready at start. A list of its modules written here went stale when the readers took two more.
+    optimizeDeps: { entries: ["**/*.html", "../../packages/catalog/web/src/internal/reader.worker.ts"] },
     // Keep every asset a file. Vite would otherwise inline small font subsets as data: URIs,
     // which the content security policy (font-src 'self') rightly blocks.
     build: { assetsInlineLimit: 0 },

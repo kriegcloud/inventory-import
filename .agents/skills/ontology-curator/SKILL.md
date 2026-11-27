@@ -23,12 +23,13 @@ reviewable, and validated before merging.
 
 Read `../_shared/project-profile.md` first; it wins over this file. Benjamin is the named steward, and a
 ratification is his answer scribed in a `rat-` file under `explorations/erp-ontology/assets/audit/<name>/governance/ratifications/`,
-mirrored one line in the packet's `DECISIONS.md`. The thin thread's terms have no `rat-` file: decision 111 ratifies
-them as a set (decision 107). One TypeScript vocabulary module
+mirrored one line in the packet's `DECISIONS.md`. The thin thread's and the party slice's terms have no `rat-` file:
+decisions 111 and 176 ratify them as sets (decisions 107 and 129). One TypeScript vocabulary module
 owns every term fact and all Turtle is generated from it, so a change is never made in a `.ttl` or `.obo` file.
-The thin thread is built: `packages/kernel/src/Terms.vocab.ts`, the projector in `packages/ontology`, the generated
-Turtle, CQ-P06 and CQ-P11, the law `bun run beep laws ontology-terms`, and the reasoner step. SHACL over the stored
-rows, alignments and any term beyond the thread's 22 are not built: say "not built" for those, and never report a
+The thin thread and the party slice are built: `packages/kernel/src/Terms.vocab.ts`, the projector in
+`packages/ontology`, the generated Turtle, CQ-P06 and CQ-P11 and the party questions, the law `bun run beep laws
+ontology-terms`, and the reasoner step. SHACL over the stored rows, alignments and any term beyond the module's are
+not built: say "not built" for those, and never report a
 check as run that has no code behind it.
 
 | Step or output | What it becomes here |
@@ -475,7 +476,7 @@ This skill produces:
 
 ## Error Handling
 
-> Here: generated Turtle exists. A failure of a gate that is not built (SHACL over the stored rows, alignments, the party slice) is reported as "not built".
+> Here: generated Turtle exists. A failure of a gate that is not built (SHACL over the stored rows, alignments, the slices after the party slice) is reported as "not built".
 
 | Error | Likely Cause | Recovery |
 |-------|-------------|----------|

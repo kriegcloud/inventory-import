@@ -1,3 +1,4 @@
+import { CsvText } from "./internal/cellText.ts"
 /**
  * How a CSV is read and written. A choice that carries data (the delimiter, the encoding) is a tagged union; a choice
  * between plain modes is a `LiteralKit`, and the behaviour that depends on it sits beside it. Every field has its
@@ -10,7 +11,6 @@ import * as ByteSize from "effect/ByteSize"
 import * as Effect from "effect/Effect"
 import { dual } from "effect/Function"
 import * as S from "effect/Schema"
-import * as Str from "effect/String"
 import * as Tuple from "effect/Tuple"
 import { CsvDiagnostic, RaggedRecord, StrayQuote, TextAfterClosingQuote } from "./CsvDiagnostic.schema.ts"
 import { MAX_TEXT_UNITS } from "./CsvPosition.schema.ts"
@@ -261,8 +261,8 @@ export const applyTrim: {
 } = dual(3, (rule: CsvTrimRule, cell: string, quoted: boolean): string =>
   CsvTrimRule.match(rule, {
     none: () => cell,
-    unquoted: () => (quoted ? cell : Str.trim(cell)),
-    all: () => Str.trim(cell)
+    unquoted: () => (quoted ? cell : CsvText.apply(cell)),
+    all: () => CsvText.apply(cell)
   })
 )
 

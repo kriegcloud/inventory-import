@@ -2,7 +2,7 @@
 type: Goal
 title: Defaults at boundaries
 description: Absence, starting values and clean-ups move out of code and onto schemas, one package at a time, until the defaults law's baseline names no contract, model or host package and no test, and every place left in web code is an edge the law names.
-status: active
+status: done
 from: explorations/ideal-architecture
 ---
 
@@ -227,10 +227,10 @@ All answered on 2026-11-23, each as recommended
 
 ## Acceptance
 
-- [ ] `defaults-baseline.json` names no file under `packages/*/contract`, `packages/*/model`, `packages/*/host` and no
+- [x] `defaults-baseline.json` names no file under `packages/*/contract`, `packages/*/model`, `packages/*/host` and no
       test (`bun run beep laws defaults`, then reading the baseline); every place left in web code is in `exemptions`
       with its reason.
-- [ ] SF-3's, SF-4's and SF-5's own checks (their `rg` lines) find nothing in any package in scope outside schema
+- [x] SF-3's, SF-4's and SF-5's own checks (their `rg` lines) find nothing in any package in scope outside schema
       definitions and named exemptions.
 - [x] `bun run check:full` passes; `git diff main -- packages/catalog/model/test/Catalog.lock.json` is empty, or
       changed only on Benjamin's word.

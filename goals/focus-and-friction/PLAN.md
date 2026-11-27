@@ -15,12 +15,12 @@ pull request is merged, or, for a step with none, when its record below is writt
 | 1 | This packet | | doing |
 | 2 | Benjamin's ruling on what waits for the person's session | none: a decision | done: 2026-11-26 (below) |
 | 3 | The person's session: prepared, run by Benjamin, written down | one for the record | doing: prepared |
-| 4 | `CLAUDE.md` as an index: which goal owns it, to what length, then the move | one | todo |
+| 4 | `CLAUDE.md` as an index: which goal owns it, to what length, then the move | one | doing |
 | 5 | Measure `bun run check`: how long, and what a failure prints | the record below | done: 2026-11-26 |
 | 6 | One summary at the end of a failing check | 35 | done: 2026-11-26 |
 | 7 | `bun run check:changed` | 40 | done: 2026-11-26 |
 | 8 | A merge that finishes on its own | none, or one for the rule in `CLAUDE.md` | todo |
-| 9 | The worktrees and the main checkout | one for `CLAUDE.md` | doing |
+| 9 | The worktrees and the main checkout | one for `CLAUDE.md` | done: #36, 2026-11-26 |
 | 10 | Close: the closing note, `status: done`, `bun run check:full` on main | one | todo |
 
 Every question was answered on 2026-11-26 ("Decided", below). Step 5 is done. Steps 4, 6, 7 and 9 can start. Step 8 waits on Benjamin's change to the settings, and step 3 on a person he brings.
@@ -63,6 +63,31 @@ the longest sections. Quality's step 3 already holds "under 400 lines" and is `t
 quality's place), and the layout to `docs/architecture.md`, which exists. What stays: what the app is, how we work, the
 import's rules, the UI's rules in short, and one line for each moved section with its link. The pull request lists
 every moved rule and where it now is.
+
+**Done, 2026-11-26.** `CLAUDE.md` went from 800 lines to 170 (the limit is 200; 166 before step 9's rule on worktrees joined it). It keeps the header, "What this is",
+"How we work", "Rules for an import", a short "UI, in short", and "Where the rest is", a table that names each moved
+section and its file. Every moved section kept its heading, so a pointer elsewhere that reads `CLAUDE.md`, "Commands"
+finds the section through that table. No pointer had to change, except the two that said `CLAUDE.md` holds the skills
+table (`AGENTS.md`, `.agents/skills/README.md`).
+
+| Moved | To |
+| --- | --- |
+| What is there, Layout | `docs/architecture.md`, after its diagrams |
+| Skills, Sub-agents | `docs/agents.md`, new |
+| Commands | `docs/commands.md`, new |
+| What the type-check enforces | `docs/laws.md`, new |
+| Adding a feature; Effect (version 4) with The model's blocks and Tests; Platform; Identity and permissions; AI features; Comments and documentation | `docs/building.md`, new |
+| UI | `docs/ui.md`, new |
+
+The move was a script, and a second script checked it. It read every non-blank line of the old file and looked for
+each one, as a whole line, in the new `CLAUDE.md` and the six `docs/` files. 721 of 723 lines were found. Ten of them
+were found only through a listed rewrite: two link targets made relative to `docs/`, and five cross-references to a
+section now in another file ("UI" below became "UI" in `[ui](ui.md)`). The two not found are the old intro sentence,
+which named the sections the file no longer holds, and it was rewritten. The line "Paths in this file and in `docs/`
+that start `src/`..." stays in both places.
+
+Found on the way and not changed, since a move changes no words: "UI" still names the views "Needs you N · Can't
+fix here N", where the screen reads "Needs a decision" and "Cannot import".
 
 ## 5. Measuring the check
 

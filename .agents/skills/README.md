@@ -40,7 +40,7 @@ steps is `explorations/erp-ontology/research/03-skills-review.md`.
 Each folder carries the upstream `LICENSE`. Better Auth's skills are the exception: their repository has no licence
 file. They are copied as published, so they can be compared with upstream, except that their install and run commands
 are written for `bun` and `bunx`.
-The "Skills" section of `CLAUDE.md` says how each is used here, and where this repo's own rules win.
+The "Skills" section of `docs/agents.md` (moved there from `CLAUDE.md`) says how each is used here, and where this repo's own rules win.
 
 | Skill | From | Version | Licence | Why it is here |
 | --- | --- | --- | --- | --- |

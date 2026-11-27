@@ -1,0 +1,40 @@
+{
+  "package": "@alchemy.run/domain",
+  "mutants": [
+    {
+      "key": "default-left-out",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "    fields[key] = fromHost(value, key);\n  }",
+      "new": "  }",
+      "why": "a field left to its default read as not there"
+    },
+    {
+      "key": "default-always-zero",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "    fields[key] = fromHost(value, key);\n  }",
+      "new": "    fields[key] = Value.num(0);\n  }",
+      "why": "every default read as zero, whatever the schema gives"
+    },
+    {
+      "key": "held-struct-not-filled",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "const inner = withDefaults(held, property.type);",
+      "new": "const inner = { made: held };",
+      "why": "a struct held inside one read without its own defaults"
+    },
+    {
+      "key": "computed-default-guessed",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "if (held !== undefined || !Exit.isExit(given) || !Exit.isSuccess(given)) return { unread: key };",
+      "new": "if (held !== undefined) return { unread: key }; if (!Exit.isExit(given) || !Exit.isSuccess(given)) { fields[key] = Value.num(0); continue; }",
+      "why": "a default worked out when asked for, answered as zero without running it"
+    },
+    {
+      "key": "list-default-guessed",
+      "file": "lib/Prove/internal/Interpreter.js",
+      "old": "      return { unread: key };\n    fields[key] = fromHost(value, key);",
+      "new": "      fields[key] = fromHost(value, key);\n    fields[key] = fromHost(value, key);",
+      "why": "a default that is a list handed on as a value the prover never looked into"
+    }
+  ]
+}

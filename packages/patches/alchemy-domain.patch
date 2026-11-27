@@ -1051,3 +1051,167 @@ index 98d616c..8b8b20f 100644
            });
        }
      }
+Package: @alchemy.run/domain
+Applies-to: vendor/alchemy/alchemy.run-domain-e1c3e6d.tgz
+Upstream: not yet reported
+Why: The prover reads `State.make({...})` of a struct as the fields written and nothing more, where the library's
+  `make` adds each field left out that has a constructor default (`Schema.withConstructorDefault`, and the tag of
+  `Schema.tag`). A state built that way is "read wrongly" for every rule, so an `evolve` has to write every field,
+  the status and each count that starts at zero included, and the schema's defaults cannot be used. With this a
+  field left out takes its default when that is a number, a text, a truth or `null` already there
+  (`Effect.succeed(0)`), in a struct held inside one too. Of any other default the prover says the code is not read.
+Remove-when: The library's prover reads a struct's constructor defaults. `bun run beep patches prove` then says this
+  patch's test passes without it.
+Test: test/alchemy-domain/05-a-structs-defaults/StructDefaults.test.ts
+
+diff --git a/lib/Prove/internal/Interpreter.js b/lib/Prove/internal/Interpreter.js
+index 9403f20..215ad72 100644
+--- a/lib/Prove/internal/Interpreter.js
++++ b/lib/Prove/internal/Interpreter.js
+@@ -1,5 +1,6 @@
+ import * as Data from "effect/Data";
+ import * as Effect from "effect/Effect";
++import * as Exit from "effect/Exit";
+ import * as Option from "effect/Option";
+ import * as Brands from "./Brands.js";
+ import * as Compare from "./Compare.js";
+@@ -71,6 +72,40 @@ const fromHost = (value, name) => typeof value === "number"
+                     : value === undefined
+                         ? Value.undef
+                         : { _tag: "Host", value, name };
++/**
++ * What `Schema.make` adds to a struct written without some of its fields: each field left out that has a
++ * constructor default takes it, as the real `make` gives it, and so in a struct held inside one. A default is read
++ * only when it is a value already there (`Effect.succeed(0)`, `Schema.tag("Open")`) and a number, a text, a truth
++ * or `null`. For any other the answer names the field, and the caller says the code is not read.
++ */
++const withDefaults = (
++  made,
++  ast,
++) => {
++  if (ast._tag !== "Objects" || made._tag !== "Obj") return { made };
++  const fields = { ...made.fields };
++  for (const property of ast.propertySignatures) {
++    const key = String(property.name);
++    const held = fields[key];
++    const given = property.type.context?.constructorDefault;
++    if (held !== undefined && held._tag !== "Undef") {
++      const inner = withDefaults(held, property.type);
++      if ("unread" in inner) return inner;
++      fields[key] = inner.made;
++      continue;
++    }
++    if (given === undefined) continue;
++    if (held !== undefined || !Exit.isExit(given) || !Exit.isSuccess(given)) return { unread: key };
++    const value = given.value;
++    if (
++      !(typeof value === "number" || typeof value === "string" || typeof value === "boolean" || value === null)
++    )
++      return { unread: key };
++    fields[key] = fromHost(value, key);
++  }
++  return { made: made.brand ? Value.obj(fields, made.brand) : Value.obj(fields) };
++};
++
+ const child = (parent) => ({ variables: new Map(), parent });
+ /** A value the prover knows, as the text JavaScript makes of it in a string. */
+ const shown = (v) => v._tag === "Null"
+@@ -812,9 +847,17 @@ export const make = (loader, run) => {
+                     return {
+                         _tag: "Native",
+                         name: `${value.name}.make`,
+-                        call: ([made]) => made && Symbolic.assumeFits(made, ast, current.run)
+-                            ? Effect.succeed(made)
+-                            : Effect.fail(new Value.Infeasible()),
++                        // A field left to its constructor default is the default, as the real `make` gives it.
++                        call: ([made], at) => {
++                            if (!made)
++                                return Effect.fail(new Value.Infeasible());
++                            const filled = withDefaults(made, ast);
++                            if ("unread" in filled)
++                                return fail(at, `leaves ${filled.unread} of ${value.name}.make to a default the prover does not read`);
++                            return Symbolic.assumeFits(filled.made, ast, current.run)
++                                ? Effect.succeed(filled.made)
++                                : Effect.fail(new Value.Infeasible());
++                        },
+                     };
+                 }
+                 return (library.unionMember(value.value, key, value.name) ??
+diff --git a/src/Prove/internal/Interpreter.ts b/src/Prove/internal/Interpreter.ts
+index e4502fb..8e01f7d 100644
+--- a/src/Prove/internal/Interpreter.ts
++++ b/src/Prove/internal/Interpreter.ts
+@@ -1,6 +1,8 @@
+ import * as Data from "effect/Data";
+ import * as Effect from "effect/Effect";
++import * as Exit from "effect/Exit";
+ import * as Option from "effect/Option";
++import type * as SchemaAST from "effect/SchemaAST";
+ import * as Brands from "./Brands.ts";
+ import * as Compare from "./Compare.ts";
+ import { fromTruth, isQuotient, same, textual, truth } from "./Compare.ts";
+@@ -100,6 +102,40 @@ const fromHost = (value: unknown, name: string): V =>
+               ? Value.undef
+               : { _tag: "Host", value, name };
+ 
++/**
++ * What `Schema.make` adds to a struct written without some of its fields: each field left out that has a
++ * constructor default takes it, as the real `make` gives it, and so in a struct held inside one. A default is read
++ * only when it is a value already there (`Effect.succeed(0)`, `Schema.tag("Open")`) and a number, a text, a truth
++ * or `null`. For any other the answer names the field, and the caller says the code is not read.
++ */
++const withDefaults = (
++  made: V,
++  ast: SchemaAST.AST,
++): { readonly made: V } | { readonly unread: string } => {
++  if (ast._tag !== "Objects" || made._tag !== "Obj") return { made };
++  const fields: Record<string, V> = { ...made.fields };
++  for (const property of ast.propertySignatures) {
++    const key = String(property.name);
++    const held = fields[key];
++    const given = property.type.context?.constructorDefault;
++    if (held !== undefined && held._tag !== "Undef") {
++      const inner = withDefaults(held, property.type);
++      if ("unread" in inner) return inner;
++      fields[key] = inner.made;
++      continue;
++    }
++    if (given === undefined) continue;
++    if (held !== undefined || !Exit.isExit(given) || !Exit.isSuccess(given)) return { unread: key };
++    const value: unknown = given.value;
++    if (
++      !(typeof value === "number" || typeof value === "string" || typeof value === "boolean" || value === null)
++    )
++      return { unread: key };
++    fields[key] = fromHost(value, key);
++  }
++  return { made: made.brand ? Value.obj(fields, made.brand) : Value.obj(fields) };
++};
++
+ const child = (parent: Scope | undefined): Scope => ({ variables: new Map(), parent });
+ 
+ export interface Interpreter {
+@@ -1009,10 +1045,19 @@ export const make = (loader: Loader, run: Run): Interpreter => {
+           return {
+             _tag: "Native",
+             name: `${value.name}.make`,
+-            call: ([made]) =>
+-              made && Symbolic.assumeFits(made, ast, current.run)
+-                ? Effect.succeed(made)
+-                : Effect.fail(new Value.Infeasible()),
++            // A field left to its constructor default is the default, as the real `make` gives it.
++            call: ([made], at) => {
++              if (!made) return Effect.fail(new Value.Infeasible());
++              const filled = withDefaults(made, ast);
++              if ("unread" in filled)
++                return fail(
++                  at,
++                  `leaves ${filled.unread} of ${value.name}.make to a default the prover does not read`,
++                );
++              return Symbolic.assumeFits(filled.made, ast, current.run)
++                ? Effect.succeed(filled.made)
++                : Effect.fail(new Value.Infeasible());
++            },
+           };
+         }
+         return (

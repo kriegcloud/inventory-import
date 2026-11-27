@@ -19,6 +19,8 @@ import {
   ImportState,
   MatchedSince,
   NotOpen,
+  ImportNotFound,
+  NoImportThere,
   NotPermitted,
   ImportEvent
 } from "../Import/Import.aggregate.ts"
@@ -89,8 +91,9 @@ export class UndoRowStep extends Domain.Command(
     },
     events: [StepUndone, ActCounted],
     rejects: [
-      NotOpen,
       NotPermitted,
+      ImportNotFound,
+      NotOpen,
       ConfirmedSince,
       GroupedSince,
       NotYourStep,
@@ -121,15 +124,16 @@ export class Undoing extends Domain.Decision(
     keyOf: (cmd: UndoRowStep) => ({ life: cmd.importId, row: `${cmd.importId}/${cmd.row}` }),
     decide: Effect.fn("Undoing.decide")(function* ({ life, row }, cmd) {
       const actor = yield* CurrentActor
-      if (!ImportState.guards.Open(life.state)) return yield* NotOpen.make({})
-      if (actor.organizationId !== life.state.organizationId || actor.role === "viewer") {
-        return yield* NotPermitted.make({})
+      if (actor.role === "viewer") return yield* NotPermitted.make({ required: "editor" })
+      if (ImportState.guards.Unstaged(life.state) || actor.organizationId !== life.state.organizationId) {
+        return yield* ImportNotFound.make({ reason: NoImportThere })
       }
+      if (!ImportState.guards.Open(life.state)) return yield* NotOpen.make({})
       if (
         !RowState.guards.Untouched(row.state) &&
         (row.state.importId !== cmd.importId || row.state.organizationId !== life.state.organizationId)
       ) {
-        return yield* NotPermitted.make({})
+        return yield* ImportNotFound.make({ reason: NoImportThere })
       }
       // The same undo sent again: the row took this very act already (this change, in this step, from this person),
       // and it is written once. Its sender is answered as the first time, with nothing new, whatever was decided on

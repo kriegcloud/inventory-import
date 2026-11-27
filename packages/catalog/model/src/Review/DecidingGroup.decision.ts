@@ -18,6 +18,8 @@ import {
   ImportState,
   MatchedSince,
   NotOpen,
+  ImportNotFound,
+  NoImportThere,
   NotPermitted,
   ReviewMovedOn,
   ImportEvent
@@ -53,7 +55,7 @@ export class DecideGroup extends Domain.Command(
       label: Label
     },
     events: [GroupDecided, GroupCounted],
-    rejects: [NotOpen, NotPermitted, StepTaken, ConfirmedSince, ReviewMovedOn, MatchedSince]
+    rejects: [NotPermitted, ImportNotFound, NotOpen, StepTaken, ConfirmedSince, ReviewMovedOn, MatchedSince]
   },
   { description: "Decide a group of rows as one act, from a screen that has every change of the import" }
 ) {}
@@ -66,10 +68,11 @@ export class DecidingGroup extends Domain.Decision(
     keyOf: (cmd: DecideGroup) => ({ life: cmd.importId, group: `${cmd.importId}/${cmd.step}` }),
     decide: Effect.fn("DecidingGroup.decide")(function* ({ life, group }, cmd) {
       const actor = yield* CurrentActor
-      if (!ImportState.guards.Open(life.state)) return yield* NotOpen.make({})
-      if (actor.organizationId !== life.state.organizationId || actor.role === "viewer") {
-        return yield* NotPermitted.make({})
+      if (actor.role === "viewer") return yield* NotPermitted.make({ required: "editor" })
+      if (ImportState.guards.Unstaged(life.state) || actor.organizationId !== life.state.organizationId) {
+        return yield* ImportNotFound.make({ reason: NoImportThere })
       }
+      if (!ImportState.guards.Open(life.state)) return yield* NotOpen.make({})
       if (!GroupState.guards.Untouched(group.state)) return yield* StepTaken.make({})
       if (cmd.opening !== life.state.confirms) return yield* ConfirmedSince.make({})
       if (cmd.seen !== life.state.changes) return yield* ReviewMovedOn.make({ last: life.state.changes })

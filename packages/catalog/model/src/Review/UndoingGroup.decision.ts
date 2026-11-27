@@ -20,6 +20,8 @@ import {
   Import,
   ImportState,
   NotOpen,
+  ImportNotFound,
+  NoImportThere,
   NotPermitted,
   ReviewMovedOn,
   ImportEvent
@@ -39,7 +41,16 @@ export class UndoGroup extends Domain.Command(
     middleware: [Session],
     input: { importId: ImportKey, step: Step, undo: Change, opening: S.Int, seen: Change },
     events: [GroupUndone, GroupCounted],
-    rejects: [NotOpen, NotPermitted, ConfirmedSince, NotYourStep, DecidedBeforeTheConfirm, GroupedAfter, ReviewMovedOn]
+    rejects: [
+      NotPermitted,
+      ImportNotFound,
+      NotOpen,
+      ConfirmedSince,
+      NotYourStep,
+      DecidedBeforeTheConfirm,
+      GroupedAfter,
+      ReviewMovedOn
+    ]
   },
   { description: "Take back the sender's own act on a group of rows, while it is the last group in force" }
 ) {}
@@ -52,15 +63,16 @@ export class UndoingGroup extends Domain.Decision(
     keyOf: (cmd: UndoGroup) => ({ life: cmd.importId, group: `${cmd.importId}/${cmd.step}` }),
     decide: Effect.fn("UndoingGroup.decide")(function* ({ life, group }, cmd) {
       const actor = yield* CurrentActor
-      if (!ImportState.guards.Open(life.state)) return yield* NotOpen.make({})
-      if (actor.organizationId !== life.state.organizationId || actor.role === "viewer") {
-        return yield* NotPermitted.make({})
+      if (actor.role === "viewer") return yield* NotPermitted.make({ required: "editor" })
+      if (ImportState.guards.Unstaged(life.state) || actor.organizationId !== life.state.organizationId) {
+        return yield* ImportNotFound.make({ reason: NoImportThere })
       }
+      if (!ImportState.guards.Open(life.state)) return yield* NotOpen.make({})
       if (cmd.opening !== life.state.confirms) return yield* ConfirmedSince.make({})
       if (!GroupState.guards.Decided(group.state)) return yield* NotYourStep.make({})
       // A group instance belongs to one import of one organization, for good.
       if (group.state.importId !== cmd.importId || group.state.organizationId !== life.state.organizationId) {
-        return yield* NotPermitted.make({})
+        return yield* ImportNotFound.make({ reason: NoImportThere })
       }
       if (group.state.by !== actor.memberId || group.state.change !== cmd.undo || group.state.undoneAt !== 0) {
         return yield* NotYourStep.make({})

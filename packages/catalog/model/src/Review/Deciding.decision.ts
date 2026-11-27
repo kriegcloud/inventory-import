@@ -28,6 +28,8 @@ import {
   ImportState,
   MatchedSince,
   NotOpen,
+  ImportNotFound,
+  NoImportThere,
   NotPermitted,
   ImportEvent
 } from "../Import/Import.aggregate.ts"
@@ -129,8 +131,9 @@ export class DecideRow extends Domain.Command(
     },
     events: [RowDecided, ActCounted],
     rejects: [
-      NotOpen,
       NotPermitted,
+      ImportNotFound,
+      NotOpen,
       ConfirmedSince,
       GroupedSince,
       DecidedSince,
@@ -188,16 +191,17 @@ export class Deciding extends Domain.Decision(
     keyOf: (cmd: DecideRow) => ({ life: cmd.importId, row: `${cmd.importId}/${cmd.row}` }),
     decide: Effect.fn("Deciding.decide")(function* ({ life, row }, cmd) {
       const actor = yield* CurrentActor
-      if (!ImportState.guards.Open(life.state)) return yield* NotOpen.make({})
-      if (actor.organizationId !== life.state.organizationId || actor.role === "viewer") {
-        return yield* NotPermitted.make({})
+      if (actor.role === "viewer") return yield* NotPermitted.make({ required: "editor" })
+      if (ImportState.guards.Unstaged(life.state) || actor.organizationId !== life.state.organizationId) {
+        return yield* ImportNotFound.make({ reason: NoImportThere })
       }
+      if (!ImportState.guards.Open(life.state)) return yield* NotOpen.make({})
       // A row instance belongs to one import of one organization, for good.
       if (
         !RowState.guards.Untouched(row.state) &&
         (row.state.importId !== cmd.importId || row.state.organizationId !== life.state.organizationId)
       ) {
-        return yield* NotPermitted.make({})
+        return yield* ImportNotFound.make({ reason: NoImportThere })
       }
       // The same press sent again: the row holds this very act already, and it is written once. Its sender is answered
       // as the first time, with nothing new, whatever landed on the import between the two sendings: a confirm and a

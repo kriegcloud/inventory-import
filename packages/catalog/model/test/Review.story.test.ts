@@ -27,6 +27,7 @@ import {
   HasItemsInForce,
   Import,
   ImportConfirmed,
+  ImportNotFound,
   ImportRemoved,
   ImportReopened,
   ImportStaged,
@@ -34,6 +35,7 @@ import {
   MatchColumn,
   MatchedSince,
   MoreKeptThanInForce,
+  NoImportThere,
   NotClosed,
   NotImported,
   NotOpen,
@@ -309,7 +311,7 @@ it.effect("a viewer may not stage a file; an editor stages it, once", () =>
   story(
     Story.provide(CurrentActor, anaViewer),
     Story.when(StageImport.make({ importId: id, rows: 200, columns: "by heading" })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(NotPermitted.make({ required: "editor" })),
     Story.provide(CurrentActor, ana),
     Story.when(StageImport.make({ importId: id, rows: 200, columns: "by heading" })),
     Story.then(life, staged),
@@ -329,7 +331,7 @@ it.effect("a suggestion is recorded as its asker's and changes no number; a view
     Story.then(life, ColumnMatched.make({ change: 1, matching: 1, columns: "tags: none", by: "dana" })),
     Story.provide(CurrentActor, anaViewer),
     Story.when(RecordSuggestion.make({ importId: id })),
-    Story.rejected(NotPermitted.make({}))
+    Story.rejected(NotPermitted.make({ required: "editor" }))
   )
 )
 it.effect(
@@ -366,21 +368,21 @@ it.effect("an admin of another organization changes nothing in this one's import
     Story.given(g1, groupDecided(2)),
     Story.provide(CurrentActor, oli),
     Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
     Story.when(RecordSuggestion.make({ importId: id })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
     Story.when(confirm({ seen: 2, planAt: 2 })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
     Story.when(RemoveImport.make({ importId: id, seen: 2 })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
     Story.when(act({ row: "row-12", step: "o1", saw: 1, sawGroup: 2, covered: true, flags: kept })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
     Story.when(undo({ row: "row-12", undo: 1, step: "o2", sawGroup: 2 })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
     Story.when(group({ step: "g2", seen: 2 })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
     Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 0, seen: 2 })),
-    Story.rejected(NotPermitted.make({}))
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere }))
   )
 )
 it.effect("an admin of another organization neither takes back nor reopens this one's confirmed import", () =>
@@ -388,9 +390,47 @@ it.effect("an admin of another organization neither takes back nor reopens this 
     Story.given(life, staged, confirmed(1)),
     Story.provide(CurrentActor, oli),
     Story.when(TakeBackImport.make({ importId: id, seen: 1, kept: 0, keptReplaced: 0 })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
     Story.when(ReopenImport.make({ importId: id, seen: 1 })),
-    Story.rejected(NotPermitted.make({}))
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere }))
+  )
+)
+// Another organization's import is answered as an id no import has, and before its state is asked, so that whoever
+// names an id that is not theirs learns nothing of what is stored: not that it is staged, removed or confirmed.
+it.effect("an id no import has, and another organization's import in any state, are answered alike: not found", () =>
+  story(
+    Story.provide(CurrentActor, ana),
+    Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
+    Story.when(TakeBackImport.make({ importId: id, seen: 0, kept: 0, keptReplaced: 0 })),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
+    Story.when(ReopenImport.make({ importId: id, seen: 0 })),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
+    Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: leftOut })),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
+    Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 1, opening: 0, seen: 0 })),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
+    Story.given(life, staged, ImportRemoved.make({ change: 1, by: "ana" })),
+    Story.provide(CurrentActor, oli),
+    // Not "staged already", and not "not open": the import is Prairie's, and Northline has none with this id.
+    Story.when(StageImport.make({ importId: id, rows: 200, columns: "by heading" })),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
+    Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 1, opening: 0 })),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
+    Story.when(RemoveImport.make({ importId: id, seen: 1 })),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
+    Story.when(RecordSuggestion.make({ importId: id })),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
+    Story.when(confirm({ seen: 1, planAt: 1 })),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
+    Story.when(act({ row: "row-12", step: "o1", saw: 1, flags: kept })),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
+    Story.when(undo({ row: "row-12", undo: 1, step: "o2" })),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
+    Story.when(group({ step: "g2", seen: 1 })),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
+    Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 1, opening: 0, seen: 1 })),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere }))
   )
 )
 it.effect("a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo", () =>
@@ -405,21 +445,21 @@ it.effect("a viewer changes nothing: no match, suggestion, confirm, remove, row 
     Story.given(g1, groupDecided(2)),
     Story.provide(CurrentActor, anaViewer),
     Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(NotPermitted.make({ required: "editor" })),
     Story.when(RecordSuggestion.make({ importId: id })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(NotPermitted.make({ required: "editor" })),
     Story.when(confirm({ seen: 2, planAt: 2 })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(NotPermitted.make({ required: "editor" })),
     Story.when(RemoveImport.make({ importId: id, seen: 2 })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(NotPermitted.make({ required: "editor" })),
     Story.when(act({ row: "row-12", step: "v1", saw: 1, sawGroup: 2, covered: true, flags: kept })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(NotPermitted.make({ required: "editor" })),
     Story.when(undo({ row: "row-12", undo: 1, step: "v2", sawGroup: 2 })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(NotPermitted.make({ required: "editor" })),
     Story.when(group({ step: "g2", seen: 2 })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(NotPermitted.make({ required: "editor" })),
     Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 0, seen: 2 })),
-    Story.rejected(NotPermitted.make({}))
+    Story.rejected(NotPermitted.make({ required: "editor" }))
   )
 )
 it.effect("a viewer neither takes back nor reopens a confirmed import", () =>
@@ -427,9 +467,9 @@ it.effect("a viewer neither takes back nor reopens a confirmed import", () =>
     Story.given(life, staged, confirmed(1)),
     Story.provide(CurrentActor, anaViewer),
     Story.when(TakeBackImport.make({ importId: id, seen: 1, kept: 0, keptReplaced: 0 })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(NotPermitted.make({ required: "editor" })),
     Story.when(ReopenImport.make({ importId: id, seen: 1 })),
-    Story.rejected(NotPermitted.make({}))
+    Story.rejected(NotPermitted.make({ required: "editor" }))
   )
 )
 it.effect("when a person is made a viewer, their next act on a row is refused, and an admin's confirm is taken", () =>
@@ -438,7 +478,7 @@ it.effect("when a person is made a viewer, their next act on a row is refused, a
     Story.given(row3, decided({ change: 1, by: "ana", step: "a1", flags: leftOut })),
     Story.provide(CurrentActor, anaViewer),
     Story.when(act({ row: "row-12", step: "a2", saw: 0, flags: leftOut })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(NotPermitted.make({ required: "editor" })),
     Story.provide(CurrentActor, admin),
     Story.when(confirm({ seen: 1, planAt: 1 })),
     Story.then(life, confirmedAs(2, { by: "ada" }))
@@ -458,17 +498,17 @@ it.effect("a row or a group kept under another organization's or import's name i
     Story.given(Group.ref(`${id}/g2`), groupDecidedIn(2, { importId: otherImport, step: "g2" })),
     Story.provide(CurrentActor, ana),
     Story.when(act({ row: "row-12", step: "a2", saw: 1, sawGroup: 2, covered: true, flags: kept })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
     Story.when(undo({ row: "row-12", undo: 1, step: "a3", sawGroup: 2 })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
     Story.when(act({ row: "row-3", step: "a4", saw: 1, sawGroup: 2, covered: true, flags: kept })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
     Story.when(undo({ row: "row-3", undo: 1, step: "a5", sawGroup: 2 })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
     Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 0, seen: 2 })),
-    Story.rejected(NotPermitted.make({})),
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere })),
     Story.when(UndoGroup.make({ importId: id, step: "g2", undo: 2, opening: 0, seen: 2 })),
-    Story.rejected(NotPermitted.make({}))
+    Story.rejected(ImportNotFound.make({ reason: NoImportThere }))
   )
 )
 

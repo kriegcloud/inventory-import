@@ -16,6 +16,7 @@ import { Activity } from "@inventory/kernel/Activity"
 import { AgentRun } from "@inventory/kernel/AgentRun"
 import { Member } from "@inventory/kernel/Member"
 import { Role } from "@inventory/kernel/Role"
+import { ModelCallPurpose as UsageModelCallPurpose } from "@inventory/usage-contract/ModelCall"
 import type * as S from "effect/Schema"
 
 const member = "packages/kernel/src/Member.schema.ts#Member"
@@ -26,6 +27,7 @@ const auditTrail = "packages/access/contract/src/Activity/AuditTrail.read.ts#Aud
 const agentRun = "packages/kernel/src/AgentRun.schema.ts#AgentRun"
 const organizationChoice = "packages/access/contract/src/Session/SessionState.read.ts#OrganizationChoice"
 const modelCallPurpose = "packages/access/contract/src/Allowance/ModelAllowance.gateway.ts#ModelCallPurpose"
+const usageModelCallPurpose = "packages/usage/contract/src/Allowance/ModelCall.payload.ts#ModelCallPurpose"
 const membership = "packages/access/contract/src/Session/SessionState.read.ts#Membership"
 
 /**
@@ -40,6 +42,7 @@ export const enrolled: Readonly<Record<string, S.Top>> = {
   [agentRun]: AgentRun,
   [organizationChoice]: OrganizationChoice,
   [modelCallPurpose]: ModelCallPurpose,
+  [usageModelCallPurpose]: UsageModelCallPurpose,
   [membership]: Membership
 }
 

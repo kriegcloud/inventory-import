@@ -62,6 +62,7 @@
     "@inventory/kernel": "workspace:*",
     "@inventory/review": "workspace:*",
     "@inventory/ui": "workspace:*",
+    "@inventory/usage-contract": "workspace:*",
     "@shadcn/react": "catalog:",
     "@tanstack/react-table": "catalog:",
     "@tanstack/react-virtual": "catalog:",

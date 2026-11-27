@@ -1,0 +1,152 @@
+{
+  "$schema": "../../../node_modules/turbo/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // The proof of the allowance. A proof reads the model's own blocks (the aggregate, who is asking and the middleware
+    // that provides it), named by their endings: every file ending `.context.ts`, `.middleware.ts` or `.schema.ts` is
+    // read. `bun run beep laws model-inputs` walks the relative imports of the aggregate, and of every code file of the
+    // package these inputs read (the proof, `vitest.config.ts`), and fails on a file no input here reads. A proof also
+    // reads the kernel and the usage contract the blocks import from (the limit and the purposes), how the code is
+    // compiled, and the pinned library; the contract's `transit` brings what it is built on; turbo adds the
+    // versions the lockfile resolves for this package (Effect, the solver, the parser). The vendored kit the kernel is
+    // built on, `@beep/schema` among it, comes with the kernel's `transit`, which folds the source of every package the
+    // kernel depends on into this task's hash. It is replayed until one of them changes, or the limits and retries its
+    // vitest config takes from the root: an edit to a rule (`.rules.ts`) or a test that is not a proof does not run it
+    // again.
+    "prove": {
+      "dependsOn": ["//#patches:installed", "@inventory/kernel#transit", "@inventory/usage-contract#transit"],
+      "inputs": [
+        "package.json",
+        "turbo.json",
+        "tsconfig.json",
+        "vitest.config.ts",
+        "src/**/*.aggregate.ts",
+        "src/**/*.decision.ts",
+        "src/**/*.context.ts",
+        "src/**/*.middleware.ts",
+        "src/**/*.schema.ts",
+        "test/**/*.prove.test.ts",
+        "$TURBO_ROOT$/packages/kernel/package.json",
+        "$TURBO_ROOT$/packages/kernel/src/**",
+        "$TURBO_ROOT$/packages/usage/contract/package.json",
+        "$TURBO_ROOT$/packages/usage/contract/src/**",
+        "$TURBO_ROOT$/tsconfig.base.json",
+        "$TURBO_ROOT$/vendor/alchemy/*.tgz",
+        "$TURBO_ROOT$/vitest.shared.ts",
+        "$TURBO_ROOT$/vitest.retries.ts"
+      ],
+      "outputs": []
+    },
+    // The search of the whole model: the same blocks and the model that joins them, every other block it can come to
+    // import, named by its ending (views, queries, projections, streams, policies, sagas, external systems, Apis,
+    // middleware, request contexts, rewrites, compactions and the schemas they share), its own test, and the lock file
+    // that keeps the rules as written. `bun run beep laws model-inputs` walks the relative imports of the model and
+    // its Apis, and of every code file of the package these inputs read (its own test), and fails on a file no input
+    // here reads, so this list cannot fall behind the model.
+    "verify": {
+      // Verify reads these two: under CI it writes no lock and refuses a rule the lock does not list, and with
+      // UPDATE_VERIFY_LOCK=1 it locks every rule as written and passes. Both are in the hash, so a run under one is
+      // never replayed as a run under another.
+      "env": ["CI", "UPDATE_VERIFY_LOCK"],
+      "dependsOn": ["//#patches:installed", "@inventory/kernel#transit", "@inventory/usage-contract#transit"],
+      "inputs": [
+        "package.json",
+        "turbo.json",
+        "tsconfig.json",
+        "vitest.config.ts",
+        "src/**/*.aggregate.ts",
+        "src/**/*.decision.ts",
+        "src/**/*.model.ts",
+        "src/**/*.{view,query,projection,stream,policy,saga,external,api,middleware,context,rewrite,compaction,schema}.ts",
+        "test/**/*.verify.test.ts",
+        "test/**/*.lock.json",
+        "$TURBO_ROOT$/packages/kernel/package.json",
+        "$TURBO_ROOT$/packages/kernel/src/**",
+        "$TURBO_ROOT$/packages/usage/contract/package.json",
+        "$TURBO_ROOT$/packages/usage/contract/src/**",
+        "$TURBO_ROOT$/tsconfig.base.json",
+        "$TURBO_ROOT$/vendor/alchemy/*.tgz",
+        "$TURBO_ROOT$/vitest.shared.ts",
+        "$TURBO_ROOT$/vitest.retries.ts"
+      ],
+      "outputs": []
+    },
+    // The mutants of the allowance (`mutants/mutants.json`, read by the repository's runner, `beep-cli mutants`;
+    // packages/catalog/model/mutants/README.md says how a run works): each one change to `TakeCall`'s `decide`, to
+    // the aggregate's `evolve`, to the view's fold or its `validate`, or to `leftOn` and `dayOf`, run against the
+    // proof and the three test files the mutants file names (the stories, the rule of what is left and the Apis'
+    // test), which must notice it. The sample is in `bun run check:full`; all of them run every night. Both read what
+    // the proof and the search read, those test files and what they import (the rule of what is left, the test
+    // session), and the mutants themselves, and are replayed until one changes. `bun run beep laws model-inputs` holds
+    // each list against the model and every file the mutants file names. The CLI's `transit` brings the runner's
+    // source; the kernel's and the contract's bring what they are built on.
+    "mutants:sample": {
+      "dependsOn": [
+        "//#patches:installed",
+        "@inventory/kernel#transit",
+        "@inventory/usage-contract#transit",
+        "@beep/repo-cli#transit"
+      ],
+      "inputs": [
+        "package.json",
+        "turbo.json",
+        "tsconfig.json",
+        "vitest.config.ts",
+        "src/**/*.aggregate.ts",
+        "src/**/*.decision.ts",
+        "src/**/*.model.ts",
+        "src/**/*.{view,query,projection,stream,policy,saga,external,api,middleware,context,rewrite,compaction,schema}.ts",
+        "src/**/*.rules.ts",
+        "test/**/*.story.test.ts",
+        "test/**/*.prove.test.ts",
+        "test/AllowanceLeft.test.ts",
+        "test/UsageApi.test.ts",
+        "test/session.ts",
+        "mutants/**",
+        "$TURBO_ROOT$/packages/kernel/package.json",
+        "$TURBO_ROOT$/packages/kernel/src/**",
+        "$TURBO_ROOT$/packages/usage/contract/package.json",
+        "$TURBO_ROOT$/packages/usage/contract/src/**",
+        "$TURBO_ROOT$/tsconfig.base.json",
+        "$TURBO_ROOT$/vendor/alchemy/*.tgz",
+        "$TURBO_ROOT$/vitest.shared.ts",
+        "$TURBO_ROOT$/vitest.retries.ts"
+      ],
+      "outputs": []
+    },
+    "mutants": {
+      "dependsOn": [
+        "//#patches:installed",
+        "@inventory/kernel#transit",
+        "@inventory/usage-contract#transit",
+        "@beep/repo-cli#transit"
+      ],
+      "inputs": [
+        "package.json",
+        "turbo.json",
+        "tsconfig.json",
+        "vitest.config.ts",
+        "src/**/*.aggregate.ts",
+        "src/**/*.decision.ts",
+        "src/**/*.model.ts",
+        "src/**/*.{view,query,projection,stream,policy,saga,external,api,middleware,context,rewrite,compaction,schema}.ts",
+        "src/**/*.rules.ts",
+        "test/**/*.story.test.ts",
+        "test/**/*.prove.test.ts",
+        "test/AllowanceLeft.test.ts",
+        "test/UsageApi.test.ts",
+        "test/session.ts",
+        "mutants/**",
+        "$TURBO_ROOT$/packages/kernel/package.json",
+        "$TURBO_ROOT$/packages/kernel/src/**",
+        "$TURBO_ROOT$/packages/usage/contract/package.json",
+        "$TURBO_ROOT$/packages/usage/contract/src/**",
+        "$TURBO_ROOT$/tsconfig.base.json",
+        "$TURBO_ROOT$/vendor/alchemy/*.tgz",
+        "$TURBO_ROOT$/vitest.shared.ts",
+        "$TURBO_ROOT$/vitest.retries.ts"
+      ],
+      "outputs": []
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "name": "@inventory/usage-model",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The day's model calls as a model of its own: one allowance per organization, forty calls a day, back at midnight UTC",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    "./Actor": "./src/Actor/Actor.context.ts",
+    "./Session": "./src/Actor/Session.middleware.ts",
+    "./Allowance": "./src/Allowance/Allowance.aggregate.ts",
+    "./AllowanceToday": "./src/Allowance/AllowanceToday.view.ts",
+    "./AllowanceLeft": "./src/Allowance/AllowanceLeft.rules.ts",
+    "./Model": "./src/Usage.model.ts",
+    "./ServerApi": "./src/Usage.api.ts",
+    "./MemberApi": "./src/UsageMember.api.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "lint": "oxlint --quiet src test",
+    "test": "vitest run --project fast",
+    "prove": "vitest run --project prove",
+    "verify": "vitest run --project verify",
+    "mutants": "beep-cli mutants . --all",
+    "mutants:sample": "beep-cli mutants . --sample"
+  },
+  "dependencies": {
+    "@alchemy.run/domain": "2.0.0-beta.87-e1c3e6d",
+    "@beep/schema": "workspace:*",
+    "@inventory/kernel": "workspace:*",
+    "@inventory/usage-contract": "workspace:*",
+    "alchemy": "2.0.0-beta.87-e1c3e6d",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/platform-node": "catalog:",
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "vitest": "catalog:"
+  },
+  "beep": {
+    "family": "context",
+    "context": "usage",
+    "layer": "model"
+  }
+}

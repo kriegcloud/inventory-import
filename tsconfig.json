@@ -30,6 +30,8 @@
     { "path": "./packages/tooling/tool/cli/tsconfig.test.json" },
     { "path": "./packages/patches/tsconfig.test.json" },
     { "path": "./packages/foundation/modeling/vocabulary/tsconfig.test.json" },
-    { "path": "./packages/ontology/tsconfig.test.json" }
+    { "path": "./packages/ontology/tsconfig.test.json" },
+    { "path": "./packages/usage/model/tsconfig.test.json" },
+    { "path": "./packages/usage/contract/tsconfig.test.json" }
   ]
 }

@@ -18,7 +18,7 @@ pull request is merged, or, for a step with none, when its record below is writt
 | 4 | `CLAUDE.md` as an index: which goal owns it, to what length, then the move | one | todo |
 | 5 | Measure `bun run check`: how long, and what a failure prints | the record below | done: 2026-11-26 |
 | 6 | One summary at the end of a failing check | 35 | done: 2026-11-26 |
-| 7 | `bun run check:changed` | one | doing |
+| 7 | `bun run check:changed` | 40 | done: 2026-11-26 |
 | 8 | A merge that finishes on its own | none, or one for the rule in `CLAUDE.md` | todo |
 | 9 | The worktrees and the main checkout | one for `CLAUDE.md` | todo |
 | 10 | Close: the closing note, `status: done`, `bun run check:full` on main | one | todo |
@@ -218,6 +218,17 @@ Appending `export const scratchTwo = (xs: ReadonlyArray<string>) => xs[0]! ?? "x
 named both `//#assertions:check` and `//#defaults:check`: 2 of 107 tasks failed. The file was then restored byte for
 byte from its saved copy. The full `bun run check` then passed 107 of 107 tasks, 92 replayed, in 3.62 s wall time
 (turbo: 3.445 s). SPEC's acceptance remains unticked; step 7 stays `doing` until its pull request is merged.
+
+**Timed on main after the merge, 2026-11-26**, at `4db228f2`, each with `bun run check:changed` itself:
+
+| Change | `bun run check` (step 5) | `bun run check:changed` | Tasks |
+| --- | --- | --- | --- |
+| One comment line in `packages/catalog/model/src/Item/Items.handler.ts` | 167 s | 37 s | 39 |
+| One comment line in `apps/inventory/src/web/Workspace.tsx` | 10 s | 10 s | 32 |
+| Nothing changed | 3.5 s | 4 s | 29 |
+
+The target SPEC's acceptance names is this table: a one-file change in one package finishes in at most 60 s. The
+failing case was run before the merge, on the branch (above). Step 7 is done.
 
 ## 8. A merge that finishes on its own
 

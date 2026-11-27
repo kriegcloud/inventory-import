@@ -34,7 +34,7 @@ const DEPTH = 3
 /**
  * Each sequence the search finds, run as a story. The allowance's `decide` reads `now` for its day, and the search
  * runs a short sequence at the solver's first time, the epoch: the repository's patch
- * `packages/patches/alchemy-domain/04-a-found-sequence-keeps-its-time.patch` makes the story set that clock first.
+ * `packages/patches/alchemy-domain/06-a-found-sequence-keeps-its-time.patch` makes the story set that clock first.
  */
 const story = Story.make(Usage, { layer: AllowanceTodayLive })
 

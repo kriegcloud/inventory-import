@@ -1,0 +1,182 @@
+Package: @alchemy.run/domain
+Applies-to: vendor/alchemy/alchemy.run-domain-e1c3e6d.tgz
+Upstream: not yet reported
+Why: A lock keeps each rule as the text written at its place in the aggregate, the decision or the model. For a
+  rule listed by name (`transitions: { ARule }`, `ARule: Rules.ARule`) that text is the name. A transition moved to
+  a file of its own is then refused as changed, though it is the rule that was locked; and once a lock is written
+  again it holds the name, so a later change to the rule where it is declared is never seen. With this the text of a
+  rule written as a name is the text of what the name is declared as, through the imports that give it.
+Remove-when: The library's lock follows a rule's name to its declaration. `bun run beep patches prove` then says
+  this patch's test passes without it.
+Test: test/alchemy-domain/04-a-rule-by-its-name/RuleByItsName.test.ts
+
+diff --git a/lib/Prove/internal/Lock.js b/lib/Prove/internal/Lock.js
+index 4ec4152..b49d5ee 100644
+--- a/lib/Prove/internal/Lock.js
++++ b/lib/Prove/internal/Lock.js
+@@ -93,6 +93,45 @@ const compare = Effect.fn(function* (solver, loader, interpreter, aggregate, def
+     const made = unknown === undefined ? { _tag: "Kept" } : { _tag: "Unknown", reason: unknown };
+     return made;
+ });
++/**
++ * A rule's text. One written as a name (`{ Rule }`, `Rule: Rule`) or as a member of a file read as a namespace
++ * (`Rule: Rules.Rule`) is the text of what that name is declared as, in the file that declares it, through the
++ * imports that give it: a rule moved to a file of its own is the rule it was, and a change to it there is a change.
++ */
++const ruleText = (modules, definition, node) => {
++  let module = definition.module;
++  let name = node.type === "Identifier" ? node.name : undefined;
++  if (
++    node.type === "MemberExpression" &&
++    !node.computed &&
++    node.object.type === "Identifier" &&
++    node.property.type === "Identifier" &&
++    !module.declarations.has(node.object.name)
++  ) {
++    const held = module.imports.get(node.object.name);
++    const file = held?.imported === "*" ? module.resolved.get(held.specifier) : undefined;
++    const next = modules.find((m) => m.path === file);
++    if (next) {
++      module = next;
++      name = node.property.name;
++    }
++  }
++  for (let hops = 0; name !== undefined && hops < 16; hops++) {
++    const declaration = module.declarations.get(name);
++    if (declaration?._tag === "Const" && declaration.init)
++      return module.source.slice(declaration.init.start, declaration.init.end);
++    if (declaration) break;
++    const imported = module.imports.get(name);
++    if (!imported || imported.imported === "*") break;
++    const file = module.resolved.get(imported.specifier);
++    const next = modules.find((m) => m.path === file);
++    if (!next) break;
++    module = next;
++    name = imported.imported;
++  }
++  return Paths.textOf(definition, node);
++};
++
+ /**
+  * Read the rules of a model, or of one aggregate, from the files that declare
+  * them, and compare each invariant in `changed` with the text it was locked as.
+@@ -112,7 +151,7 @@ export const inspect = Effect.fn(function* (options) {
+         for (const key of ["invariants", "transitions"])
+             for (const [rule, node] of Paths.written(definition, key)) {
+                 const name = options.qualified ? `${aggregate.aggregateName}.${rule}` : rule;
+-                const source = Paths.textOf(definition, node);
++                const source = ruleText(modules, definition, node);
+                 sources.set(name, { kind: key === "invariants" ? "invariant" : "transition", source });
+                 const locked = options.locked.get(name);
+                 if (key === "invariants" && locked !== undefined && normal(locked) !== normal(source))
+@@ -127,7 +166,7 @@ export const inspect = Effect.fn(function* (options) {
+         for (const [rule, node] of Paths.written(definition, "transitions"))
+             sources.set(`${decision.decisionName}.${rule}`, {
+                 kind: "transition",
+-                source: Paths.textOf(definition, node),
++                source: ruleText(modules, definition, node),
+             });
+     }
+     if (options.model !== undefined) {
+@@ -143,14 +182,14 @@ export const inspect = Effect.fn(function* (options) {
+                 for (const [rule, node] of Paths.written(definition, key))
+                     sources.set(`${options.model}.${rule}`, {
+                         kind: key === "invariants" ? "model invariant" : key,
+-                        source: Paths.textOf(definition, node),
++                        source: ruleText(modules, definition, node),
+                     });
+             for (const rule of Paths.relationNames(definition)) {
+                 const node = Paths.relationNode(definition, rule);
+                 if (node)
+                     sources.set(`${options.model}.${rule}`, {
+                         kind: "relation",
+-                        source: Paths.textOf(definition, node),
++                        source: ruleText(modules, definition, node),
+                     });
+             }
+         }
+diff --git a/src/Prove/internal/Lock.ts b/src/Prove/internal/Lock.ts
+index 98d616c..8b8b20f 100644
+--- a/src/Prove/internal/Lock.ts
++++ b/src/Prove/internal/Lock.ts
+@@ -129,6 +129,45 @@ export interface Inspected {
+   readonly compared: ReadonlyMap<string, Comparison>;
+ }
+ 
++/**
++ * A rule's text. One written as a name (`{ Rule }`, `Rule: Rule`) or as a member of a file read as a namespace
++ * (`Rule: Rules.Rule`) is the text of what that name is declared as, in the file that declares it, through the
++ * imports that give it: a rule moved to a file of its own is the rule it was, and a change to it there is a change.
++ */
++const ruleText = (modules: ReadonlyArray<Value.Module>, definition: Paths.Definition, node: Value.Node): string => {
++  let module = definition.module;
++  let name: string | undefined = node.type === "Identifier" ? node.name : undefined;
++  if (
++    node.type === "MemberExpression" &&
++    !node.computed &&
++    node.object.type === "Identifier" &&
++    node.property.type === "Identifier" &&
++    !module.declarations.has(node.object.name)
++  ) {
++    const held = module.imports.get(node.object.name);
++    const file = held?.imported === "*" ? module.resolved.get(held.specifier) : undefined;
++    const next = modules.find((m) => m.path === file);
++    if (next) {
++      module = next;
++      name = node.property.name;
++    }
++  }
++  for (let hops = 0; name !== undefined && hops < 16; hops++) {
++    const declaration = module.declarations.get(name);
++    if (declaration?._tag === "Const" && declaration.init)
++      return module.source.slice(declaration.init.start, declaration.init.end);
++    if (declaration) break;
++    const imported = module.imports.get(name);
++    if (!imported || imported.imported === "*") break;
++    const file = module.resolved.get(imported.specifier);
++    const next = modules.find((m) => m.path === file);
++    if (!next) break;
++    module = next;
++    name = imported.imported;
++  }
++  return Paths.textOf(definition, node);
++};
++
+ /**
+  * Read the rules of a model, or of one aggregate, from the files that declare
+  * them, and compare each invariant in `changed` with the text it was locked as.
+@@ -167,7 +206,7 @@ export const inspect = Effect.fn(function* (options: {
+     for (const key of ["invariants", "transitions"])
+       for (const [rule, node] of Paths.written(definition, key)) {
+         const name = options.qualified ? `${aggregate.aggregateName}.${rule}` : rule;
+-        const source = Paths.textOf(definition, node);
++        const source = ruleText(modules, definition, node);
+         sources.set(name, { kind: key === "invariants" ? "invariant" : "transition", source });
+         const locked = options.locked.get(name);
+         if (key === "invariants" && locked !== undefined && normal(locked) !== normal(source))
+@@ -181,7 +220,7 @@ export const inspect = Effect.fn(function* (options: {
+     for (const [rule, node] of Paths.written(definition, "transitions"))
+       sources.set(`${decision.decisionName}.${rule}`, {
+         kind: "transition",
+-        source: Paths.textOf(definition, node),
++        source: ruleText(modules, definition, node),
+       });
+   }
+   if (options.model !== undefined) {
+@@ -199,14 +238,14 @@ export const inspect = Effect.fn(function* (options: {
+         for (const [rule, node] of Paths.written(definition, key))
+           sources.set(`${options.model}.${rule}`, {
+             kind: key === "invariants" ? "model invariant" : key,
+-            source: Paths.textOf(definition, node),
++            source: ruleText(modules, definition, node),
+           });
+       for (const rule of Paths.relationNames(definition)) {
+         const node = Paths.relationNode(definition, rule);
+         if (node)
+           sources.set(`${options.model}.${rule}`, {
+             kind: "relation",
+-            source: Paths.textOf(definition, node),
++            source: ruleText(modules, definition, node),
+           });
+       }
+     }

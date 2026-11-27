@@ -9,7 +9,7 @@ Why: Verify runs each sequence its search found as a `Story`, and a `Story` star
   the clock before its first command, so the story runs it when the search did, whatever time the story starts at.
 Remove-when: The library's found sequences set the clock the search used before their first command.
   `bun run beep patches prove` then says this patch's test passes without it.
-Test: test/alchemy-domain/04-a-found-sequence-keeps-its-time/FoundSequenceTime.test.ts
+Test: test/alchemy-domain/06-a-found-sequence-keeps-its-time/FoundSequenceTime.test.ts
 
 diff --git a/lib/Explore/internal/Script.js b/lib/Explore/internal/Script.js
 index 36af935..06b1c41 100644

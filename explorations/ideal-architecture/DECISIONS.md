@@ -427,6 +427,17 @@ This narrows I8 for staging only: an email I name may be stored there. Known: st
 who can push a branch here can reach that person's account on staging; today only I can push. Rejected: share a
 test account's login. Reverse: delete the secret, deploy staging again, and delete the invited account.
 
+### 2026-11-26 — the lists of emails are written by the repository's stack
+
+Question: who may open a preview (`PREVIEW_ACCESS`) and production's sign-up list (`SIGN_UP`) were set by hand
+with `gh secret set`, outside the code. Should the repository's stack write them? I chose "Repository stack" and
+"Yes, both together"; the agent recommended the same. Each list is a field of a 1Password item, referenced from
+my `packages/infra/env/op.env.local`. `GitHub.stack.ts` asks 1Password for both and writes them as secrets of the
+`preview` and `production` environments. It stops without either one, and on a preview list that is not a list of
+emails. This supersedes the entry below on one point: the stack no longer writes the variable `SIGN_UP`, and the
+setup command's `--sign-up` flag is gone, so no email is in GitHub in the clear. Staging's own `SIGN_UP` secret is
+still set by hand. Reverse: put the `GitHub.Variable` and the flag back, and set both secrets by hand.
+
 ### 2026-11-25 — production's sign-up list is a secret
 
 Question: production read its sign-up list from a GitHub variable, which the public deploy log prints. Mine: keep
@@ -2270,6 +2281,22 @@ and carries everything on two slots.
 Reverse: 1, the parts are named in the stack and I deploy it; 2, the seed loop comes back; 3, the `TURBO_*` settings
 come out of the workflow and a cache step takes their place; 4, the variable is removed and the counts are literals
 again.
+
+### 2026-11-26 — CI speed: property run counts once the cache is shared
+
+Asked from the review of the shared cache's branch: a pull request set `PROPERTY_RUNS=short`, which is in every `test`
+task's hash, while the cache's only writers, main's push and the workstation, leave it unset. No pull request could
+have replayed a `test` task.
+
+1. **Which counts does a pull request run once the cache is shared?** I chose; the agent recommended the same. Today's
+   counts: a pull request sets `short` only while no cache is shared, and after that hashes as main and the
+   workstation do, so one that touches only documents replays every test, and one that changes a test's inputs pays
+   about 30 s more. This changes entry 4 of "the split, the seeds, the cache and the run counts" from the day the
+   stack is deployed; the variable stays in each task's `env`. Rejected: keeping `short` and saying a pull request's
+   fast tests never replay; taking the variable out of the hash, so a result made at one count replays at another.
+
+Reverse: the step's condition loses `vars.TURBO_CACHE_API == ''`, and the plan says a pull request's tests never
+replay.
 
 ### 2026-11-26 — CI speed: who writes to the cache, where its settings live, main's runs and the largest save
 

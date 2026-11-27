@@ -85,9 +85,9 @@ describe("the references a stack asks 1Password for", () => {
     ).toEqual({ A: "op://A Vault/An Item/ field " })
   })
 
-  it("a stage is asked only for what its plan reads: a test stage for nothing, production for its model key", () => {
-    expect(names("prod")).toEqual(["OPENROUTER_API_KEY"])
-    expect(names("pr-42")).toEqual(["PREVIEW_TEST_ACCOUNT_PASSWORD"])
+  it("a stage is asked only for what its plan reads: a test stage for nothing, production for its key and sign-up list, a preview for its gate", () => {
+    expect(names("prod")).toEqual(["OPENROUTER_API_KEY", "SIGN_UP"])
+    expect(names("pr-42")).toEqual(["PREVIEW_TEST_ACCOUNT_PASSWORD", "PREVIEW_ACCESS"])
     expect(names("staging")).toEqual(["PREVIEW_TEST_ACCOUNT_PASSWORD"])
     expect(names("test_ben")).toEqual([])
   })

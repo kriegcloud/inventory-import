@@ -8,7 +8,7 @@ import * as Result from "effect/Result"
 import * as R from "effect/Record"
 import * as Str from "effect/String"
 import { pipe } from "effect/Function"
-import { checkRun } from "../src/commands/Check/Check.command.ts"
+import { checkChanged, checkRun } from "../src/commands/Check/Check.command.ts"
 import { Repo } from "../src/Repo.service.ts"
 import { checkSummary, checkSentence } from "../src/commands/Check/CheckSummary.rules.ts"
 import { CheckFinding, TurboLogLine } from "../src/commands/Check/CheckSummary.schema.ts"
@@ -209,6 +209,50 @@ describe("check summary", () => {
       })
     )
   )
+  it.effect("filters on the commit where the branch left origin/main, and adds the runner's flags", () =>
+    inTree(
+      {},
+      Effect.gen(function* () {
+        const repo = yield* Repo
+        const git = (args: ReadonlyArray<string>) =>
+          repo.run("git", [
+            "-c",
+            "user.email=check@example.invalid",
+            "-c",
+            "user.name=check",
+            "-c",
+            "commit.gpgsign=false",
+            ...args
+          ])
+        yield* git(["init", "--quiet"])
+        yield* git(["commit", "--quiet", "--allow-empty", "-m", "base"])
+        const base = yield* git(["rev-parse", "HEAD"])
+        yield* git(["update-ref", "refs/remotes/origin/main", "HEAD"])
+        yield* git(["commit", "--quiet", "--allow-empty", "-m", "on the branch"])
+        yield* checkChanged(["sh", "-c", 'printf "%s\\n" "$@" > received.txt', "runner", "check"])
+        const received = yield* repo.text(repo.join(repo.root, "received.txt"))
+        expect(received).toBe(
+          `check\n--filter=[${A.headNonEmpty(Str.split("\n")(base.stdout))}]\n--continue\n--summarize\n--log-file=.turbo/check-output.json\n`
+        )
+      })
+    )
+  )
+
+  it.effect("refuses a branch with no origin/main and says what to run", () =>
+    inTree(
+      {},
+      Effect.gen(function* () {
+        const repo = yield* Repo
+        yield* repo.run("git", ["init", "--quiet"])
+        const result = yield* checkChanged(["sh", "-c", "exit 0"]).pipe(Effect.result)
+        const failed = Result.isFailure(result)
+        assert(failed)
+        expect(result.failure).toMatchObject({ path: "git merge-base HEAD origin/main" })
+        expect(result.failure.message).toContain("git fetch origin")
+      })
+    )
+  )
+
   it.effect("retains the newest ten JSON run records and leaves other files alone", () =>
     inTree(
       {

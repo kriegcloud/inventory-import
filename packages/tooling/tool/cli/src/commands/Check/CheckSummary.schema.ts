@@ -156,3 +156,22 @@ export class TurboLogLine extends S.Opaque<TurboLogLine, { readonly brand: uniqu
     text: S.String.pipe(S.annotateKey({ description: "One output line, without a task prefix" }))
   }).pipe($I.annoteSchema("TurboLogLine", { description: "A task's output line in turbo's structured log" }))
 ) {}
+
+/**
+ * Where this branch left `origin/main`: the commit `bun run check:changed` checks the changes since. Read from the
+ * first line `git merge-base HEAD origin/main` prints, so anything but a full commit id is refused, not guessed at.
+ * Measured on 2026-11-26 (`goals/focus-and-friction/PLAN.md`, step 5): with no base named, turbo compared against a
+ * local `main` 94 commits behind and counted every package as changed.
+ *
+ * @category schemas
+ */
+export const MergeBase = S.String.check(S.isPattern(/^[0-9a-f]{40}$/)).pipe(
+  $I.annoteSchema("MergeBase", { description: "The commit where this branch left origin/main, as git names it" })
+)
+
+/**
+ * A merge base as the code holds it.
+ *
+ * @category models
+ */
+export type MergeBase = typeof MergeBase.Type

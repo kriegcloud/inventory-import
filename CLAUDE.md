@@ -49,9 +49,9 @@ the line to write; `bun run imports:fix` repairs code.
   `sayError` (words for any failure).
   Building a second one is a decision for Benjamin, with the reason the first does not fit.
 - **Commit at each working step** with a conventional message (`feat:`, `fix:`, `test:`, `docs:`, `chore:`,
-  `refactor:`) that describes the change to the app. Run `bun run check` before every commit, and
-  `bun run format -- <your files>` if the format check fails. If you commit while the check fails, say so with the
-  reason in the commit message.
+  `refactor:`) that describes the change to the app. Run `bun run check:changed` before every commit and
+  `bun run check` before every push (Benjamin, 2026-11-26), and `bun run format -- <your files>` if the format check
+  fails. If you commit while the check fails, say so with the reason in the commit message.
 - **Prove it, then say it.** Check a change in the running app or with a test before calling it done. Report what you
   checked and what you did not. "Not verified" is an acceptable sentence. A claim you did not check is not.
 - **Look at it.** A change to what the person sees is done only when it was seen on screen, and your message says

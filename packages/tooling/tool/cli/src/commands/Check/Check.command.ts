@@ -4,6 +4,7 @@ import * as Console from "effect/Console"
 import * as Str from "effect/String"
 import * as O from "effect/Option"
 import * as Effect from "effect/Effect"
+import * as S from "effect/Schema"
 import * as Argument from "effect/cli/Argument"
 import * as Command from "effect/cli/Command"
 import * as ChildProcess from "effect/process/ChildProcess"
@@ -11,7 +12,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import { RepoError } from "../../Cli.errors.ts"
 import { Repo } from "../../Repo.service.ts"
 import { emit } from "../../Report.schema.ts"
-import { CheckFinding, CheckRunFailed } from "./CheckSummary.schema.ts"
+import { CheckFinding, CheckRunFailed, MergeBase } from "./CheckSummary.schema.ts"
 import { checkRuns, checkSentence, checkSummary } from "./CheckSummary.rules.ts"
 
 /** Runs turbo, retaining exactly its exit code even when the summary cannot be read. */
@@ -116,6 +117,39 @@ export const checkRun = Effect.fn("Check.run")(function* (args: ReadonlyArray<st
   if (code !== 0) return yield* CheckRunFailed.make({ code })
 }, Effect.scoped)
 
+/**
+ * Where this branch left `origin/main`, the base `check:changed` filters on. A branch with no merge base (no fetch
+ * yet, or `origin/main` unknown) is told what to run, never checked against a guess.
+ */
+export const changedBase = Effect.fn("Check.changedBase")(function* () {
+  const repo = yield* Repo
+  const merged = yield* repo.run("git", ["merge-base", "HEAD", "origin/main"])
+  const first = A.head(Str.split("\n")(merged.stdout))
+  const base =
+    merged.code === 0 && O.isSome(first)
+      ? yield* S.decodeEffect(MergeBase)(first.value).pipe(Effect.option)
+      : O.none<MergeBase>()
+  if (O.isNone(base))
+    return yield* RepoError.make({
+      path: "git merge-base HEAD origin/main",
+      message: "found no commit where this branch left origin/main: run git fetch origin, then check:changed again"
+    })
+  return base.value
+})
+
+/**
+ * The check before a commit (Benjamin, 2026-11-26): the tasks given, for only the packages changed since this branch
+ * left `origin/main` (committed or not; `--filter=[<base>]`, which leaves out the packages that depend on them), and
+ * every root task named. The dependents' tests, and every other test, are `bun run check`'s, before a push.
+ */
+export const checkChanged = Effect.fn("Check.changed")(function* (args: ReadonlyArray<string>) {
+  const base = yield* changedBase()
+  yield* Console.error(
+    `check:changed: the packages changed since ${Str.slice(0, 8)(base)}, where this branch left origin/main`
+  )
+  return yield* checkRun(A.append(args, `--filter=[${base}]`))
+})
+
 /** Shows the latest turbo record without starting another check. */
 export const checkSummaryCommand = Command.make("summary", {}, () =>
   checkSummary().pipe(Effect.flatMap(emit(checkSentence)))
@@ -126,5 +160,13 @@ export const checkRunCommand = Command.make(
   { args: Argument.String("args").pipe(Argument.variadic()) },
   ({ args }) => checkRun(args)
 )
-/** The commands for running a check or reading its last summary. */
-export const checkCommand = Command.make("check").pipe(Command.withSubcommands([checkSummaryCommand, checkRunCommand]))
+/** Accepts turbo's task names and flags after `--`, and checks only the packages changed since `origin/main`. */
+export const checkChangedCommand = Command.make(
+  "changed",
+  { args: Argument.String("args").pipe(Argument.variadic()) },
+  ({ args }) => checkChanged(args)
+)
+/** The commands for running a check, a check of what changed, or reading its last summary. */
+export const checkCommand = Command.make("check").pipe(
+  Command.withSubcommands([checkSummaryCommand, checkRunCommand, checkChangedCommand])
+)

@@ -18,7 +18,7 @@ pull request is merged, or, for a step with none, when its record below is writt
 | 4 | `CLAUDE.md` as an index: which goal owns it, to what length, then the move | one | doing |
 | 5 | Measure `bun run check`: how long, and what a failure prints | the record below | done: 2026-11-26 |
 | 6 | One summary at the end of a failing check | one | doing |
-| 7 | `bun run check:changed` | one | todo |
+| 7 | `bun run check:changed` | one | doing |
 | 8 | A merge that finishes on its own | none, or one for the rule in `CLAUDE.md` | todo |
 | 9 | The worktrees and the main checkout | one for `CLAUDE.md` | todo |
 | 10 | Close: the closing note, `status: done`, `bun run check:full` on main | one | todo |
@@ -200,6 +200,33 @@ then `turbo run check lint test --affected` for the type-check and the fast test
 The target time comes from step 5. It is documented as the check before a commit, with `bun run check` still before
 every push. Whether `CLAUDE.md`'s "Run `bun run check` before every commit" becomes "`check:changed` before a commit,
 `check` before a push" is his; until he says so, the rule stays.
+
+**Done, 2026-11-26.** `bun run check:changed` is `bun run beep check changed -- turbo run check lint test` with every
+root task of `check`. The command reads where the branch left `origin/main` (`git merge-base HEAD origin/main`,
+decoded as a full commit id; none is refused with "run git fetch origin") and adds `--filter=[<that commit>]`. That
+filter selects only the packages changed since then, committed or not, and not the packages that depend on them, as
+Benjamin chose ("the commit check's tests"). The root tasks always run, and turbo replays each one whose inputs did
+not change. So the laws are not given a list of files, as this step first planned: the turbo cache already skips them.
+`prove` is left to `bun run check`. It goes through step 6's runner, so a failure ends with the same summary.
+config-sync now holds its root tasks too.
+
+Measured on this branch, one run each, on the same shared machine (load average 18 to 32):
+
+| Change | `check:changed` | Tasks (replayed) | `bun run check` |
+| --- | --- | --- | --- |
+| Nothing beyond the branch | 3.4 s | 32 (22) | 4.6 s, 107 (90) |
+| One comment line in `packages/catalog/model/src/Item/Items.handler.ts` | 35.5 s; ran only `catalog-model`'s check, lint and test | 35 (11) | 62.6 s, 107 (77), a second comment line so nothing was replayed from the first |
+| One comment line in `apps/inventory/src/web/Workspace.tsx` | 10.2 s | 35 (13) | not run; step 5 measured 10 s |
+| `x ?? ""` added to `packages/catalog/model/src/Words.rules.ts` | failed, 35.6 s, and ended with `defaults:check`, `Words.rules.ts:16  x ?? ""` and "Put the starting value on the schema" | 35 (11) | not run |
+
+So on a model change the commit check takes about half the time of the push check, and on a web change it is no
+slower. Step 5's 163 s for `catalog-web`'s tests did not recur. With the shared turbo cache of pull request 33, the
+whole push check took 62.6 s. As Benjamin decided, `CLAUDE.md`, "How we work", now says `check:changed` before every
+commit and `check` before every push.
+
+Found on the way: a worktree under `.claude/worktrees/` sits inside the main checkout, and bun reads the main
+checkout's `package.json` from there. While that file held a merge conflict at 21:27, `lockfile:check` failed in this
+worktree for a reason this branch did not cause. It cleared once the other session finished its merge.
 
 ## 8. A merge that finishes on its own
 

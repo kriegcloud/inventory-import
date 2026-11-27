@@ -2204,6 +2204,8 @@ Asked by dialog in two rounds, once the goal `focus-and-friction` was written (p
    and the main checkout is left alone; those are listed for me. Rejected: a list first, with nothing removed until I
    name each.
 
+**Own tests only, decided by dialog 2026-11-26.** check:changed runs a changed package's own tests; its dependents' tests wait for `bun run check` before the push. I chose; the agent recommended the same.
+
 Next: steps 4 to 7 and 9 of `goals/focus-and-friction` start; 6 waits on me; 3 waits on a person.
 
 Reverse: 1, the pause ends early by a dated line here; 2, the session moves to a stage; 3 and 4, the text moves back

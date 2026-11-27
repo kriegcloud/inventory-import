@@ -160,3 +160,26 @@ reference a person gave it.
 
 The rest of what repeats the workspaces is held elsewhere: the two stylesheet lists by `bun run beep laws screens`,
 which package may import which by `bun run beep laws boundaries`.
+
+## Check runs and their summary
+
+Before every commit, `bun run check:changed` compares with the merge base of `HEAD` and `origin/main`, including
+uncommitted and untracked files. It runs all root laws, the changed packages' and their dependents' type-check and
+lint, and only the changed packages' own tests and proofs. Dependents' tests wait for `bun run check` before every
+push. With only root files or docs changed it runs root laws only; a change to `turbo.json`, `bun.lock`, root
+`package.json` or `tsconfig.base.json` runs every package's own tests too. Extra arguments after `--` reach turbo.
+If `origin/main` is missing, run `git fetch origin main` first. Both commands use the same runner and failure summary.
+
+
+`bun run check`, `check:full` and `check:ci` run `bun run beep check run -- turbo run <tasks>`. The runner
+passes the task list and flags to turbo, adds `--continue --summarize` and a structured `--log-file`, and
+inherits the terminal streams. Every task can finish, even when another fails. A successful run prints only
+turbo's output. A failed run ends with each failed task's diagnostic lines and its log path, then the number
+of failed and attempted tasks. The runner returns turbo's exit code.
+
+`bun run beep check summary` reads the newest `.turbo/runs/*.json` without starting tasks. The runner retains
+the newest ten run records and their structured output companions. Uncached tasks have no separate turbo task
+log, so their diagnostic lines come from that companion. Diagnostic lines are capped at ten per task, with the
+overflow count and log path; an unfamiliar log contributes its last eight nonempty lines. No law changes its
+output or writes another findings file. For a narrower run, `bun run check -- --filter=@beep/repo-cli`
+forwards the filter; `--force` is forwarded too.

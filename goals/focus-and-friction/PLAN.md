@@ -17,8 +17,8 @@ pull request is merged, or, for a step with none, when its record below is writt
 | 3 | The person's session: prepared, run by Benjamin, written down | one for the record | todo |
 | 4 | `CLAUDE.md` as an index: which goal owns it, to what length, then the move | one | todo |
 | 5 | Measure `bun run check`: how long, and what a failure prints | the record below | done: 2026-11-26 |
-| 6 | One summary at the end of a failing check | one | todo |
-| 7 | `bun run check:changed` | one | todo |
+| 6 | One summary at the end of a failing check | 35 | done: 2026-11-26 |
+| 7 | `bun run check:changed` | one | doing |
 | 8 | A merge that finishes on its own | none, or one for the rule in `CLAUDE.md` | todo |
 | 9 | The worktrees and the main checkout | one for `CLAUDE.md` | todo |
 | 10 | Close: the closing note, `status: done`, `bun run check:full` on main | one | todo |
@@ -127,13 +127,97 @@ type-error case's diff was not saved, so only its log shows the change.
 Whether turbo can run a task after a failed one, or `check` needs a small runner script, is found out in the
 scratchpad first.
 
+
+**Built, 2026-11-26. The design changed.** No law writes a findings file. The summary reads what turbo already
+records: its run summary (`--summarize`, `.turbo/runs/<id>.json`) names every failed task, and the run's own log
+(`--log-file`, kept beside it as `<id>.log`) holds what each task printed. So no law changed, and the type-check,
+oxlint, the formatter and the tests are summarised the same way as the laws.
+
+- `check`, `check:full` and `check:ci` are now `bun packages/tooling/tool/cli/src/bin.ts check run -- turbo run
+  <the same tasks>`. The runner streams turbo's output unchanged, adds `--continue` and `--summarize` when they are
+  not already there (CI passes both), and returns turbo's exit code. On a failure it prints the summary last. On
+  success it prints nothing more. Whatever a caller appends still reaches turbo (`bun run check -- --filter=...`,
+  `--force`). It keeps the ten newest run records.
+- `bun run beep check summary` prints the summary of the newest run by hand.
+- For each failed task the summary gives up to ten lines that say what to fix, whole, with the file and line where
+  the log names them, then the log that holds the rest. A log with no such line gives its last eight lines.
+- A task turbo never caches (every root law, the format check) keeps a log file from an earlier run, or none, so the
+  summary reads this run's own output first and a task's log file only when that holds nothing.
+- `config-sync` writes and checks the three scripts in their new form.
+
+**Checked.** A scratch line with one `??` and one `x!` in `packages/catalog/model/src/Words.rules.ts`, then
+`bun run check`: exit 1, 104 of 107 tasks passed, and the output ended with
+
+```
+//#assertions:check (exit 1)
+  packages/catalog/model/src/Words.rules.ts:16:62: error typescript(no-non-null-assertion): Forbidden non-null assertion.
+//#defaults:check (exit 1)
+  packages/catalog/model/src/Words.rules.ts  holds 1 fallback, and may hold 0: ... Put the starting value on the schema ...
+  packages/catalog/model/src/Words.rules.ts:16  xs[0]! ?? "x"
+//#format:check (exit 1)
+  packages/catalog/model/src/Words.rules.ts (0ms)
+3 of 107 tasks failed
+```
+
+Both laws are reported in one run, where step 5 saw only the first. With the line removed, `bun run check` passed
+107 of 107 and printed no summary; run again it replayed 96 from the cache in 3.9 s, as before.
+`bun run check -- --filter=@beep/repo-cli` ran 32 tasks. The test `test/CheckSummary.test.ts` feeds the summary two
+laws' failures and a package's type error.
+
+**Not checked.** `check:full` and `check:ci` were not run whole; they share the runner, and CI runs `check:ci` on
+the pull request. The assertions law's line says what is forbidden and not what to write: that is oxlint's text, and
+the summary adds nothing to a law's words.
+
 ## 7. `check:changed`
 
-**To do.** `bun run check:changed`: the file-reading laws on `git diff --name-only $(git merge-base HEAD origin/main)`,
-then `turbo run check lint test --affected` for the type-check and the fast tests of the packages those files touch.
-The target time comes from step 5. It is documented as the check before a commit, with `bun run check` still before
-every push. Whether `CLAUDE.md`'s "Run `bun run check` before every commit" becomes "`check:changed` before a commit,
-`check` before a push" is his; until he says so, the rule stays.
+**Decided 2026-11-26.** By dialog, as recommended: "Own tests only" — it type-checks and lints the changed packages
+and everything that depends on them, runs every root law, and runs tests only in the packages whose files changed;
+dependents' tests wait for `bun run check` before the push. `bun run check` is unchanged and still runs everything.
+
+**To do.** Build and measure `bun run check:changed` before a commit. Root laws run whole, rather than per changed
+file: they take seconds and most read the whole tree. The merge base with `origin/main` selects changed packages,
+including uncommitted and untracked files; type-check and lint include dependents, but tests and proofs belong to
+changed packages only. No package changed means root laws only. Shared root configuration runs all packages' own
+tests as well. Reuse the full check's runner and failure summary.
+
+**Built.** `check changed` reads the root laws from the root `check` script, and package names, scripts and dependency
+edges from workspace manifests. A schema-backed pure planner emits one turbo run, with explicit own `test` and
+`prove` tasks and the merge-base filter for type-check and lint. It shares `check run`'s runner, `--continue`,
+`--summarize`, failure summary and exit code. Extra arguments after `--` reach turbo. No scope-override option was
+added just for timing.
+
+Timed by hand before the build, with the same turbo line the planner writes, beside step 5's full check:
+
+| One comment line in | Full check (step 5) | The changed-only turbo line | Tasks in changed run |
+| --- | --- | --- | --- |
+| `packages/catalog/model/src/Item/Items.handler.ts` | 167 s | 68 s | 39 |
+| `apps/inventory/src/web/Workspace.tsx` | 10 s | 13 s | 32 |
+
+The model change avoids its dependents' long tests. The web change gains nothing: the app has no dependents, and
+the root laws run either way. The command itself was not timed on a one-file change: this branch changes the root
+`package.json`, which makes every run on it the global case. That timing is taken on main after the merge, and
+SPEC's acceptance stays unticked until then.
+
+End to end on this branch: `bun run check:changed`, with the root
+`package.json` changed, announced all 28 packages and passed 107 of 107 tasks, zero replayed, in 196.85 s wall time
+(turbo: 196.517 s). This is the global-change case, not an isolated one-file timing.
+
+**Probed.** On this checkout with turbo 2.11.13 and merge base `4043181f`, `turbo ls --filter=[B] --output=json`
+selected zero packages with no change, 28 after a whitespace edit to `turbo.json`, and zero after whitespace edits
+to each of `bun.lock`, root `package.json` and `tsconfig.base.json`. With this build's root script and CLI edits it
+selected only `@beep/repo-cli`. So the command also checks changed root paths explicitly: any of those four files
+runs every package's own tests and proofs, and says so. Every probe file was restored byte for byte.
+
+**Checked.** The CLI's type-check, lint and 740 fast tests passed, including the planner's leaf, dependent/proof,
+no-package and global-change cases and forwarding arguments through Bun. `config-sync:check` and `docs:check`
+passed. In a temporary root without `origin/main`, the command exited 1 with the instruction to
+`git fetch origin main`.
+
+Appending `export const scratchTwo = (xs: ReadonlyArray<string>) => xs[0]! ?? "x"` to
+`packages/catalog/model/src/Words.rules.ts`, then running `check:changed`, exited 1 in 54.42 s. Its final summary
+named both `//#assertions:check` and `//#defaults:check`: 2 of 107 tasks failed. The file was then restored byte for
+byte from its saved copy. The full `bun run check` then passed 107 of 107 tasks, 92 replayed, in 3.62 s wall time
+(turbo: 3.445 s). SPEC's acceptance remains unticked; step 7 stays `doing` until its pull request is merged.
 
 ## 8. A merge that finishes on its own
 
@@ -180,6 +264,5 @@ In short:
 - **Step 9.** An agent removes clean worktrees whose commit is in main. Dirty or unmerged ones, and the main checkout,
   are listed for him.
 
-**Open since step 5.** Does `check:changed` run only the changed packages' own tests, and leave their dependents'
-tests (for example `catalog-web`'s 163 s after a model change) to `bun run check` before the push? Recommended: yes,
-since the push still runs every test. Put to Benjamin when step 7 opens.
+**Answered in step 7.** Own tests only, decided by dialog on 2026-11-26 as recommended; dependents' tests wait for
+the full check before the push.

@@ -12,11 +12,12 @@
  */
 import { $RepoCliId } from "@beep/identity/packages"
 import * as S from "effect/Schema"
+import * as Runtime from "effect/Runtime"
 
 const $I = $RepoCliId.create("commands/Check/CheckSummary.schema")
 
 /**
- * One task's execution as turbo records it. A task turbo never started (its dependency failed) has none.
+ * One task's execution as turbo records it. Turbo may omit a cancelled or never-started task entirely. A row without execution is tolerated as unattempted.
  *
  * @category schemas
  */
@@ -40,8 +41,10 @@ export class TurboTask extends S.Class<TurboTask, { readonly brand: unique symbo
     directory: S.String.pipe(
       S.annotateKey({ description: "The package's folder, relative to the repository's root; empty for the root" })
     ),
-    logFile: S.String.pipe(
-      S.annotateKey({ description: "The task's log, relative to its package's folder, as turbo names it" })
+    logFile: S.OptionFromOptionalKey(S.String).pipe(
+      S.annotateKey({
+        description: "The task's log, relative to the repository root; absent for tasks without a saved log"
+      })
     ),
     execution: S.OptionFromOptionalKey(TurboExecution).pipe(
       S.annotateKey({ description: "How the task ended; none when turbo never started it" })
@@ -134,3 +137,22 @@ export const CheckFinding = S.TaggedUnion({
  * @category models
  */
 export type CheckFinding = typeof CheckFinding.Type
+
+/** Carries turbo's exit code through the CLI runtime without printing a second error. */
+export class CheckRunFailed extends S.TaggedError<CheckRunFailed, { readonly brand: unique symbol }>(
+  $I`CheckRunFailed`
+)(
+  "CheckRunFailed",
+  { code: S.Int.pipe(S.annotateKey({ description: "The child process exit code" })) },
+  $I.annote("CheckRunFailed", { description: "Turbo failed; preserve its exit code" })
+) {
+  override readonly [Runtime.errorExitCode] = this.code
+}
+
+/** One task output line from turbo's structured log, including tasks whose cache is disabled. */
+export class TurboLogLine extends S.Opaque<TurboLogLine, { readonly brand: unique symbol }>()(
+  S.Struct({
+    source: S.String.pipe(S.annotateKey({ description: "Turbo task id, or turbo for the runner's own output" })),
+    text: S.String.pipe(S.annotateKey({ description: "One output line, without a task prefix" }))
+  }).pipe($I.annoteSchema("TurboLogLine", { description: "A task's output line in turbo's structured log" }))
+) {}

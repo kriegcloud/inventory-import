@@ -20,6 +20,24 @@ from: explorations/ideal-architecture
 | 6 | `@inventory/catalog-web`: the upload, the Items page and its editor, the assistant, the import's steps | done |
 | 7 | `@inventory/review`: the region's state with undo, saved progress, the grid, the queue; the A6 remodel | done |
 | 8 | TanStack Query removed (A2); the lint everywhere; the documents the move made false | done |
+| 9 | The kit, batch 2: the data grid ("The kit on atoms") | todo |
+| 10 | The kit, batch 3: the frame and the form pieces | todo |
+| 11 | The kit, batch 4: the pieces no screen uses today | todo |
+
+Steps 9 to 11 are the goal's widening of 2026-11-22 ("atoms A1, the kit too": the whole kit, the table first). Batch 1,
+the data table, is done ("Batch 1, the data table", below). On `main` at `5aa253aa`, counting only the state and effect
+hooks (`useState`, `useReducer`, `useMemo`, `useCallback`, the three effect hooks, `useSyncExternalStore`,
+`useImperativeHandle`; no `useRef`, `useId` or `useContext`), the kit still holds 305 calls: batch 2 176, batch 3 19,
+batch 4 110. `packages/ui/.oxlintrc.kit.json` reads batch 1's files only.
+
+## Current blocker
+
+None for batches 2 and 3. Batch 4 asks Benjamin first whether a piece no screen uses is moved or deleted
+("The kit on atoms"). The goal is `done` when step 11 is, the kit lint reads the two folders whole and the SPEC's
+acceptance is ticked.
+
+The branch `claude/atoms-b569e5` holds 17 commits that are not on `main` (its last a draft audit marked "wip … not
+checked yet"); it is draft-machine work, not a step of this table, and is left as it is.
 
 ## The hook count
 

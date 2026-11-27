@@ -65,6 +65,28 @@ sorted lines.
   with `dual`, and the prover reads through it: with `matching: e.matching` dropped from it, `AMatchIsTheNextOne` was
   `Violated` for `MatchColumn`. The line was put back.
 
+- **The aggregate's file can be a listing and nothing else** (`FullShape.test.ts`, `full/`). Every event's `evolve`
+  is beside its event and every command's `decide` beside its command, in seven `.command.ts` files and two
+  `.event.ts` files (for `ActCounted` and `GroupCounted`, which only a decision records); the four invariants are in
+  `Import.state.ts` with the state; the 23 transitions and the two unions they read are in `Import.rules.ts`; five
+  shared rejections are in `Import.rejection.ts`. `Import.aggregate.ts` goes from 725 lines to 99: its comment, its imports and
+  the listing. The import stands as the baseline does, line for line, with the listing written out (`Name: Name`) and
+  in shorthand (`full-shorthand/`). With one moved transition and one moved invariant changed, three proofs were
+  `Violated`; the files were made again.
+- **Transitions cannot sit beside the state or an event.** A transition reads the command and the events, so its
+  file imports every command's file, and every command's file imports the state's. They need a file above the
+  commands; the invariants read the state alone and sit with it.
+- **Only a `decide` costs mutants.** All 60 of the mutants that name `Import.aggregate.ts` change a line of a
+  `decide`; none changes an `evolve`, a transition or an invariant. Each of the 60 names the file and the line's text
+  with its indentation, and both change.
+
+- **Under the whole model, the transitions must stay where they are.** With them in `Import.rules.ts` the model's
+  verify fails on the lock for all 23: "changed from the rule locked in Catalog.lock.json: only an invariant of an
+  aggregate is compared with the one it was". The lock keeps each rule's text. `model-full` therefore keeps the two
+  unions and the transitions in the aggregate's file, in place, and moves everything else: verified against the
+  package's lock, the lock unchanged. The same shape, alone and formatted, is
+  [import-module](../import-module/NOTE.md).
+
 Not tried here: the stories; `laws block-files` and `laws model-inputs` on the new files. The model's mutants name a file, an
 anchor and the exact text of a line with its indentation (60 of the 192 name `src/Import/Import.aggregate.ts`), so
 moving a decide means writing those again; moving only a command and its event leaves every decide where its mutants

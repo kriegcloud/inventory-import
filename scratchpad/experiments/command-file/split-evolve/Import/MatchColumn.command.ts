@@ -2,6 +2,7 @@
 // variant) what the import decides of it.
 import * as Domain from "@alchemy.run/domain"
 import * as Effect from "effect/Effect"
+import { dual } from "effect/Function"
 import * as S from "effect/Schema"
 import { CurrentActor } from "../Actor/Actor.context.ts"
 import { Session } from "../Actor/Session.middleware.ts"
@@ -19,8 +20,14 @@ export class ColumnMatched extends Domain.Event(
   { description: "A column was matched to a field: every field's column after it" }
 ) {
   /** What an import is after a match: an open one takes the match, any other is as it was. */
-  static readonly evolve = (s: ImportState, e: ColumnMatched): ImportState =>
-    ImportState.guards.Open(s) ? { ...s, changes: e.change, matching: e.matching, columns: e.columns } : s
+  static readonly evolve: {
+    (e: ColumnMatched): (s: ImportState) => ImportState
+    (s: ImportState, e: ColumnMatched): ImportState
+  } = dual(
+    2,
+    (s: ImportState, e: ColumnMatched): ImportState =>
+      ImportState.guards.Open(s) ? { ...s, changes: e.change, matching: e.matching, columns: e.columns } : s
+  )
 }
 
 /** Match a column to a field. `columns` is every field's column after it; `saw` the matching the sender's screen has. */

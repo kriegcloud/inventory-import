@@ -4,7 +4,7 @@ title: Module taxonomy
 description: Whether the per-unit module shape tried on RPCs in beep-effect (one unit, role-named files, a contract door and a handler door) gives @alchemy.run/domain blocks, and the rest of this repository, one consistent structure. A reading from source and two experiments run: a command in its own file proves as before, and a registry of kinds refuses sixteen of the two contexts' 173 files.
 status: active
 stage: shape
-next: he said the brief matches (2026-11-27); graduate it to the goal module-kinds when he asks; decisions 2, 6 and 7 are open and block no part of its first slice
+next: he reads scratchpad/experiments/import-module and says whether that shape replaces decision 1; the brief matches as written (2026-11-27); decisions 2, 6 and 7 are open
 goals: []
 ---
 
@@ -288,3 +288,9 @@ whether a block's name, tag and stem being equal is a law.
 - 2026-11-27: he asked whether an event could carry its own `evolve` (`GroupDecided: GroupDecided.evolve`), and
   rules and decisions likewise. Tried on `Import`: as a static of the event's class the prover does not read it (27
   rules `NotTranslated`); as an exported function beside the event it stands as the baseline. Not a decision yet.
+- 2026-11-27: he asked for the full shape, then for one module to read. `scratchpad/experiments/import-module`: the
+  `Import` aggregate as twelve files, each `evolve` beside its event, each `decide` beside its command, the
+  invariants with the state. It proves as the package's file does and the whole model verifies against the unchanged
+  lock. The transitions stay in the aggregate's file: moved, the lock refuses all 23. An `evolve` as a static of
+  its event's class, which he asked for twice, is not read by the prover. This shape is not decision 1 as he answered
+  it ("decide stays"); he has not been asked to change it.

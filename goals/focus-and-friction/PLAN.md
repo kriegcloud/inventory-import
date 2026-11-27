@@ -20,7 +20,7 @@ pull request is merged, or, for a step with none, when its record below is writt
 | 6 | One summary at the end of a failing check | one | todo |
 | 7 | `bun run check:changed` | one | todo |
 | 8 | A merge that finishes on its own | none, or one for the rule in `CLAUDE.md` | todo |
-| 9 | The worktrees and the main checkout | one for `CLAUDE.md` | todo |
+| 9 | The worktrees and the main checkout | one for `CLAUDE.md` | doing |
 | 10 | Close: the closing note, `status: done`, `bun run check:full` on main | one | todo |
 
 Every question was answered on 2026-11-26 ("Decided", below). Step 5 is done. Steps 4, 6, 7 and 9 can start. Step 8 waits on Benjamin's change to the settings, and step 3 on a person he brings.
@@ -162,6 +162,52 @@ one. `.claude/worktrees/` is where the Claude app puts them, and nothing written
 yes, remove the clean ones whose branch is in main and the clean detached ones whose commit is in main, then
 `git worktree prune`. He says whose the main checkout's changes are. `CLAUDE.md`, "How we work", gets one line on where
 worktrees go.
+
+**Done, 2026-11-26, 20:55.** 57 worktrees were listed with `git worktree list --porcelain`, and each was read for its
+branch, whether its commit is in `origin/main`, `git status --porcelain` and its last commit's date. None of them had a
+process running inside it. Seven were clean with their commit in main, and were removed with `git worktree remove`,
+then `git worktree prune`:
+
+| Removed | Branch | Commit |
+| --- | --- | --- |
+| `.claude/worktrees/alchemy-uptake-setup` | `docs/alchemy-uptake-goal` (#30, merged) | `a4c37ae9` |
+| `.claude/worktrees/integration-b24a` | `integration/b48` | `c66937b5` |
+| `.claude/worktrees/kernel-drivers-c595b2` | detached | `3a3ff59b` |
+| `.claude/worktrees/party-slice` | `goal/party-slice` (#23, merged) | `e8b5aafb` |
+| `.claude/worktrees/patches` | `claude/patches` | `5e99a950` |
+| `.claude/worktrees/strict-hosts-5e2ab1` | detached | `c21d5482` |
+| the atoms session's cache, `scratchpad/loop` | detached | `c0391da7` |
+
+The four local branches among them were deleted with `git branch -d`, which refuses a branch that is not merged. Their
+copies on GitHub were left, since deleting those is the setting of step 8. What git ignores in them went with them:
+`.mutants/` folders, `.scratch/` screenshots and one `.scratch-dev.log`.
+
+The 51 left, this step's own included, each with why it stays:
+
+| Worktree | Branch | In main | Changed files | Last commit | Why it stays |
+| --- | --- | --- | --- | --- | --- |
+| the main checkout | `feat/domain-uptake-move-1` | no | 63 | 2026-11-26 | Pull request 32, open; a session is working there. Whose the changes are is Benjamin's |
+| `.claude/worktrees/focus-and-friction` | `goal/ff-summary` | no | 0 | 2026-11-26 | Step 6, pull request 35, open |
+| `.claude/worktrees/ff-worktrees` | `goal/ff-worktrees` | no | 2 | 2026-11-26 | This step's pull request |
+| `.claude/worktrees/ci-speed` | `fix/ci-cache-run-counts` | yes | 1 | 2026-11-26 | One changed file |
+| `.claude/worktrees/integration` | `integration/b10` | yes | 0 | 2026-11-22 | Clean and in main, but git ignores an `.alchemy/` state folder and `packages/infra/env/op.env.local` in it. Benjamin's |
+| `sean-demo/rebuild` (a sibling folder) | detached | yes | 0 | 2026-11-22 | Clean and in main, but in another project's folder. Benjamin's |
+| `interview/inventory-import-latest` (a sibling folder) | `chore/actions-node24` | no | 0 | 2026-11-26 | Branch not in main |
+| `.claude/worktrees/integration-b11` | `integration/b43` | no | 0 | 2026-11-23 | Branch not in main |
+| `.claude/worktrees/wf_9da7e007-88f-3` | `worktree-wf_9da7e007-88f-3` | no | 0 | 2026-11-23 | Branch not in main |
+| `.claude/worktrees/atoms-b569e5` | detached | no | 0 | 2026-11-25 | Commit not in main |
+| `.claude/worktrees/defaults-last` | detached | no | 0 | 2026-11-26 | Commit not in main |
+| `.claude/worktrees/wf_083b9049-27a-1`, `wf_0a2b9bdf-fd3-1` | detached | no | 2 each | 2026-11-22 | Changed, commit not in main |
+| `.claude/worktrees/wf_29cd7dc9-997-1` | detached | no | 11 | 2026-11-22 | Changed, commit not in main |
+| `.claude/worktrees/wf_31a2095e-a44-1`, `-2` | their own `worktree-wf_…` branches | yes | 2 and 1 | 2026-11-22 | Changed |
+| 21 other `.claude/worktrees/wf_*` of workflows from 2026-11-21 and 22 | detached | yes | 1 to 57 | 2026-11-21 to 22 | Changed |
+| 14 under the atoms session's cache: `scratchpad/chk-world` and its 13 mutant copies in `.mut/` | detached | no | 22 to 25 | 2026-11-22 | Changed, commit not in main |
+
+The `wf_*` worktrees are what Workflow runs left behind: a child agent's worktree is kept when it has changes. Most
+of those changes may be work that a merged pull request already holds in another form, but that was not checked file
+by file, so they stay until Benjamin says.
+
+`CLAUDE.md`, "How we work", now says where this repository's worktrees go and when one is removed.
 
 ## Decided 2026-11-26
 

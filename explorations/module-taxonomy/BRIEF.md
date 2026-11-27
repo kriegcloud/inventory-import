@@ -88,7 +88,7 @@ kind. The experiment's test does both readings over the real tree in under a sec
 | --- | --- | --- |
 | `<Tag>.event.ts` | `Event`, `evolve` | `ImportStaged.Event`, `ImportStaged.evolve` |
 | `<Tag>.command.ts` | `Command`, `decide`, the rejections only it returns | `StageImport.Command`, `DecideRow.decide` |
-| `<Noun>.rejection.ts` | each rejection several commands return, by its own name, and a record of fields they share | named imports |
+| `<Noun>.rejection.ts` | each rejection several commands return, by its own name, and a record of fields the module's rejections spread, a command's own included | named imports |
 | `<Noun>.state.ts` | each case by its name (a branded `S.Opaque` class), `State`, `guards`, `cases`, `isAnyOf`, each invariant, and what is worked out of a state | `ImportState.State`, `ImportState.Open`, `ImportState.guards.Open` |
 | `<Noun>.transition.ts` | each rule of a step, by its own name | named imports, listed by name |
 | `<Union>.union.ts` | one tagged union, the file named for it (decision 8b) | `ImportEvent.guards.ActCounted` |

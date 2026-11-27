@@ -1,4 +1,5 @@
-// The rejections more than one command of the review returns, and the record of fields three of them share.
+// The rejections more than one command of the review returns, and `whose`, a record of fields that one of them and
+// two of `DecideRow`'s own rejections spread.
 import * as Domain from "@alchemy.run/domain"
 import * as S from "effect/Schema"
 import { Change } from "./Change.schema.ts"

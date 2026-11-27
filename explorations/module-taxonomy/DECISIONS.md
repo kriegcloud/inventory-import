@@ -208,6 +208,8 @@ Asked by dialog after decision 1 was replaced. He picked the recommended option.
 - Rationale: nine classes of `Import` are named `Event`, and an editor offers `import { Event }` for each. Rejected:
   "A law, without the import rule"; "A convention", held by review. Nothing of the law is written or tried.
 - Not decided by it: what a decision's, an aggregate's or a rejection's file exports. They keep their own names.
+- Added by the agent on review, his to overturn: a command's file may also export a helper its decision's rules call
+  by name. The verified model has one, `changesNothing` in `DecideRow.command.ts`, which fourteen locked rules call.
 - Reverse: take the three checks out of `block-files`; no file changes.
 
 ### 2026-11-27: decision 1, replaced

@@ -366,3 +366,9 @@ rest of 6, and 7, are open.
   that passes. Listed in the real model on a copy, they leave the lock as it is; Verify then asks for the saga and
   policy to be followed or skipped by name, and for the external system to be answered. A compaction, a sealed
   field, the Vault and every host are on paper.
+- 2026-11-27: the experiment's model went through a review loop of three rounds, five read-only reviewers each
+  (schema and reuse, Effect and errors, documentation, architecture, tests). Required findings: 35, then 5, then 1,
+  every one fixed and none waived; the last was a sentence that named the wrong owners of a shared field record,
+  corrected after the third round and confirmed by its reviewer. The trial blocks gained from it: every read is
+  guarded by organization, the row's view sits beside the row, and a decide reads a state's helper through its
+  namespace. The lock is byte for byte the package's throughout.

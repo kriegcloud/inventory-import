@@ -38,7 +38,7 @@ namespace (`RowState.holdsThisAct`).
 | `<Noun>.state.ts` | each case by name, `State`, `guards`, `cases`, `isAnyOf`, the invariants, a field record its event shares, what is worked out of a state (`inForce`, `sawIt`) | `RowState.Decided`, `RowState.guards.Decided` |
 | `<Noun>.transition.ts` | every rule of a step, each under its own name | named imports, listed in the aggregate or the decision |
 | `<Union>.union.ts` | one tagged union, the file named for it (`ImportEvent.union.ts`, `RowEvent.union.ts`) | `ImportEvent.guards.ActCounted` |
-| `<Noun>.rejection.ts` | the rejections more than one command returns, and a record of fields they share (`whose`); a rejection no command returns has its tag for a stem (`SuggesterUnavailable.rejection.ts`) | named imports |
+| `<Noun>.rejection.ts` | the rejections more than one command returns, and a record of fields a module's rejections spread (`whose`: one shared rejection and two of `DecideRow`'s own); a rejection no command returns has its tag for a stem (`SuggesterUnavailable.rejection.ts`) | named imports |
 | `<Noun>.schema.ts` | a value several blocks share, with what is worked out of it | `Level`, `seal` |
 | `<Noun>.aggregate.ts`, `<Noun>.decision.ts` | the class, and nothing but a listing | `Import`, `Deciding` |
 

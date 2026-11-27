@@ -295,7 +295,7 @@ const actingAs = (actor: Actor) =>
 const Hosted = CatalogTrial.layer(handlers.pipe(Layer.provide(AnySuggestion))).pipe(Layer.provide(Domain.InMemory))
 
 layer(Hosted, { excludeTestServices: true })("the guarded reads, through an Api", (it) => {
-  it.effect("the import's organization reads its status, acts and row; another's read of each is refused NotPermitted", () =>
+  it.effect("its organization reads an import's status, acts and row; another's read of each is refused", () =>
     Effect.gen(function* () {
       const asAna = yield* TrialApi.clientInProcess.pipe(actingAs(ana))
       const asOmar = yield* TrialApi.clientInProcess.pipe(actingAs(omar))
@@ -342,11 +342,12 @@ layer(Hosted, { excludeTestServices: true })("the guarded reads, through an Api"
           asAna.ImportStatus.get(none),
           asAna.ImportActs.peek(none),
           asOmar.ImportStatus.get(none),
-          asOmar.ImportActs.peek(none)
+          asOmar.ImportActs.peek(none),
+          asOmar.RowHolds.get(RowKey.make("r-none"))
         ],
         { concurrency: 1 }
       )
-      expect(seen).toEqual([null, null, null, null])
+      expect(seen).toEqual([null, null, null, null, null])
     }).pipe(Effect.scoped)
   )
 })

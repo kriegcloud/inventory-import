@@ -16,7 +16,7 @@ request of its own.
 | 0 | Where main stands: `bun run check:full` on `main` | minutes | todo |
 | 1 | The laws that read oxlint's report pass in a JetBrains terminal | an hour | todo |
 | 2 | Loose ends: the push rule, `docs:check`'s warnings, the explorations' README | an hour | todo |
-| 3 | `CLAUDE.md` under 400 lines; the two agent files name folders that exist | half a day | todo |
+| 3 | `CLAUDE.md` under 400 lines; the two agent files name folders that exist | half a day | `CLAUDE.md`: moved to [focus-and-friction](../focus-and-friction/PLAN.md), step 4, at 200 lines (2026-11-26); the agent files: todo |
 | 4 | The prover reads a case's own `status` (a fourth patch) | a day or two | todo |
 | 5 | The transitions say their claim, if the prover reads a helper | a day, after an experiment | todo |
 | 6 | The five longest files split | several days, one file a pull request | todo |

@@ -13,7 +13,7 @@ pull request is merged, or, for a step with none, when its record below is writt
 | # | Step | Pull request | Status |
 | --- | --- | --- | --- |
 | 1 | This packet | | doing |
-| 2 | Benjamin's ruling on what waits for the person's session | none: a decision | todo |
+| 2 | Benjamin's ruling on what waits for the person's session | none: a decision | done: 2026-11-26 (below) |
 | 3 | The person's session: prepared, run by Benjamin, written down | one for the record | todo |
 | 4 | `CLAUDE.md` as an index: which goal owns it, to what length, then the move | one | todo |
 | 5 | Measure `bun run check`: how long, and what a failure prints | none: a record below | todo |
@@ -23,8 +23,8 @@ pull request is merged, or, for a step with none, when its record below is writt
 | 9 | The worktrees and the main checkout | one for `CLAUDE.md` | todo |
 | 10 | Close: the closing note, `status: done`, `bun run check:full` on main | one | todo |
 
-Steps 2, 4, 8 and 9 each open with a question to Benjamin. Steps 5 to 7 need no answer and can start at once. Step 3
-needs a person, and only Benjamin can find one.
+Every question was answered on 2026-11-26 ("Decided", below). Steps 4, 5, 7 and 9 can start at once, and step 6
+after step 5. Step 8 waits on Benjamin's change to the settings, and step 3 on a person he brings.
 
 ## 2. What waits
 
@@ -127,14 +127,19 @@ yes, remove the clean ones whose branch is in main and the clean detached ones w
 `git worktree prune`. He says whose the main checkout's changes are. `CLAUDE.md`, "How we work", gets one line on where
 worktrees go.
 
-## His to decide
+## Decided 2026-11-26
 
-| Step | Question | Recommended | Why |
-| --- | --- | --- | --- |
-| 2 | What waits until the person's session is recorded? | New ontology slices, new laws and new vendored libraries wait. Fixes to what exists, and steps 4 to 9, do not | The import is the product. Each of those adds upkeep without anyone having used the import |
-| 3 | Who uses it, on what, and where? | One operations person with a spreadsheet they really use, on `bun run dev` on his machine, him beside them | One honest session finds more than a staged one, and it needs no deploy |
-| 4 | Which goal owns `CLAUDE.md`, and how long may it be? | This goal, at 200 lines or fewer, with quality's step 3 marked as moved here | An index is short. 400 lines is still more than an agent reads with care |
-| 4 | Where do the laws go: `docs/laws.md`, or under `docs/standards/` as quality planned? | `docs/laws.md`, linked from `docs/standards/` | One page for "why did check fail" is what an agent looks for first |
-| 7 | Does a commit need `check:changed` only, and a push the full `check`? | Yes | The full check before a push still keeps main green, and a commit gets cheap |
-| 8 | Turn on auto-merge and branch deletion? | Both | No protection is lost. Merges stop waiting on someone, and merged branches stop piling up |
-| 9 | Remove the clean, merged worktrees, and whose is the main checkout's work? | Remove them; he names the owner of the rest | 42 detached worktrees are noise for every session that lists them |
+All seven questions were answered by dialog, each as recommended, and are written in
+[the exploration's decisions](../../explorations/ideal-architecture/DECISIONS.md), "2026-11-26 — focus and friction".
+In short:
+
+- **Step 2.** New ontology slices, new laws and new vendored libraries wait until step 3 is recorded. Fixes, and
+  steps 4 to 9, go on. Step 2 is done.
+- **Step 3.** One operations person with a spreadsheet they really use, on `bun run dev` on Benjamin's machine, him
+  beside them.
+- **Step 4.** This goal owns it, at 200 lines or fewer; quality's step 3 is moved here. The laws go to
+  `docs/laws.md`.
+- **Step 7.** Once `check:changed` is built and measured faster, a commit needs it and a push needs `bun run check`.
+- **Step 8.** Benjamin turns on auto-merge and automatic deletion of head branches.
+- **Step 9.** An agent removes clean worktrees whose commit is in main. Dirty or unmerged ones, and the main checkout,
+  are listed for him.

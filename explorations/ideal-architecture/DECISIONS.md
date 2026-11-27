@@ -2165,3 +2165,36 @@ Next: 1 and 2 are built on the branch of step 7b; the baseline then names no fil
 
 Reverse: 1, the three files leave the list and are counted again; 2, the reader returns text with `""` for a column
 it does not hold; 3, the value moves or becomes an Option on its schema.
+
+### 2026-11-26 — focus and friction: what waits for a person's session, and seven answers on the repository's weight
+
+Asked by dialog in two rounds, once the goal `focus-and-friction` was written (pull request 28).
+
+1. **What waits until a person who did not build the import has used it on their own file?** I chose; the agent
+   recommended the same. New ontology slices, new laws and new vendored libraries wait. Fixes to what exists, and the
+   goal's other steps, go on. Rejected: only ontology slices; nothing waits.
+2. **Who uses it, and where?** I chose; the agent recommended the same. One operations person with a spreadsheet they
+   really use, on `bun run dev` on my machine, with me beside them. Their file stays on my machine; the record keeps
+   counts and observations, no value and no name. Rejected: a hosted test stage, which needs a deploy first and puts
+   their file in its database; picking later.
+3. **Which goal owns the slim-down of `CLAUDE.md`, and how long may it be?** I chose; the agent recommended the same.
+   `focus-and-friction`, at 200 lines or fewer; `quality`'s step 3 is moved there. Every rule moves word for word with
+   a link in its place. Rejected: 400 lines in this goal; leaving it in `quality` at 400.
+4. **Where do the laws and the type-check's rules go?** I chose; the agent recommended the same. `docs/laws.md`,
+   linked from `docs/standards/` and `docs/index.md`. Rejected: a file per area under `docs/standards/`.
+5. **May a commit need only `bun run check:changed`, with `bun run check` before every push?** I chose; the agent
+   recommended the same. Yes, if step 5's measurements show `check:changed` is faster; until it is built, the rule
+   stays. Rejected: the full check before every commit.
+6. **Auto-merge?** I chose; the agent recommended the same. I turn on "Allow auto-merge" and "Automatically delete
+   head branches" in the repository's settings; then "merge it" means `gh pr merge --auto`. Rejected: auto-merge
+   alone; keeping it off.
+7. **The 55 worktrees?** I chose; the agent recommended the same. An agent may remove a worktree that has no
+   uncommitted change and whose commit is in main, then `git worktree prune`. Nothing dirty or unmerged is touched,
+   and the main checkout is left alone; those are listed for me. Rejected: a list first, with nothing removed until I
+   name each.
+
+Next: steps 4 to 7 and 9 of `goals/focus-and-friction` start; 6 waits on me; 3 waits on a person.
+
+Reverse: 1, the pause ends early by a dated line here; 2, the session moves to a stage; 3 and 4, the text moves back
+or to the other place; 5, `CLAUDE.md` asks for `bun run check` before every commit again; 6, both settings off; 7,
+removal asks first.

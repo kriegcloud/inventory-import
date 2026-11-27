@@ -70,7 +70,8 @@ Steps 2 and 3 rest on no exploration; it rests on the product rule in `CLAUDE.md
       import, on a file of their own. It records what they did, where they stopped, and the counts the screen showed,
       and holds no file content and no name. Each problem it found is a fix merged or a question answered in the root
       `DECISIONS.md`.
-- [ ] Benjamin's ruling on what waits (step 2) is in the root `DECISIONS.md`, with the date it ends.
+- [x] Benjamin's ruling on what waits (step 2) is in the exploration's `DECISIONS.md`; it ends when step 3 is
+      recorded.
 - [ ] `wc -l CLAUDE.md` is at most the length Benjamin chose in step 4, `bun run docs:check` passes, and every rule
       that left the file is found word for word under `docs/` (a check in the step's pull request lists them).
 - [ ] Breaking one law in a scratch commit (`??` in a model file), then running `bun run check`, ends with a summary
@@ -87,6 +88,6 @@ Steps 2 and 3 rest on no exploration; it rests on the product rule in `CLAUDE.md
 
 ## Decisions
 
-None is answered yet. The open ones are in [PLAN.md](PLAN.md), "His to decide". Each is put to Benjamin when its step
-opens, and each answer is written in the root `DECISIONS.md` (product: steps 2 and 3) or in
-[the exploration's](../../explorations/ideal-architecture/DECISIONS.md) (the rest).
+All seven were answered on 2026-11-26, each as recommended:
+[the exploration's decisions](../../explorations/ideal-architecture/DECISIONS.md), "2026-11-26 — focus and friction".
+[PLAN.md](PLAN.md), "Decided 2026-11-26", says what each changes. Questions that come up later are logged there too.

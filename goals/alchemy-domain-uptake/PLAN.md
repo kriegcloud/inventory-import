@@ -49,7 +49,9 @@ Three more need nothing at all, being tooling of the scratchpad: **tests-40**, *
 
 ## Current blocker
 
-None for move 1. He signed the brief on 2026-11-26 ("I've approved", the exploration's DECISIONS). Move 2 is open. The pin holds `@alchemy.run/better-auth` since his re-pin of 2026-11-26 (`@alchemy.run/test` is npm's build, which the registry never makes). Four of the move's decisions are answered (the exploration's DECISIONS, "Move 2 opens"); the rest are put to him in rounds, and what none of them blocks is built meanwhile.
+None for move 1. He signed the brief on 2026-11-26 ("I've approved", the exploration's DECISIONS). Move 2 is open. The pin holds `@alchemy.run/better-auth` since his re-pin of 2026-11-26 (`@alchemy.run/test` is npm's build, which the registry never makes). The move's decisions so far are answered (the exploration's DECISIONS, "Move 2 opens" to "after the second round"); what a later slice raises is put to him in rounds.
+
+Move 2's state on 2026-11-27. Built, with no host calling it yet: the `Usage` model and its contract (`packages/usage`: usage-01, usage-04, usage-05), the session middleware and the role refusals in both models (access-03), the catalog's refusals over its Api (the catalog halves of tests-09 and tests-14), the client's model atoms and held live reads (web-01, web-04's watched read, web-05a), the allowance's mutants and the runner in the CLI (tests-12), and library patch 04. Not built: `apps/model` and its Worker (host-01 to host-08), the kernel's session port and its implementation (access-01, access-02, access-04), the gateway sending `TakeCall` and the new used-up sentence (usage-03), the forwarded socket (web-02, web-03, web-06), web-07, web-08, tests-08, tests-10, tests-11, tests-13.
 
 ## What Benjamin does by hand
 

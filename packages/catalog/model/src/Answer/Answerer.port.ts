@@ -120,7 +120,10 @@ export class Answerer extends Context.Service<
         const ask: Answerer["Service"]["ask"] = dual(2, (self: ModelQuestion, schema: AnswerSchema) =>
           scriptedAnswer(self, schema)
         )
-        return Answerer.of({ status: "on", ask })
+        return Answerer.of({
+          status: "on",
+          ask
+        })
       })
     )
 }

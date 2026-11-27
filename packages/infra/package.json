@@ -14,7 +14,8 @@
     "./OpReferencesSecrets": "./src/OpReferences.secrets.ts",
     "./Inventory": "./src/Inventory.stack.ts",
     "./Stage": "./src/Stage.schema.ts",
-    "./StagePlan": "./src/StagePlan.rules.ts"
+    "./StagePlan": "./src/StagePlan.rules.ts",
+    "./TurboCache": "./src/TurboCache.rules.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",

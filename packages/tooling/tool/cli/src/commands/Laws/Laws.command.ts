@@ -10,6 +10,7 @@ import * as Flag from "effect/cli/Flag"
 import { diagnosticDirective } from "../Scratch/Scratch.templates.ts"
 import { emit } from "../../Report.schema.ts"
 import { assertions, assertionsLedger, assertionsSentence } from "./Assertions.rules.ts"
+import { blockFiles, blockFilesSentence } from "./BlockFiles.rules.ts"
 import { boundaries, boundariesSentence } from "./Boundaries.rules.ts"
 import { defaults, defaultsSentence, exemptions } from "./Defaults.rules.ts"
 import { deprecatedApis, deprecatedApisSentence } from "./DeprecatedApis.rules.ts"
@@ -19,6 +20,7 @@ import { effectImportsSentence } from "./EffectImports.schema.ts"
 import { exactExports, exportsSentence } from "./Exports.rules.ts"
 import { fastRefresh, fastRefreshSentence } from "./FastRefresh.rules.ts"
 import { keys, keysSentence } from "./Keys.rules.ts"
+import { modelInputs, modelInputsSentence } from "./ModelInputs.rules.ts"
 import { ontologyTerms, ontologyTermsSentence } from "./OntologyTerms.rules.ts"
 import { privatePaths, privatePathsSentence } from "./PrivatePaths.rules.ts"
 import { promises, promiseSentence } from "./Promises.rules.ts"
@@ -37,6 +39,20 @@ export const exportsCommand = Command.make("exports", {}, () =>
 export const boundariesCommand = Command.make("boundaries", {}, () =>
   Effect.flatMap(boundaries(), emit(boundariesSentence))
 ).pipe(Command.withDescription("Every workspace imports only what it declares and what its family and layer allow"))
+
+/** `laws block-files`: every block of a model is in the file its ending names, and the reserved endings are freed. */
+export const blockFilesCommand = Command.make("block-files", {}, () =>
+  Effect.flatMap(blockFiles(), emit(blockFilesSentence))
+).pipe(
+  Command.withDescription(
+    "Every block of a model is in a file of its own ending, and .command.ts and .external.ts hold only their block"
+  )
+)
+
+/** `laws model-inputs`: every file a model imports is in the inputs of its package's `verify` task. */
+export const modelInputsCommand = Command.make("model-inputs", {}, () =>
+  Effect.flatMap(modelInputs(), emit(modelInputsSentence))
+).pipe(Command.withDescription("Every file a model reaches through its relative imports is an input of verify"))
 
 /** `laws screens`: every package with screens is in both lists Tailwind reads class names from. */
 export const screensCommand = Command.make("screens", {}, () => Effect.flatMap(screens(), emit(screensSentence))).pipe(
@@ -162,6 +178,7 @@ export const lawsCommand = Command.make("laws").pipe(
   Command.withDescription("The repository's rules over its own source"),
   Command.withSubcommands([
     assertionsCommand,
+    blockFilesCommand,
     boundariesCommand,
     defaultsCommand,
     deprecatedApisCommand,
@@ -171,6 +188,7 @@ export const lawsCommand = Command.make("laws").pipe(
     exportsCommand,
     fastRefreshCommand,
     keysCommand,
+    modelInputsCommand,
     ontologyTermsCommand,
     privatePathsCommand,
     promisesCommand,

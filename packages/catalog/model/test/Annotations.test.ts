@@ -11,7 +11,8 @@ import * as O from "effect/Option"
 import * as P from "effect/Predicate"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
-import { Catalog, CatalogApi } from "../src/Catalog.model.ts"
+import { CatalogApi } from "../src/Catalog.api.ts"
+import { Catalog } from "../src/Catalog.model.ts"
 import { Import } from "../src/Import/Import.aggregate.ts"
 
 /** A declaration as this check reads it: its name and its description, if it has one. */

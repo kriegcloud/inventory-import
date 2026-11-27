@@ -3,7 +3,7 @@
  *
  * @packageDocumentation
  */
-import { AddPersonProblem } from "@inventory/access-contract/PeopleCommand"
+import { AddPersonProblem } from "@inventory/access-contract/PeoplePayload"
 import type { Person } from "@inventory/access-contract/Person"
 import type { AccountEmail } from "@inventory/access-contract/SessionState"
 import type { Role } from "@inventory/kernel/Role"

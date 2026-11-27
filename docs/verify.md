@@ -34,7 +34,7 @@ the lock (`test/Proving.test.ts`).
 | An act on a group (`DecideGroup`) | 20 | Proved |
 | Its undo (`UndoGroup`) | 15 | Proved |
 | Between an import and one row, or one group | 2 | Proved: every decision that records on both keeps it |
-| Over every import, row and group at once | 9 | Searched: every sequence of up to three commands, and 200 longer walks. Never proved |
+| Over every import, row and group at once | 9 | Searched: every sequence of up to three commands, and 200 longer walks; every night 5,000 more on a new seed. Never proved |
 | That each command can be taken | 11 | Reached: one sequence of commands was found that gets there. Not a proof, and it says nothing of any other sequence |
 
 **A proved rule says what never happens.** It is proved from the code of `decide` and `evolve`, for every state the
@@ -150,8 +150,11 @@ that code cannot break it.
 bun run --cwd packages/catalog/model prove
 ```
 
-Five files: the import over its own commands, and the four decisions. About half a minute together on a busy machine
-(the longest, `Undoing`, about twenty seconds). `bun run check` runs them as the `prove` task.
+Seven files: the import over its own commands, the group under the two decisions that record on it, the row's
+starting state, and the four decisions. About half a minute together on a busy machine (the longest, `Undoing`, about
+twenty seconds; the group's and the row's a second or less). `bun run check` runs them as the `prove` task. The row is
+not proved under its two decisions in its own file, as the group is: that report takes about three minutes and proves
+no rule the decisions' own files do not.
 
 ```bash
 bun run --cwd packages/catalog/model verify
@@ -194,10 +197,17 @@ Two more tasks hold the model, both in `bun run check:full`:
 In CI these four have a job of their own (`proofs` in `.github/workflows/ci.yml`, which runs the tasks of
 `bun run proofs` through turbo itself), which restores turbo's results from the last run on `main` and so runs
 nothing unless one of those changed. They run again every night with nothing replayed and every mutant
-(`.github/workflows/proofs-nightly.yml`, which also calls turbo itself). `bun run proofs:nightly` is the same four
-tasks by hand, with `--force`, so it replays nothing either, with two differences. By hand turbo starts the four
-tasks at once on the one machine, so the first mutants share it with the proofs, Verify's search and the fold; the
-nightly runs those three in one job and the mutants on runners of their own. And by hand every mutant runs in the
+(`.github/workflows/proofs-nightly.yml`, which also calls turbo itself), and a fifth task with them: `explore`
+(`test/Catalog.explore.test.ts`, `bun run --cwd packages/catalog/model explore`), which searches the rules over every
+import, row and group at once again at three commands deep and then on 5,000 walks, from a seed taken from the day
+and printed, so a failing night is run again with `EXPLORE_SEED=<that number>`. A rule a walk breaks fails it with the
+sequence as a story's steps, to paste into a story file as the regression (its `new X(...)` written `X.make(...)`).
+It is still a search: more short orderings each night, never a proof, and no deeper than three commands for an act a
+random input rarely gets accepted (a walk here is five commands on average). It took 364 s on the workstation, and is
+never replayed. `bun run proofs:nightly` is the same five
+tasks by hand, with `--force`, so it replays nothing either, with two differences. By hand turbo starts the five
+tasks at once on the one machine, so the first mutants share it with the proofs, Verify's search, the fold and the
+walks; the nightly runs the first three in one job, and the walks and the mutants on runners of their own. And by hand every mutant runs in the
 one task, two at a time, and `row-open` keeps the proof's own 50 minutes beside another mutant, where the nightly
 runs it alone with 100. It took 1,544 s on the workstation; on a slower machine run it as the nightly does
 (`packages/catalog/model/mutants/README.md`). `bun run check:ci` is `check:full` without them, for

@@ -28,8 +28,8 @@ import {
   suggestLines,
   SuggestAnswer
 } from "./Suggest.rules.ts"
-import { AllowanceAnswer, taken, ModelAllowance } from "../Answer/ModelAllowance.external.ts"
-import { Answerer, ModelAvailability, ModelQuestion, answeredByRules } from "../Answer/Answerer.external.ts"
+import { AllowanceAnswer, taken, ModelAllowance } from "../Answer/ModelAllowance.port.ts"
+import { Answerer, ModelAvailability, ModelQuestion, answeredByRules } from "../Answer/Answerer.port.ts"
 import { asAgent } from "@inventory/kernel/Agent"
 import { ImportId, SuggestionId } from "@inventory/catalog-contract/Ids"
 import { CurrentActor } from "@inventory/kernel/Actor"

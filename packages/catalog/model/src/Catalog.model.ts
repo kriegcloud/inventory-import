@@ -184,13 +184,3 @@ export class Catalog extends Domain.Model(
   },
   { description: "The catalog: the review of an import, its rows, the acts on groups of them, and the acts on each" }
 ) {}
-
-/**
- * Every command of the model, for its stories and for Verify's search. What a browser and what the server may send
- * are separate Apis, declared when the model is hosted.
- */
-export class CatalogApi extends Domain.Api(
-  "CatalogApi",
-  { model: Catalog },
-  { description: "Every command of the catalog's model, for its stories and its search" }
-) {}

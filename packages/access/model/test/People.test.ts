@@ -1,7 +1,7 @@
 // Who may add, promote and remove people, over the in-memory twins: the rules the People page relies on. The same
 // scenario runs on D1 through HTTP in the app's People.slow.test.ts.
 import { describe, expect, layer } from "@effect/vitest"
-import { AddPerson, AddPersonProblem, ChangeRole } from "@inventory/access-contract/PeopleCommand"
+import { AddPerson, AddPersonProblem, ChangeRole } from "@inventory/access-contract/PeoplePayload"
 import { LastAdmin, PersonNotFound } from "@inventory/access-contract/PeopleRejection"
 import { Forbidden } from "@inventory/kernel/AccessError"
 import { accessMemory } from "@inventory/access-model/Memory"

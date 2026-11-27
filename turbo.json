@@ -50,6 +50,10 @@
     // every short sequence of commands and the longer walks. Longer than the proofs, so only `bun run check:full`
     // runs it. Like `prove` it has no `transit` edge and names its own inputs, and is replayed until one changes.
     "verify": { "dependsOn": ["//#patches:installed"], "outputs": [] },
+    // The nightly's longer search of a whole model (`*.explore.test.ts`, the "explore" project): every short sequence
+    // again, then thousands of walks on a seed taken from the day. Never cached: the same files are searched another
+    // way each night. Only the nightly workflow runs it.
+    "explore": { "dependsOn": ["//#patches:installed"], "cache": false, "passThroughEnv": ["EXPLORE_SEED"] },
     // The mutants of a model: each one change to its code, which its proofs or its stories must notice. A package that
     // has them names their inputs in its own turbo.json. The sample is in `bun run check:full`; all of them run in
     // the nightly workflow.
@@ -119,6 +123,30 @@
         "apps/inventory/vite.config.ts",
         "packages/**/package.json",
         "packages/**/src/**/*.tsx",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
+    // Every block of a model is in the file its ending names, a file with a block's ending holds only that block, and
+    // `.command.ts` and `.external.ts` are kept for their block (`beep laws block-files`).
+    "//#block-files:check": {
+      "inputs": [
+        "packages/**/package.json",
+        "packages/**/src/**/*.{ts,tsx}",
+        "!**/node_modules/**",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
+    // Every file a model, an Api, an aggregate or a decision reaches through its relative imports is an input of each
+    // task of its package that reads it: verify, the mutants, prove (`beep laws model-inputs`). The walk can leave a
+    // package's src, so every code file under packages/ is read.
+    "//#model-inputs:check": {
+      "inputs": [
+        "packages/**/package.json",
+        "packages/**/turbo.json",
+        "packages/**/*.{ts,tsx}",
+        "!**/node_modules/**",
         "packages/tooling/tool/cli/src/**"
       ],
       "outputs": []

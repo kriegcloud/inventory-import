@@ -50,10 +50,12 @@ library file is cited as `node_modules/@alchemy.run/domain/src/<File>.ts:<line>`
 
 `Domain` is `import * as Domain from "@alchemy.run/domain"`; a subpath is `@alchemy.run/domain/<Name>`. "Here" is where
 the block lives under decision 32 (a context's `model` package, one folder per aggregate) and the suffix the files
-already there use; for a kind with no file yet, the library's own suffix (`.view.ts`, `.query.ts`, `.projection.ts`,
-`.stream.ts`, `.policy.ts`, `.saga.ts`, `.external.ts`, `.api.ts`, `.middleware.ts`, `.rewrite.ts`). Two names are
-taken here: `*.command.ts` in a contract package is a payload schema, and `*.external.ts` in `packages/catalog/model`
-is today a hand-written port. Say which you mean.
+already there use (`Catalog.api.ts`, `Actor/Session.middleware.ts`); for a kind with no file yet, the library's own
+suffix (`.view.ts`, `.query.ts`, `.projection.ts`, `.stream.ts`, `.policy.ts`, `.saga.ts`, `.external.ts`,
+`.rewrite.ts`, `.compaction.ts`), which `bun run beep laws block-files` holds. A payload
+schema left in a contract package ends `.payload.ts`, and a hand-written port in a model package `.port.ts`
+(`Answer/Answerer.port.ts`, `Answer/ModelAllowance.port.ts`), so `.command.ts` and `.external.ts` name only their
+blocks.
 
 | Block | What it is | Declared with | Here | Checked by |
 | --- | --- | --- | --- | --- |
@@ -77,11 +79,11 @@ is today a hand-written port. Say which you mean.
 | Saga | A process over time, with steps and undo | `Domain.Saga(name, { key, input?, result?, rejects? }, annotations?)`; `toLayer(run)` | `<Name>.saga.ts` | `Story.start`, `signal`, `saga` |
 | ExternalSystem | An outside system as declared operations | `Domain.ExternalSystem(name, { op: { args?, success?, error? } }, annotations?)`; `toLayer(build, { validate? })` | `<Name>.external.ts`; the adapter in the host | `Story.call`, `succeed`, `fail`, `die` |
 | Rewrite | A change to events already recorded | `Domain.Rewrite(name, { of, input?, events?, delete? }, annotations?)`; `client.rewrite`, `client.rewritten` | `<Name>.rewrite.ts` | `Prove.rewrite`, `Story.rewrite` |
-| Compaction | History replaced by a roll-up | `Domain.Compaction(name, { of, rollup }, annotations?)`; `toLayer(keep, { after })` | Beside its aggregate | `Prove.compaction`, `Story.compact` |
+| Compaction | History replaced by a roll-up | `Domain.Compaction(name, { of, rollup }, annotations?)`; `toLayer(keep, { after })` | `<Name>.compaction.ts`, in its aggregate's folder | `Prove.compaction`, `Story.compact` |
 | Backfill | A new view or projection built from old events | A `version` on the view or the projection's Layer; no declaration | The host | A stage test |
-| Api | What one kind of client may send and read | `Domain.Api(name, { model, commands?, views?, streams?, queries? }, annotations?)` | `<Context>.model.ts` today (`CatalogApi`) | An Api test in process (`clientInProcess`) |
+| Api | What one kind of client may send and read | `Domain.Api(name, { model, commands?, views?, streams?, queries? }, annotations?)` | `<Context>.api.ts` (`CatalogApi` in `Catalog.api.ts`) | An Api test in process (`clientInProcess`) |
 | Api clients | The typed client and its transports | `Api.client`, `layerClient`, `Domain.protocolHttp`, `protocolWebSocket`, `protocolInProcess` | `packages/client`, a web package | The same test |
-| Middleware | What runs before a served call | A plain `RpcMiddleware.Service`, listed on the command, view, stream or query | `<Name>.middleware.ts` | An Api test: no session refused |
+| Middleware | What runs before a served call | A plain `RpcMiddleware.Service`, listed on the command, view, stream or query | `<Name>.middleware.ts` (`Actor/Session.middleware.ts`) | An Api test: no session refused |
 | RequestContext | What middleware hands to `decide` | `Domain.RequestContext<Self>()(key, schema)`; `Domain.setExpiry(at)` | `Actor/Actor.context.ts` | Found unread by the prover when declared in another package, on an earlier commit (research 04, 07); at e1c3e6d the prover reads a package import like the model's own files, so run the proof before relying on either |
 | DefaultConsistency | Whether a command waits for the views; `"strong"` fails `ConsistencyTimeout` after 10 s with the command still committed; a read that waits fails `WaitTimeout` | `Domain.DefaultConsistency` (a reference, "eventual"); per call `consistency` | The client's Layer | A slow test |
 | HTTP and OpenAPI | An Api as an Effect HttpApi | `toHttpApi(api, { expose })` from `/Http` | The host's Worker | The document lists exactly those calls |
@@ -277,7 +279,7 @@ not installed until move 2).
 | `Upload.machine.ts`, `Upload.controller.ts`, the reader worker | Stay; `Upload` records begun, finished and expired | The four upload endpoints stay HTTP |
 | A follow-up after a write: a mail, a notice, a second write | Policy | It is not atomic with the write |
 | A process with steps a person waits for (suggestions, many items) | Saga | Decisions 43, 44; which host has the engine |
-| A model call behind `ModelAllowanceGateway.take`; a driver in `packages/drivers`; `Answerer.external.ts` | ExternalSystem, with `TakeCall` as a command | `CLAUDE.md`, "AI features" |
+| A model call behind `ModelAllowanceGateway.take`; a driver in `packages/drivers`; `Answerer.port.ts` | ExternalSystem, with `TakeCall` as a command | `CLAUDE.md`, "AI features" |
 | An upload's `expiresAt` and its sweep on the next request | A scheduled command (`ExpireUpload`, with the `eventually` rule `EveryUploadEnds`; move 5) | Only a command with no rejections can be scheduled; `decide` answers `[]` when it no longer applies |
 | A sweep of rows no instance owns (unused confirm plans) | Open: decision 56 (a workflow on the Worker that has D1, or only the sagas) | Name 56 under "Blocked by" |
 | `servicesWith` in `App.ts`, group Layers in `handlers.ts` | `Model.layer(handlers)` and the platform Layer | Decisions 27, 29 |
@@ -313,8 +315,8 @@ a finding with "The brief: not in the brief" and "Blocked by: a new decision by 
 `packages/catalog/model` holds the review as a model, in memory only; nothing a person sees uses it and nothing is
 stored through it. `Import/Import.aggregate.ts`, `Row/Row.aggregate.ts`, `Group/Group.aggregate.ts`; the four
 decisions in `Review/` (`Deciding`, `Undoing`, `DecidingGroup`, `UndoingGroup`); `Catalog.model.ts` with the model,
-two relations, the model's invariants and `sometimes` rules, and `CatalogApi`; `Actor/Actor.context.ts`, the
-RequestContext. Tests: `test/*.story.test.ts`, `test/*.prove.test.ts`, `test/Catalog.verify.test.ts` with
+two relations, the model's invariants and `sometimes` rules; `Catalog.api.ts` with `CatalogApi`;
+`Actor/Actor.context.ts`, the RequestContext, and `Actor/Session.middleware.ts`, the middleware that provides it. Tests: `test/*.story.test.ts`, `test/*.prove.test.ts`, `test/Catalog.verify.test.ts` with
 `test/Catalog.lock.json`, `test/proving.ts` (`missingRules`), `mutants/`, and the fold in
 `packages/catalog/web/test/ReviewModelFold.fold.test.ts`. Count rules, stories and mutants from those files; do not
 copy a number from a document.

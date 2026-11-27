@@ -4,7 +4,7 @@
  *
  * @packageDocumentation
  */
-import type { AddPerson, AddPersonOutcome, ChangeRole } from "@inventory/access-contract/PeopleCommand"
+import type { AddPerson, AddPersonOutcome, ChangeRole } from "@inventory/access-contract/PeoplePayload"
 import { LastAdmin, PersonNotFound } from "@inventory/access-contract/PeopleRejection"
 import type { Person } from "@inventory/access-contract/Person"
 import { Activity } from "@inventory/kernel/Activity"

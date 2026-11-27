@@ -1,6 +1,7 @@
 // The modules one file imports, read from its syntax tree: `import … from "x"`, `export … from "x"`, `import "x"`,
-// `import x = require("x")` and `import("x")` with a written-out name. A pattern over the text would also take the word out of a comment, and
-// an import planted in a test's fixture text for one of the file's own.
+// `import x = require("x")`, `import("x")` with a written-out name (a string, or a template with nothing put into it,
+// `import(\`x\`)`), and the type `import("x")` (`typeof import("x")`, `import("x").T`). A pattern over the text would
+// also take the word out of a comment, and an import planted in a test's fixture text for one of the file's own.
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as P from "effect/Predicate"
@@ -16,7 +17,25 @@ const children = (node: Node): ReadonlyArray<Node> =>
     key === "parent" ? [] : A.isArray(value) ? A.filter(value, isNode) : isNode(value) ? [value] : []
   )
 
-const importing = ["ImportDeclaration", "ExportNamedDeclaration", "ExportAllDeclaration", "ImportExpression"]
+const importing = [
+  "ImportDeclaration",
+  "ExportNamedDeclaration",
+  "ExportAllDeclaration",
+  "ImportExpression",
+  "TSImportType"
+]
+
+/** The name a specifier writes out: a string, or a template with nothing put into it (`\`./x.ts\``). */
+const writtenOf = (source: Node): O.Option<string> =>
+  source.type === "TemplateLiteral"
+    ? A.isArray(source["expressions"]) && A.isReadonlyArrayEmpty(source["expressions"])
+      ? O.flatMap(A.head(A.isArray(source["quasis"]) ? A.filter(source["quasis"], isNode) : []), (quasi) =>
+          O.flatMap(O.liftPredicate(quasi["value"], P.isObject), (value) =>
+            O.liftPredicate(value["cooked"], P.isString)
+          )
+        )
+      : O.none()
+    : O.liftPredicate(source["value"], P.isString)
 
 /**
  * Every module specifier `source` imports or re-exports, in the order written.
@@ -29,9 +48,7 @@ export const readImports = (input: { readonly file: string; readonly source: str
   const found: Array<string> = []
   const walk = (node: Node): void => {
     if (A.contains(importing, node.type)) {
-      const named = O.liftPredicate(node["source"], isNode).pipe(
-        O.flatMap((source) => O.liftPredicate(source["value"], P.isString))
-      )
+      const named = O.liftPredicate(node["source"], isNode).pipe(O.flatMap(writtenOf))
       if (O.isSome(named)) found.push(named.value)
     }
     // `import x = require("x")`: TypeScript's own form, the module named inside its external reference.

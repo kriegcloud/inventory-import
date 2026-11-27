@@ -7,7 +7,7 @@
  *
  * @packageDocumentation
  */
-import type { AddPerson, ChangeRole } from "@inventory/access-contract/PeopleCommand"
+import type { AddPerson, ChangeRole } from "@inventory/access-contract/PeoplePayload"
 import { AuditTrailStore } from "@inventory/access-model/AuditTrailStore"
 import { accessHandlers } from "@inventory/access-model/Handlers"
 import { MemberDirectory } from "@inventory/access-model/MemberDirectory"

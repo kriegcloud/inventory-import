@@ -24,8 +24,8 @@
     "./Ports": "./src/Catalog.ports.ts",
     "./Handlers": "./src/Catalog.handlers.ts",
     "./Confirm": "./src/Confirm/Confirm.rules.ts",
-    "./Answerer": "./src/Answer/Answerer.external.ts",
-    "./ModelAllowance": "./src/Answer/ModelAllowance.external.ts",
+    "./Answerer": "./src/Answer/Answerer.port.ts",
+    "./ModelAllowance": "./src/Answer/ModelAllowance.port.ts",
     "./SuggestionStore": "./src/Suggestion/SuggestionStore.store.ts",
     "./SuggestionsHandler": "./src/Suggestion/Suggestions.handler.ts",
     "./AssistantLog": "./src/Assistant/AssistantLog.store.ts",
@@ -38,6 +38,7 @@
     "./ItemSearch": "./src/Item/ItemSearch.rules.ts",
     "./ItemEdit": "./src/Item/ItemEdit.rules.ts",
     "./Actor": "./src/Actor/Actor.context.ts",
+    "./Session": "./src/Actor/Session.middleware.ts",
     "./ImportAggregate": "./src/Import/Import.aggregate.ts",
     "./RowAggregate": "./src/Row/Row.aggregate.ts",
     "./GroupAggregate": "./src/Group/Group.aggregate.ts",
@@ -46,7 +47,8 @@
     "./DecidingGroup": "./src/Review/DecidingGroup.decision.ts",
     "./UndoingGroup": "./src/Review/UndoingGroup.decision.ts",
     "./ReviewChange": "./src/Review/Change.schema.ts",
-    "./Model": "./src/Catalog.model.ts"
+    "./Model": "./src/Catalog.model.ts",
+    "./Api": "./src/Catalog.api.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
@@ -54,6 +56,7 @@
     "test": "vitest run --project fast",
     "prove": "vitest run --project prove",
     "verify": "vitest run --project verify",
+    "explore": "vitest run --project explore",
     "mutants": "python3 -I mutants/run.py --all --jobs 2",
     "mutants:sample": "python3 -I mutants/run.py --sample"
   },

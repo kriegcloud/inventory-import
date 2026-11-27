@@ -5,6 +5,7 @@
  * @packageDocumentation
  */
 import { $RepoCliId } from "@beep/identity/packages"
+import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 
 const $I = $RepoCliId.create("Repo.schema")
@@ -47,6 +48,11 @@ export class Manifest extends S.Class<Manifest, { readonly brand: unique symbol 
       S.Array,
       S.optionalKey,
       S.annotateKey({ description: "The workspace globs: only the repository's root has them" })
+    ),
+    scripts: S.Record(S.String, S.String).pipe(
+      S.annotateKey({ description: "Commands the workspace provides; no scripts when the field is absent" }),
+      S.withConstructorDefault(Effect.succeed({})),
+      S.withDecodingDefaultTypeKey(Effect.succeed({}))
     ),
     exports: S.optionalKey(names).pipe(S.annotateKey({ description: "The export map, entry to target" })),
     dependencies: S.optionalKey(names).pipe(S.annotateKey({ description: "Run-time dependencies" })),

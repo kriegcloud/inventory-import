@@ -13,6 +13,8 @@ import * as Cause from "effect/Cause"
 import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Stdio from "effect/Stdio"
+import { changedCheckArguments } from "./commands/Check/CheckChanged.schema.ts"
 import * as Command from "effect/cli/Command"
 import * as Digest from "effect/crypto/Digest"
 import { Workstation } from "./commands/Infra/Workstation.service.ts"
@@ -28,7 +30,13 @@ const services = Workstation.layer.pipe(
 
 // The entry point: the services are built once, for the run, and the command is given what they made.
 Layer.build(services).pipe(
-  Effect.flatMap((context) => Command.run(rootCommand, { version: "0.0.0" }).pipe(Effect.provideContext(context))),
+  Effect.flatMap((context) =>
+    Stdio.Stdio.use(({ args }) =>
+      args.pipe(
+        Effect.flatMap((args) => Command.runWith(rootCommand, { version: "0.0.0" })(changedCheckArguments(args)))
+      )
+    ).pipe(Effect.provideContext(context))
+  ),
   Effect.scoped,
   Effect.tapErrorTag("RepoError", (error) => Console.error(error.message)),
   Effect.tapDefect((defect) => Console.error(Cause.die(defect).pipe(Cause.pretty))),

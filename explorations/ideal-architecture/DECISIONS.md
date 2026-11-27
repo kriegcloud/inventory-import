@@ -2232,6 +2232,23 @@ Next: step 7 is built on answer 1; step 9 compares and removes on answer 2.
 Reverse: 1, `check:changed` adds the dependents' tests; 2, removal of a changed worktree asks first again; 3, either
 is removed by a dated line here.
 
+### 2026-11-27 — focus and friction closes; the person's session is its own goal
+
+Asked by dialog when only steps 3, 8 and 10 of `goals/focus-and-friction` were left and I was running fifteen other
+sessions. I told the agent to do what was left itself.
+
+1. **Step 3 needs a person who did not build the import, which the agent cannot be. How does the goal finish?** I
+   chose; the agent recommended the same. The session becomes its own goal, `goals/person-session`, with
+   `SESSION.md` moved there, and `focus-and-friction` closes. Answer 1 of "2026-11-26 — focus and friction" stands:
+   new ontology slices, new laws and new vendored libraries still wait, now until `person-session` records a
+   session. Rejected: keeping the goal open until I run it.
+2. **Step 8's settings.** I asked the agent to turn on "Allow auto-merge" and "Automatically delete head branches"
+   itself, where answer 6 had them as mine to change. It did, at 04:06 UTC.
+
+Next: `goals/person-session`, step 1, is mine.
+
+Reverse: 1, the session's step returns to `focus-and-friction` and its status to `active`; 2, both settings off.
+
 ### 2026-11-26 — Alchemy uptake: the goal's edges
 
 After the sweep in [research 05](research/05-alchemy-unused.md) I asked for a goal that makes use of all of it:

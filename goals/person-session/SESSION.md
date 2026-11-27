@@ -1,13 +1,13 @@
 ---
 type: Reference
-title: "Focus and friction, the person's session"
-description: What step 3 hands Benjamin for a session with an operations person who did not build the import, on a spreadsheet of their own, on his machine with bun run dev - the page they read, what he watches for, and the record he fills in with counts and observations only.
+title: "The person's session, what Benjamin runs"
+description: What the person-session goal hands Benjamin for a session with an operations person who did not build the import, on a spreadsheet of their own, on his machine with bun run dev - the page they read, what he watches for, and the record he fills in with counts and observations only.
 from: explorations/ideal-architecture
 ---
 
 # The person's session
 
-Step 3 of [PLAN.md](PLAN.md). Benjamin runs it, as decided on 2026-11-26: one operations person with a spreadsheet
+Step 1 of [PLAN.md](PLAN.md), prepared as step 3 of `goals/focus-and-friction` and moved here on 2026-11-27. Benjamin runs it, as decided on 2026-11-26: one operations person with a spreadsheet
 they really use, on `bun run dev` on his machine, with him beside them. The agent prepared the three parts below and
 takes no part in the session.
 
@@ -86,7 +86,7 @@ or say "hm", write the step, what was on screen, and what they said.
 
 ## 3. The record to fill in
 
-Copy this block into PLAN.md, step 3, once the session is over. Leave a line blank rather than guess.
+Copy this block into PLAN.md, step 1, once the session is over. Leave a line blank rather than guess.
 
 ```markdown
 **Session 1, <date>.** One operations person who did not build the import, with a file of their own (.csv or .xlsx,
@@ -114,5 +114,5 @@ Each problem, one line each, as "a fix" or "a question for Benjamin":
 1.
 ```
 
-Each problem then becomes a fix with its own pull request or a question in the root `DECISIONS.md`, as SPEC's
+Each problem then becomes a fix with its own pull request or a question in the root `DECISIONS.md`, as [SPEC](SPEC.md)'s
 acceptance asks, and is linked from that line.

@@ -14,16 +14,16 @@ pull request is merged, or, for a step with none, when its record below is writt
 | --- | --- | --- | --- |
 | 1 | This packet | 28 | done: 2026-11-26 |
 | 2 | Benjamin's ruling on what waits for the person's session | none: a decision | done: 2026-11-26 (below) |
-| 3 | The person's session: prepared, run by Benjamin, written down | one for the record | doing: prepared |
+| 3 | The person's session: prepared, run by Benjamin, written down | moved: [person-session](../person-session/PLAN.md) | moved: 2026-11-27 (below) |
 | 4 | `CLAUDE.md` as an index: which goal owns it, to what length, then the move | 39 | done: 2026-11-26 |
 | 5 | Measure `bun run check`: how long, and what a failure prints | the record below | done: 2026-11-26 |
 | 6 | One summary at the end of a failing check | 35 | done: 2026-11-26 |
 | 7 | `bun run check:changed` | 40 | done: 2026-11-26 |
-| 8 | A merge that finishes on its own | none, or one for the rule in `CLAUDE.md` | todo |
+| 8 | A merge that finishes on its own | 47, the rule in `CLAUDE.md` | done: 2026-11-27 |
 | 9 | The worktrees and the main checkout | 36 | done: 2026-11-26 |
-| 10 | Close: the closing note, `status: done`, `bun run check:full` on main | one | todo |
+| 10 | Close: the closing note, `status: done`, `bun run check:full` on main | 47 | done: 2026-11-27 |
 
-Every question was answered on 2026-11-26 ("Decided", below). Steps 1, 2 and 4 to 7 and 9 are done. Step 3 is prepared and waits on a person Benjamin brings; step 8 waits on his change to the repository's settings (`allow_auto_merge` and `delete_branch_on_merge` were both `false` at 03:55 UTC on 2026-11-27); step 10 waits on both.
+Every question was answered on 2026-11-26 ("Decided", below), and the last one on 2026-11-27. The goal is done. Step 3, prepared, moved to its own goal, [person-session](../person-session/SPEC.md), on Benjamin's answer; the hold of step 2 now ends there. The closing note is at the end.
 
 ## 2. What waits
 
@@ -47,10 +47,15 @@ who did not build the import is recorded anywhere in `goals/`, `docs/qa/` or the
 The file stays theirs. The record holds counts and observations, never a value, a heading or a name from it. Where
 the session runs (Benjamin's machine with `bun run dev`, or a hosted stage he deploys) is his.
 
-**Prepared, 2026-11-26.** [SESSION.md](SESSION.md) holds the three parts: the page the person reads, what Benjamin
+**Prepared, 2026-11-26.** `SESSION.md` (now [in person-session](../person-session/SESSION.md)) holds the three parts: the page the person reads, what Benjamin
 watches for, and the record he fills in and copies here. Its screen words were read on screen, from the messy sample
 on an empty database at `5aa253aa`. The session itself is Benjamin's to run with the person he brings. Until it is
 recorded here, step 2's ruling holds.
+
+**Moved, 2026-11-27.** Only this step and the close were left, and the session needs a person Benjamin brings. Asked
+by dialog, he chose as recommended: the session becomes its own goal, [person-session](../person-session/SPEC.md),
+with `SESSION.md` moved there unchanged but for its links, and this goal closes. Step 2's hold on new machinery stays
+until that goal records a session.
 
 ## 4. `CLAUDE.md`
 
@@ -270,6 +275,12 @@ as much.
 repository's settings. It is his setting, so no agent changes it. Then "merge it" means
 `gh pr merge <n> --merge --auto --match-head-commit <sha>`, and `CLAUDE.md` says so.
 
+**Done, 2026-11-27.** Benjamin asked the agent to make the change itself ("do this yourself", in his message of that
+morning), so it was made by `gh api -X PATCH repos/kriegcloud/inventory-import -F allow_auto_merge=true -F
+delete_branch_on_merge=true` at 04:06 UTC, which read back `{"allow_auto_merge":true,"delete_branch_on_merge":true}`.
+`CLAUDE.md`, "How we work", now says what a merge he asks for is. The first pull request merged that way is pull request 47,
+this goal's close.
+
 ## 9. Worktrees and the main checkout
 
 **Found on 2026-11-26.** 55 worktrees: 38 under `.claude/worktrees/`, 15 under the session cache of an earlier atoms
@@ -391,3 +402,26 @@ In short:
 
 **Answered in step 7.** Own tests only, decided by dialog on 2026-11-26 as recommended; dependents' tests wait for
 the full check before the push.
+
+## 10. Closing note, 2026-11-27
+
+**What changed.** A failing `bun run check` ends with one summary of what to fix (step 6, pull request 35).
+`bun run check:changed` checks a one-package change before a commit, and `bun run check` stays the gate before a push
+(step 7, pull request 40). `CLAUDE.md` went from 800 lines to an index of 172, with every moved rule found word for
+word under `docs/` (step 4, pull request 39). The worktrees were cleared to the ones with work main lacks (step 9,
+pull request 36). A merge Benjamin asks for now finishes on its own once the required checks pass (step 8). The
+person's session is prepared, and is now its own goal (step 3).
+
+**Worktrees left at the close.** Besides those listed in step 9, three clean worktrees whose branches are in main were
+made by other sessions within the hour before the close: `.claude/worktrees/ci-speed`,
+`.claude/worktrees/focus-and-friction` and `.claude/worktrees/goal-hand-off`. No process had its folder open, but a
+session that is idle keeps none, so they were left rather than pulled from under a session that may still be open.
+Step 9's rule lets the next agent remove them.
+
+**What was learned.** The `/goal` condition for this run had no hand-off clause, so once only Benjamin's steps were
+left the judge blocked every turn, more than twenty times, and the agent repeated the same three lines while he was
+running fifteen other sessions. [Goals](../README.md), "Running a goal with `/goal`", already names the clause; a run
+should start with it. And a step that waits on a person is better as its own goal from the start than as one step of a
+goal about the repository's machinery: nothing else here depended on it.
+
+**Checked.** `bun run check:full` on the close's branch, which is main at `4fa53491` and this pull request's documents: 117 of 117 tasks passed in 22 s (97 replayed from the cache). It is run again on main after the merge.

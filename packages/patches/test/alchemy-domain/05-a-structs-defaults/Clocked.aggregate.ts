@@ -5,7 +5,10 @@ import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 
 /** A reading, with where it starts worked out when asked. */
-export const Reading = S.Struct({ reading: S.Int.pipe(S.withConstructorDefault(Effect.suspend(() => Effect.succeed(0)))), steps: S.Int })
+export const Reading = S.Struct({
+  reading: S.Int.pipe(S.withConstructorDefault(Effect.suspend(() => Effect.succeed(0)))),
+  steps: S.Int
+})
 
 /** A clocked meter was started. */
 export class Clocked extends Domain.Event("Clocked", { steps: S.Int }) {}

@@ -77,6 +77,23 @@ Before any change, from GitHub Actions on 2026-11-26. Step 1 replaces it with tu
 | `catalog-web:test` | 190 to 449 s |
 | `app:test:slow` | 191 to 311 s |
 
+## The first run on CI
+
+PR #27, run 45918212383, 2026-11-27, the first with the split jobs, strict `envMode` and `PROPERTY_RUNS=short`.
+Every job started within a second of 00:41:40 UTC. Times from GitHub's start and end of each job:
+
+| Job | Result | Time |
+| --- | --- | --- |
+| The reasoner on the vocabulary | passed | 62 s |
+| The search of the model | passed | 146 s |
+| Check and test the catalog's screens (`web`) | passed | 182 s, against 190 to 449 s for `catalog-web:test` alone before |
+| The model against the review region, and a sample of its mutants | passed | 192 s |
+| Check, test and build, all but the two longest (`rest`) | passed | 194 s |
+| Slow tests and the data grid (`slow`) | running | |
+| The model's proofs | running; nothing to restore, since the cache keys are new | |
+
+One run is not the ten SPEC asks for; the ten after, and the median against 673 s, wait on more runs.
+
 ## Step 4, the seeds' orderings
 
 There were ten seeds, not the eight the audit counted: 9b6ac36d added two after it. Each was played at 1,000 runs

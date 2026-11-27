@@ -616,7 +616,7 @@
       },
       "Catalog.ARowsChangeIsOneItsImportGave": {
         "kind": "model invariant",
-        "source": "(all) =>\n        everyRowOfItsImport(\n          all,\n          (row, life) =>\n            row.undone.change <= life.changes &&\n            (!RowState.guards.Decided(row) || (row.change >= 1 && row.change <= life.changes))\n        )"
+        "source": "(all) =>\n        everyRowOfItsImport(\n          all,\n          (row, life) =>\n            row.undone.change >= 0 &&\n            row.undone.change <= life.changes &&\n            (!RowState.guards.Decided(row) || (row.change >= 1 && row.change <= life.changes))\n        )"
       }
     }
   }

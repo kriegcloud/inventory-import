@@ -18,17 +18,21 @@ import reviewStories from "./Review.story.test.ts?raw"
 /** What a command of a model shows of itself to this check: its tag and the tags of the refusals it can give. */
 type Told = { readonly tag: string; readonly rejects: ReadonlyArray<{ readonly tag: string }> }
 
-/** The commands no story sends and the rejections no story names, given a model's commands and its story files. */
+/**
+ * The commands no story sends and the rejections no story names, given a model's commands and its story files. A tag
+ * counts only as a whole name: `Import.make(` is not found inside `StageImport.make(`, nor `History` inside
+ * `Story.rejected(HistoryEnds`. A tag is a class name, so it holds no character a pattern would read.
+ */
 const untold = (commands: ReadonlyArray<Told>, stories: ReadonlyArray<string>) => {
-  const said = (text: string) => A.some(stories, Str.includes(text))
+  const said = (pattern: RegExp) => A.some(stories, (story) => pattern.test(story))
   return {
     commands: A.filter(
       A.map(commands, (command) => command.tag),
-      (tag) => !said(`${tag}.make(`)
+      (tag) => !said(new RegExp(`(?<![\\w$])${tag}\\.make\\(`))
     ),
     rejections: A.filter(
       A.dedupe(A.flatMap(commands, (command) => A.map(command.rejects, (rejection) => rejection.tag))),
-      (tag) => !said(`Story.rejected(${tag}`)
+      (tag) => !said(new RegExp(`Story\\.rejected\\(${tag}(?![\\w$])`))
     )
   }
 }
@@ -51,5 +55,10 @@ describe("every command and every refusal has a story", () => {
       { tag: "ArchiveImport", rejects: [{ tag: "NotOpen" }, { tag: "StillInUse" }] }
     ]
     expect(untold(added, stories)).toEqual({ commands: ["ArchiveImport"], rejections: ["StillInUse"] })
+  })
+
+  it("does not credit a name to a longer one that ends or starts with it", () => {
+    const added: ReadonlyArray<Told> = [...Catalog.commands, { tag: "Import", rejects: [{ tag: "History" }] }]
+    expect(untold(added, stories)).toEqual({ commands: ["Import"], rejections: ["History"] })
   })
 })

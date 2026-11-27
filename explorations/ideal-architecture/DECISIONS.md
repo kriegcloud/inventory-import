@@ -2339,3 +2339,17 @@ The third round: the conditions under which a result made on my machine may coun
 
 Reverse: 1, `--force` comes off main's run; 2, `envMode` is loose again and the lists stay as documentation; 3, the
 cache steps return to the proofs job and its turbo call names a local cache folder.
+
+### 2026-11-26 — The review's model: a row's undo change is bounded below
+
+From CodeRabbit's finding on pull request 32: the invariant `ARowsChangeIsOneItsImportGave` bounded a row's last
+undo change only from above, so an undo change of -1 passed for any import, though only 0 (no undo) or a change the
+import gave is meant to be there.
+
+1. **Fix it in the rule, in the schema, or not at all?** I chose; the agent recommended the same. In the rule:
+   `row.undone.change >= 0` beside its upper bound, and the lock rewritten once with `UPDATE_VERIFY_LOCK=1` for that
+   rule alone. The invariant is only searched, so the comparison it adds costs the proofs nothing. Rejected: `Change`
+   as a non-negative Int in its schema, which reaches every change number of the model; leaving the gap with a
+   reply.
+
+Reverse: the comparison comes out of the rule and the lock is rewritten once more.

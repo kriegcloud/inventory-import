@@ -62,6 +62,15 @@ export type BlockKind = typeof BlockKind.Type
 export interface BlockAt {
   readonly kind: BlockKind
   readonly name: O.Option<string>
+  /** The tag the block gives itself, when its first argument is a string written out: `Opened` of `Event("Opened")`. */
+  readonly tag: O.Option<string>
+  readonly line: number
+}
+
+/** One name a file picks out of a module: `Event` of `import { Event } from "./Opened.event.ts"`, a type's included. */
+export interface PickedAt {
+  readonly imported: string
+  readonly from: string
   readonly line: number
 }
 
@@ -77,6 +86,10 @@ export interface BlocksRead {
    * may be renamed to its block's ending, and one with other code beside its blocks keeps its name.
    */
   readonly alone: boolean
+  /** The names the file exports from its top: a class's, a function's, a constant's, and each of `export { a, b }`. */
+  readonly exported: ReadonlyArray<string>
+  /** Every name an import of the file picks out of a module, in the order written. */
+  readonly picked: ReadonlyArray<PickedAt>
   readonly unread: O.Option<string>
 }
 
@@ -307,6 +320,25 @@ const holdsNoCode = (statement: Node): boolean =>
       onSome: holdsNoCode
     }))
 
+/** A name as an import or an export writes it: an identifier, or a string (`export { a as "b" }`). */
+const writtenName = (node: Node, key: string): O.Option<string> =>
+  O.orElse(nameOf(node, key), () => stringOf(node, key))
+
+/** The names one statement at a file's top exports: what it declares, or each name of a list with no module. */
+const exportedBy = (statement: Node): ReadonlyArray<string> =>
+  statement.type !== "ExportNamedDeclaration"
+    ? []
+    : O.match(child(statement, "declaration"), {
+        onSome: (declaration) =>
+          declaration.type === "VariableDeclaration"
+            ? A.flatMap(nodesOf(declaration, "declarations"), (one) => O.toArray(nameOf(one, "id")))
+            : O.toArray(nameOf(declaration, "id")),
+        onNone: () =>
+          O.isSome(child(statement, "source"))
+            ? []
+            : A.flatMap(specifiersOf(statement), (specifier) => O.toArray(writtenName(specifier, "exported")))
+      })
+
 /**
  * Every block `source` declares, in the order written, or why it could not be read.
  *
@@ -316,7 +348,13 @@ export const readBlocks = (input: { readonly file: string; readonly source: stri
   const parsed = parseSync(input.file, input.source)
   const complaint = A.head(A.map(parsed.errors, (error) => error.message))
   if (O.isSome(complaint) || !isNode(parsed.program)) {
-    return { found: [], alone: false, unread: O.orElse(complaint, () => O.some("it is not a module")) }
+    return {
+      found: [],
+      alone: false,
+      exported: [],
+      picked: [],
+      unread: O.orElse(complaint, () => O.some("it is not a module"))
+    }
   }
   const program = parsed.program
   const body = A.filter(A.isArray(program["body"]) ? program["body"] : [], isNode)
@@ -358,6 +396,7 @@ export const readBlocks = (input: { readonly file: string; readonly source: stri
         found.push({
           kind: kind.value,
           name: first ? here : O.orElse(firstText(node), () => here),
+          tag: firstText(node),
           line: line(node.start)
         })
       }
@@ -369,5 +408,22 @@ export const readBlocks = (input: { readonly file: string; readonly source: stri
     (statement) =>
       holdsNoCode(statement) || A.some(starts, (start) => start >= statement.start && start < statement.end)
   )
-  return { found, alone, unread: O.none() }
+  const picked = A.flatMap(declarations, (declaration) =>
+    O.match(stringOf(declaration, "source"), {
+      onNone: () => A.empty<PickedAt>(),
+      onSome: (from) =>
+        A.flatMap(specifiersOf(declaration), (specifier) =>
+          specifier.type === "ImportSpecifier"
+            ? O.toArray(
+                O.map(writtenName(specifier, "imported"), (imported) => ({
+                  imported,
+                  from,
+                  line: line(declaration.start)
+                }))
+              )
+            : []
+        )
+    })
+  )
+  return { found, alone, exported: A.flatMap(body, exportedBy), picked, unread: O.none() }
 }

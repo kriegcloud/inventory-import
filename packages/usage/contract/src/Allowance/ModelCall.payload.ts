@@ -3,7 +3,7 @@
  * day, and what a call is for. The usage model's `TakeCall` is sent with these, and the usage model reads them from
  * here alone.
  *
- * The only copy since move 2's hosted half: the `ModelAllowance` gateway beside it (`ModelAllowance.gateway.ts`) asks
+ * The only copy since move 2's hosted half: the `ModelAllowance` gateway beside it (`ModelAllowance.port.ts`) asks
  * with these, and the access context's copy went with its old count. The catalog's memory host still writes 40 itself.
  *
  * The one thing not to break: the three purposes are the notations of `inv:ModelCallPurposeScheme`'s concepts and the

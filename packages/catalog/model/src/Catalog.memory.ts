@@ -1,5 +1,5 @@
 import { dual } from "effect/Function"
-import { type ImportListQuery, StoredDecisions } from "./Import/ImportStore.store.ts"
+import { type ImportListQuery, StoredDecisions } from "./Import/ImportStore.port.ts"
 // The catalog's ports in memory: the twins a test runs the handlers on. One state holds what the tables hold, and
 // each write is one pure step from a state to the next, as each write on D1 is one atomic batch. The one thing not
 // to break: a twin answers what the D1 adapter answers. Where the adapter guards a write ("the import is still
@@ -68,7 +68,7 @@ import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as S from "effect/Schema"
 import { Answerer } from "./Answer/Answerer.port.ts"
 import { ModelAllowance } from "./Answer/ModelAllowance.port.ts"
-import { AssistantLog } from "./Assistant/AssistantLog.store.ts"
+import { AssistantLog } from "./Assistant/AssistantLog.port.ts"
 import type { CatalogPorts } from "./Catalog.ports.ts"
 import { plannedItems, PlannedRow } from "./Confirm/Confirm.rules.ts"
 import {
@@ -95,8 +95,8 @@ import {
   tookBack,
   type TookBack,
   type Upload
-} from "./Import/ImportStore.store.ts"
-import { EditOutcome, ItemStore } from "./Item/ItemStore.store.ts"
+} from "./Import/ImportStore.port.ts"
+import { EditOutcome, ItemStore } from "./Item/ItemStore.port.ts"
 import { abandonedAfterMinutes } from "./Staging/Upload.rules.ts"
 import {
   type CompareAtMatch,
@@ -108,7 +108,7 @@ import {
   withTakeBacks,
   sameColumn
 } from "./Import/Rematch.rules.ts"
-import { type StoreSuggestions, SuggestionStore } from "./Suggestion/SuggestionStore.store.ts"
+import { type StoreSuggestions, SuggestionStore } from "./Suggestion/SuggestionStore.port.ts"
 import { searchWords } from "./Item/ItemSearch.rules.ts"
 import { plural } from "./Words.rules.ts"
 

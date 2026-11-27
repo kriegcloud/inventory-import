@@ -9,9 +9,9 @@ import type { CurrentActor } from "@inventory/kernel/Actor"
 import type { CurrentAgent } from "@inventory/kernel/Agent"
 import type * as Effect from "effect/Effect"
 import type * as SecureRandom from "effect/crypto/SecureRandom"
-import type { AuditTrailStore } from "./Activity/AuditTrailStore.store.ts"
-import type { PeopleStore } from "./People/PeopleStore.store.ts"
-import type { MemberDirectory } from "./Session/MemberDirectory.store.ts"
+import type { AuditTrailStore } from "./Activity/AuditTrailStore.port.ts"
+import type { PeopleStore } from "./People/PeopleStore.port.ts"
+import type { MemberDirectory } from "./Session/MemberDirectory.port.ts"
 
 /** The three ports of the access context. */
 export type AccessPorts = MemberDirectory | PeopleStore | AuditTrailStore

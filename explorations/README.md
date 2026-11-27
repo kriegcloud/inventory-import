@@ -30,8 +30,8 @@ An exploration is a question being shaped before anyone builds. Each lives in `e
   he has answered but for 21a (9 fell away, 24 stands on an earlier answer); it awaits his word that it matches.
 - [module-taxonomy](module-taxonomy/README.md): whether the per-unit module shape tried on RPCs in beep-effect gives
   the library's blocks, and the rest of this repository, one consistent structure. A reading, two scratch
-  experiments, five decisions of which he answered four, and a brief for the goal `module-kinds`, which he said
-  matches (2026-11-27). No goal is open.
+  experiments, the whole catalog model tried in the shape, and thirteen decisions, all answered. Graduated to the
+  goal `module-kinds` (2026-11-27), of which nothing is built yet.
 
 ## Graduation
 

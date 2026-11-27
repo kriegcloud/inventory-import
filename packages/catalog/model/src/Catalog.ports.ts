@@ -7,10 +7,10 @@ import type * as Effect from "effect/Effect"
 import type * as SecureRandom from "effect/crypto/SecureRandom"
 import type { Answerer } from "./Answer/Answerer.port.ts"
 import type { ModelAllowance } from "./Answer/ModelAllowance.port.ts"
-import type { AssistantLog } from "./Assistant/AssistantLog.store.ts"
-import type { ImportStore } from "./Import/ImportStore.store.ts"
-import type { ItemStore } from "./Item/ItemStore.store.ts"
-import type { SuggestionStore } from "./Suggestion/SuggestionStore.store.ts"
+import type { AssistantLog } from "./Assistant/AssistantLog.port.ts"
+import type { ImportStore } from "./Import/ImportStore.port.ts"
+import type { ItemStore } from "./Item/ItemStore.port.ts"
+import type { SuggestionStore } from "./Suggestion/SuggestionStore.port.ts"
 
 /** The six ports of the catalog context. */
 export type CatalogPorts = ImportStore | ItemStore | SuggestionStore | AssistantLog | ModelAllowance | Answerer

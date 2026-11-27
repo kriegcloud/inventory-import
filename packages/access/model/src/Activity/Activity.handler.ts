@@ -5,7 +5,7 @@
  */
 import { CurrentActor } from "@inventory/kernel/Actor"
 import * as Effect from "effect/Effect"
-import { AuditTrailStore } from "./AuditTrailStore.store.ts"
+import { AuditTrailStore } from "./AuditTrailStore.port.ts"
 
 /**
  * Who did what in the actor's organization, newest first. Any member may read it.

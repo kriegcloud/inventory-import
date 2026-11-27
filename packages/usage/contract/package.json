@@ -9,7 +9,7 @@
   "exports": {
     "./package.json": "./package.json",
     "./ModelCall": "./src/Allowance/ModelCall.payload.ts",
-    "./ModelAllowance": "./src/Allowance/ModelAllowance.gateway.ts"
+    "./ModelAllowance": "./src/Allowance/ModelAllowance.port.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",

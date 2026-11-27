@@ -13,14 +13,14 @@
     "./Memory": "./src/Access.memory.ts",
     "./LastAdmin": "./src/People/LastAdmin.rules.ts",
     "./AddPersonRules": "./src/People/AddPerson.rules.ts",
-    "./PeopleStore": "./src/People/PeopleStore.store.ts",
+    "./PeopleStore": "./src/People/PeopleStore.port.ts",
     "./PeopleHandler": "./src/People/People.handler.ts",
     "./SessionRules": "./src/Session/Session.rules.ts",
     "./SignUp": "./src/Session/SignUp.rules.ts",
     "./StagePassword": "./src/Session/StagePassword.rules.ts",
-    "./MemberDirectory": "./src/Session/MemberDirectory.store.ts",
+    "./MemberDirectory": "./src/Session/MemberDirectory.port.ts",
     "./SessionHandler": "./src/Session/Session.handler.ts",
-    "./AuditTrailStore": "./src/Activity/AuditTrailStore.store.ts",
+    "./AuditTrailStore": "./src/Activity/AuditTrailStore.port.ts",
     "./ActivityHandler": "./src/Activity/Activity.handler.ts"
   },
   "scripts": {

@@ -24,7 +24,7 @@ Design in this order. Do not start from the UI.
    payloads, every expected failure as a `Schema.TaggedError` with an `httpApiStatus`. Pattern 2 in
    `docs/patterns.md` has a path parameter and several failures.
 3. **Port and adapter**: the port (a `Context.Service` with no Layer) in the model package
-   (`Item/ItemStore.store.ts`), its Layer on D1 in the host package (`ItemStore.adapter.ts`). SQL lives in the host only, every
+   (`Item/ItemStore.port.ts`), its Layer on D1 in the host package (`ItemStore.adapter.ts`). SQL lives in the host only, every
    statement through a Schema (`SqlSchema` for a read, `D1.statement` run with `run` or `batch` of `@beep/d1/D1` for a write).
 4. **Handler** in the model package (`Item/Items.handler.ts`: what each endpoint does, the ports resolved once);
    the group Layer is built in `src/server/handlers.ts`, and the adapter added to `servicesWith` in

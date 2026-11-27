@@ -1,6 +1,6 @@
 {
   "commit": "e1c3e6d",
-  "pinnedOn": "2026-11-25",
+  "pinnedOn": "2026-11-26",
   "packages": [
     {
       "package": "@alchemy.run/1password",
@@ -23,6 +23,17 @@
       "registryAddress": "https://pkg.alchemy.run/@alchemy.run/acme/-/ea237ffc3e20a61f930814a751f05ddd7d31f864c8162749effe699f8cc20583.tgz",
       "registryBytes": 61441,
       "addressesRewritten": 2
+    },
+    {
+      "package": "@alchemy.run/better-auth",
+      "version": "2.0.0-beta.87",
+      "license": "Apache-2.0",
+      "file": "alchemy.run-better-auth-e1c3e6d.tgz",
+      "bytes": 64353,
+      "sha256": "b477f4ef8dfb1c170899568d55276e26cc3271bc974087793dc4db08335fd576",
+      "registryAddress": "https://pkg.alchemy.run/@alchemy.run/better-auth/-/2f3c2778e7042a2940e0926d09f26a5dca5922e01f778966fb96fbb18a14e1ff.tgz",
+      "registryBytes": 64208,
+      "addressesRewritten": 7
     },
     {
       "package": "@alchemy.run/cloudflare",

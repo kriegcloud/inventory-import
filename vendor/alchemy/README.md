@@ -12,12 +12,13 @@
 ## What is here
 
 <!-- pin:start (written by repin.py from sources.json; do not edit by hand) -->
-The commit is `e1c3e6d` of the library's `main`, pinned on 2026-11-25: 18 packages, 39.3 MB as files.
+The commit is `e1c3e6d` of the library's `main`, pinned on 2026-11-26: 19 packages, 39.4 MB as files.
 
 | Package | Version | Licence | Size | Sibling addresses replaced |
 | --- | --- | --- | ---: | ---: |
 | `@alchemy.run/1password` | 2.0.0-beta.87 | Apache-2.0 | 22.8 kB | 1 |
 | `@alchemy.run/acme` | 2.0.0-beta.87 | Apache-2.0 | 61.8 kB | 2 |
+| `@alchemy.run/better-auth` | 2.0.0-beta.87 | Apache-2.0 | 64.4 kB | 7 |
 | `@alchemy.run/cloudflare` | 2.0.0-beta.87 | Apache-2.0 | 3.8 MB | 11 |
 | `@alchemy.run/cloudflare-runtime` | 2.0.0-beta.87 | Apache-2.0 | 1.7 MB | 2 |
 | `@alchemy.run/docker` | 2.0.0-beta.87 | Apache-2.0 | 309.1 kB | 1 |

@@ -5,10 +5,11 @@
 // instance holds that reading. The one thing not to break: a group taken back gives no row anything again, and stays
 // taken back ("Undecided: Ana took it back").
 //
-// Verify reads this file's code, not only its types. A case is told by its schema's own guard (`GroupState.guards`),
-// which the prover reads through the repository's patch to it (docs/patches.md): the union is exported, because the
-// prover takes a schema from what the file exports. It reads a state built by its case's own `make`, with each field
-// left out taken from its constructor default through the same patch.
+// Verify reads the code of the files listed here, not only their types: the `.event.ts` evolves, the `.transition.ts`
+// rules and the `.state.ts` cases. A case is told by its schema's own guard (`GroupState.guards`), read through the
+// repository's patch (docs/patches.md); the union is exported from `Group.state.ts`, because the prover takes a schema
+// from what a file exports. `initial` is built by its case's own `make`, with each field left out taken from its
+// constructor default.
 import * as Domain from "@alchemy.run/domain"
 import * as S from "effect/Schema"
 import * as GroupState from "./Group.state.ts"

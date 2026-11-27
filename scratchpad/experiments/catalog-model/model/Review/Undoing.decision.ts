@@ -4,8 +4,8 @@
 // wrote can stand there (Benjamin, 2026-11-22: "Every step, sealed history"; "Yes, exactly what was under"). It does
 // not reach past a confirm that stands ("No, refused for both"), nor into another opening of the import ("No, name it
 // and drop it"), and it is taken only from a screen that has the import's last act on a group ("Yes, refuse and
-// show"): a group that landed since may cover the row. The one thing not to break: every check here
-// that refuses an undo has its rule below.
+// show"): a group that landed since may cover the row. The one thing not to break: every check in
+// `UndoRowStep.decide` (`UndoRowStep.command.ts`) that refuses an undo has its rule in `Undoing.transition.ts`.
 import * as Domain from "@alchemy.run/domain"
 import { Row } from "../Row/Row.aggregate.ts"
 import { Import } from "../Import/Import.aggregate.ts"

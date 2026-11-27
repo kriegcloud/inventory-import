@@ -8,7 +8,8 @@ description: Module taxonomy decisions. The open questions, one decision each, w
 
 Open questions are listed first. Each is put to Benjamin with its options, the recommended one first; nothing below
 is decided until he answers, and no recommendation here is his. Answered decisions move under "Answered" with the
-date, the answer and how to reverse it.
+date, the answer and how to reverse it. Where an entry there says the agent placed or decided it, the call is the
+agent's, made from his answers beside it, and his to overturn.
 
 ## Open
 
@@ -18,9 +19,10 @@ date, the answer and how to reverse it.
 | 7 | Is each of the three endings used once a kind, or is its file renamed? (`.reference`, `.state`, `.route`) | Asked when its part of the brief opens | Decision 1 as replaced gives a model `.state.ts`; `.state` is asked first | [BRIEF](BRIEF.md), Map |
 
 Decisions 1, 3, 4 and 5 were answered on 2026-11-27 and are under "Answered"; he replaced his answer to 1 the same
-day and then answered 2, and 8 to 11 (kind folders, the blocks to come, hosts and surfaces, sealed values) as he
-raised them. 10a answered 6 for `Host.ts`; the rest of 6, and 7, were not put to him, and neither blocks the brief's
-first slice.
+day and then answered 2. He raised 8 to 11 (kind folders, the blocks to come, hosts and surfaces, sealed values) and
+answered 8a, 8b, 8c, 9a, 9b, 9c, 10a, 10b and 11a; the agent placed 9d and 11b and named the flat modules' unions
+(under 8b). Decision 12 records, after the fact, the three calls of his that took the shape past decision 1. 10a
+answered 6 for `Host.ts`; the rest of 6, and 7, were not put to him, and neither blocks the brief's first slice.
 
 ## Answered
 
@@ -43,10 +45,13 @@ is a schema, `Domain.Sealed(S.String)`, used as a field of events and commands; 
 
 **11b. The Vault.** Placed by the agent from decisions 9 and 10; he chose no option.
 
-- The Vault adds no kind. A query, policy or saga reads it in its own Live (`yield* Domain.Vault`). `VaultLive`, its
-  key store and its key wrap are provided in `<Model>.host.ts`, where the model's Layer is built; the library's own
-  stores and wraps are used as they are, and one written here is a `.adapter.ts` in the host. A story uses the
-  library's test Vault.
+- Question: does the Vault add a kind, and where is it provided?
+- Answer (the agent's): it adds no kind. A query, policy or saga reads it in its own Live (`yield* Domain.Vault`).
+  `VaultLive`, its key store and its key wrap are provided in `<Model>.host.ts`, where the model's Layer is built; the
+  library's own stores and wraps are used as they are, and one written here is a `.adapter.ts` in the host. A story
+  uses the library's test Vault.
+- Rationale: 9b (a Live reaches what it needs through what is provided to it) and 10a (`<Model>.host.ts` builds the
+  model's Layer). No file declares a Vault, so the registry has nothing to read.
 - Reverse: nothing to undo.
 - Neither is tried in the experiment: the model has no personal data sealed today, and a sealed field on an event
   changes an aggregate the lock holds.
@@ -83,7 +88,7 @@ library at `e1c3e6d`, `toHttpApi`, `toCli`, `toToolkit` and `toMcp` each take an
 
 Asked when he said views, queries, policies, projections, sagas and external systems are coming and the layout
 should be settled for them now. None exists in a package today: the model is verified and not hosted. The alchemy-domain
-exploration's brief names 24 of them (streams included) and `goals/alchemy-domain-uptake` builds them.
+exploration's brief names 26 of them (streams included) and `goals/alchemy-domain-uptake` builds them.
 
 **9a. Where they live.**
 
@@ -116,7 +121,8 @@ Placed by the agent from 9a and 9b; he chose neither option himself.
   (the endings `block-files` reads already). A rewrite is pure and has no Live. A compaction's Live is in its file and
   writes the replaced events through a `.port.ts`, whose adapter is the host's.
 - Rationale: 9b with no exception. The library's example puts a compaction's handler in a sibling `.live.ts` that
-  imports an R2 bucket; a model package here imports only the library and `effect`, so the bucket is behind a port.
+  imports an R2 bucket; a model package here imports the library, `effect`, the kernel and its own contract, and
+  no driver (`laws boundaries`), so the bucket is behind a port.
   Rejected: the library's `.live.ts`, a second file and a kind for one block.
 - The alchemy-domain brief names no rewrite and no compaction. A rewrite is tried in the experiment; a compaction is
   not: its roll-up is an event of its aggregate that `evolve` folds, which changes an aggregate the lock holds.
@@ -125,9 +131,9 @@ Placed by the agent from 9a and 9b; he chose neither option himself.
 **9c. How far this exploration goes.**
 
 - Question: the real blocks are the uptake goal's. What does this packet do to prove the layout?
-- Answer: "One trial block per kind". All 24 are placed in the brief, and the catalog-model experiment gets one small
-  block of each of the seven kinds in its decided home, with what Verify, the lock and the type check do with them
-  recorded. A trial block is never copied into a package.
+- Answer: "One trial block per kind". All 26 are placed in the brief, and the catalog-model experiment gets one small
+  block of each of the seven read and reaction kinds in its decided home, and a rewrite (9d), with what Verify, the
+  lock and the type check do with them recorded in its `NOTE.md`. A trial block is never copied into a package.
 - Rationale: rejected "Paper only" (the uptake goal would find any surprise) and "Build the import's real ones"
   (overlaps the uptake goal's move 3 and the session on it).
 - Reverse: drop the trial blocks from the experiment.
@@ -143,7 +149,7 @@ files in one flat listing.
 - Answer: "Per kind, over 5 files". The folder takes the kind's plural (`commands/`, `events/`); the file keeps its
   singular ending (`.command.ts`, `.event.ts`, and `.transition.ts`, `.rejection.ts` at the module's root).
 - Rationale: a flat listing sorts by noun, so `Import.aggregate.ts` falls between `GroupCounted.event.ts` and
-  `ImportConfirmed.event.ts`; with the folders the module's own five files are what the folder shows. A number lets
+  `ImportConfirmed.event.ts`; with the folders the module's own four files are what the folder shows. A number lets
   `block-files` refuse both a folder of five or fewer and a flat kind of six or more. The union file is not counted.
   Today `Import/` folds both kinds; `Row/`, `Group/` and `Review/` stay flat. Rejected: "Per module, all or nothing",
   "Always folders" (a `Row/events/` of two files) and "Author's judgment" (no check).
@@ -168,6 +174,25 @@ files in one flat listing.
 - Rationale: no kind passes five, so 8a decides it with no exception, and `Deciding.decision.ts` sorts beside the
   `Deciding.transition.ts` it lists. Rejected: "A folder per act" (a second folder rule) and "Kind folders here too".
 - Reverse: nothing to undo.
+
+### 2026-11-27: decision 12, the shape past decision 1
+
+Recorded on review, after the fact. Each call below was his, made in conversation the same day as the experiments
+ran (the README's Trail has each); none had an entry here, and decision 1 as replaced still said the transitions and
+the unions stay in the aggregate's file.
+
+- Question: do the transitions, the unions and the state's cases stay as decision 1 left them?
+- Answer: no, three calls of his. The transitions are listed by name from `<Noun>.transition.ts` ("the transitions by
+  name"). Both patches to the library go into `packages/patches` ("Yes, both patches": `04-a-rule-by-its-name` and
+  `05-a-structs-defaults`). A state's cases are exported under their own names as branded classes, with starting
+  values on their fields and the union under the name `State`. The unions' own files are decision 8b.
+- Rationale: an aggregate's file becomes a listing, as an Api's and a model's are, and a starting value is said once,
+  on the schema. Tried on the whole model in `scratchpad/experiments/catalog-model`: verified against the package's
+  lock, the lock unchanged, and a weakened moved rule refused by name.
+- Costs he took: two patches to carry until the library does the same; a rule's type is written on its name and
+  never on its parameters, or its text is not the locked text; a default only on the case a value starts in.
+- Reverse: write each rule back inline in its aggregate's or decision's file and each starting value back in its
+  `make`; patches `04` and `05` can then go. The lock holds in both directions, since no rule's text changes.
 
 ### 2026-11-27: decision 2
 
@@ -198,20 +223,23 @@ which names the files export ("Role names, event per file"). Both were the recom
   `<Tag>.command.ts`, exporting `Command`, `decide` and the rejections only it returns. Each is imported as a
   namespace named for its stem: `ImportStaged.Event`, `ImportStaged.evolve`, `StageImport.Command`,
   `StageImport.decide`. The state and the invariants are in `<Aggregate>.state.ts`; the aggregate's file keeps the two
-  unions, the transitions and the listing.
+  unions, the transitions and the listing (superseded for the unions by decision 8b and for the transitions by
+  decision 12).
 - Rationale: his, that Effect's and the library's own modules are read this way (`Option.map`) and that a file read
   as a namespace gives every block of a kind the same names. An event has its own file because four of the model's
   eleven commands record an event another file declares, and `UndoGroup` records two. Tried on `Import` as sixteen
   files (`scratchpad/experiments/import-module`): it proves what the package's one file proves, a broken moved
   `decide` and a broken moved `evolve` are each caught, and the whole model verifies against the package's lock, the
-  lock unchanged (`scratchpad/experiments/command-file`, `model-role`).
+  lock unchanged (`scratchpad/experiments/command-file`, `model-role`). Both experiments were dropped the same day
+  and are in history at `ba3ac17f`; `catalog-model` carries their findings.
 - Rejected: "Role names, events stay with commands" (`StageImport.Event`), which loses the event's word and has no
   place for a second event; "Named exports, as built" (`StageImport.ImportStaged`, `ActCounted.ActCounted`), also
   verified; `evolve` and `decide` as statics of the class, which the prover reads only with about forty lines added
   to it (`prover-static-member.patch`); and the first answer below.
 - Costs he took: the 60 mutants that name `Import.aggregate.ts` each change a line of a `decide` and are written
   again; `.state.ts` and `.event.ts` become kinds; every event's class is named `Event` where a hover or a stack
-  trace shows a class's name; the transitions do not move, because the lock keeps each rule's text.
+  trace shows a class's name; the transitions do not move, because the lock keeps each rule's text (until decision
+  12's patch).
 - Reverse: move each `evolve` and `decide` back into the aggregate's or the decision's file and each event back
   beside the command that records it, and rename the classes to their tags. No rule and no tag changes either way,
   so the lock holds in both directions.
@@ -227,8 +255,9 @@ Asked by dialog, each with its options, the recommended one first. He picked the
 - Answer: "Own file, decide stays". One command to a `.command.ts`, with its events and the rejections only it
   returns; its `decide` stays in the aggregate or the decision.
 - Rationale: the library's own layout, and verified on a copy of the whole model against the package's lock
-  (`scratchpad/experiments/command-file`, `model-split-command`, run after his answer). Rejected: "Own file with its decide", also verified, which needs the state
-  in a file of its own (an ending `block-files` does not have) and 60 of the model's 192 mutants written again; and
+  (`scratchpad/experiments/command-file`, `model-split-command`, run after his answer; in history at `ba3ac17f`).
+  Rejected: "Own file with its decide", also verified, which needs the state in a file of its own (an ending
+  `block-files` does not have) and 60 of the model's 192 mutants written again; and
   "As today". It replaces "Hold all kinds" (2026-11-26) for commands. A rejection several commands return moves to a
   `.rejection.ts` with the first of them that moves.
 - Reverse: move each command, its events and its rejections back into its decider's file; `block-files` allows both

@@ -10,12 +10,13 @@
 // every `&&`, `||` and `?:` it cannot settle, in the code and in every rule a decision reads, and past 4,096 paths it
 // proves nothing.
 //
-// Verify reads this file's code, not only its types. A case is told by its schema's own guard (`ImportState.guards`,
-// `ImportCommand.guards`, `ImportEvent.guards`, `isAnyOf`), which the prover reads through the repository's patch to it
-// (docs/patches.md): the unions are exported, because the prover takes a schema from what the file exports. It reads a
-// state built by its case's own `make`, with the status and every count a `make` leaves out taken from the case's
-// constructor defaults, and an event or a rejection built with `make` as the instance it builds, through the same
-// patches: no file here turns a diagnostic off.
+// Verify reads the code of the files listed here, not only their types: the `.command.ts` decides, the `.event.ts`
+// evolves, the `.transition.ts` rules and the `.state.ts` invariants. A case is told by its schema's own guard
+// (`ImportState.guards`, `ImportCommand.guards`, `ImportEvent.guards`, `isAnyOf`), read through the repository's patch
+// (docs/patches.md); each union is exported from its `.state.ts` or `.union.ts`, because the prover takes a schema from
+// what a file exports. `initial` is built by its case's own `make`, with the status and every count a `make` leaves
+// out taken from the case's constructor defaults, and an event or a rejection built with `make` is read as the
+// instance it builds, through the same patches: no file of the model turns a diagnostic off.
 import * as Domain from "@alchemy.run/domain"
 import { ImportKey } from "../Review/Change.schema.ts"
 import * as ActCounted from "./events/ActCounted.event.ts"

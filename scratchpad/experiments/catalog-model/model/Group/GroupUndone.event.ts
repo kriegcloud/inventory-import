@@ -28,11 +28,12 @@ export class Event extends Domain.Event(
  * **Example** (Take back a decided group)
  *
  * ```ts
+ * import * as Change from "../Review/Change.schema.ts"
  * import * as GroupState from "./Group.state.ts"
  * import * as GroupUndone from "./GroupUndone.event.ts"
  *
  * const decided = GroupState.Decided.make({
- *   importId: "imp-1",
+ *   importId: Change.ImportKey.make("imp-1"),
  *   organizationId: "org-1",
  *   change: 5,
  *   by: "ana",

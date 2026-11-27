@@ -1,8 +1,8 @@
 // What one row of an import's review holds, and the rules that hold of every state of it. Read as a namespace named
 // `RowState`: `RowState.State`, `RowState.Decided`, `RowState.guards.Decided`.
 import * as S from "effect/Schema"
-import { Change } from "../Review/Change.schema.ts"
-import { Level } from "./Level.schema.ts"
+import { Change, ImportKey } from "../Review/Change.schema.ts"
+import { decision, Level } from "./Level.schema.ts"
 
 /**
  * **Details**
@@ -32,10 +32,16 @@ export const noUndo: Undone = Undone.make({ change: 0, step: "", by: "" })
 /**
  * The flags of a row with nothing decided: an act that says it on such a row changes nothing.
  *
- * @category models
+ * @category constants
  * @since 0.0.0
  */
 export const NO_DECISION = "{}"
+
+/** What every row an act has reached names: its import and that import's organization. */
+const reached = {
+  importId: ImportKey.pipe(S.annotateKey({ description: "The import the row belongs to" })),
+  organizationId: S.String.pipe(S.annotateKey({ description: "The organization of that import" }))
+}
 
 /**
  * **Details**
@@ -59,8 +65,7 @@ export class Untouched extends S.Opaque<Untouched, { readonly brand: unique symb
 export class Undecided extends S.Opaque<Undecided, { readonly brand: unique symbol }>()(
   S.Struct({
     status: S.tag("Undecided"),
-    importId: S.String.pipe(S.annotateKey({ description: "The import the row belongs to" })),
-    organizationId: S.String.pipe(S.annotateKey({ description: "The organization of that import" })),
+    ...reached,
     undone: Undone
   }).annotate({ description: "A row whose only decision was taken back" })
 ) {}
@@ -77,14 +82,9 @@ export class Undecided extends S.Opaque<Undecided, { readonly brand: unique symb
 export class Decided extends S.Opaque<Decided, { readonly brand: unique symbol }>()(
   S.Struct({
     status: S.tag("Decided"),
-    importId: S.String.pipe(S.annotateKey({ description: "The import the row belongs to" })),
-    organizationId: S.String.pipe(S.annotateKey({ description: "The organization of that import" })),
+    ...reached,
+    ...decision,
     change: Change.pipe(S.annotateKey({ description: "The change of its import that recorded the decision" })),
-    by: S.String.pipe(S.annotateKey({ description: "The member who made it" })),
-    step: S.String.pipe(S.annotateKey({ description: "The step it was made in" })),
-    flags: S.String.pipe(S.annotateKey({ description: "The decision's flags, as text" })),
-    madeOn: S.Int.pipe(S.annotateKey({ description: "The import's matching it was made on" })),
-    label: S.String.pipe(S.annotateKey({ description: "What the act was called on screen" })),
     under: Level,
     below: S.String.pipe(S.annotateKey({ description: "Every decision below that one, sealed into one text" })),
     undone: Undone
@@ -148,12 +148,13 @@ export const onItsMatching = (decision: { readonly flags: string; readonly madeO
  * **Example** (No change, and a change)
  *
  * ```ts
+ * import * as Change from "../Review/Change.schema.ts"
  * import * as Level from "./Level.schema.ts"
  * import * as RowState from "./Row.state.ts"
  *
  * const untouched = RowState.Untouched.make({ undone: RowState.noUndo })
  * const decided = RowState.Decided.make({
- *   importId: "imp-1",
+ *   importId: Change.ImportKey.make("imp-1"),
  *   organizationId: "org-1",
  *   change: 4,
  *   by: "dana",
@@ -176,6 +177,117 @@ export const onItsMatching = (decision: { readonly flags: string; readonly madeO
  */
 export const leavesAsItIs = (act: { readonly row: State; readonly flags: string; readonly madeOn: number }): boolean =>
   State.guards.Decided(act.row) ? onItsMatching(act.row) === onItsMatching(act) : act.flags === NO_DECISION
+
+/**
+ * The act's sender has seen what the row holds: its decision, by the number of the change, or that it has none.
+ *
+ * **Example** (By the number of the change)
+ *
+ * ```ts
+ * import * as Change from "../Review/Change.schema.ts"
+ * import * as Level from "./Level.schema.ts"
+ * import * as RowState from "./Row.state.ts"
+ *
+ * const row = RowState.Decided.make({
+ *   importId: Change.ImportKey.make("imp-1"),
+ *   organizationId: "org-1",
+ *   change: 4,
+ *   by: "dana",
+ *   step: "s-1",
+ *   flags: '{"kept":true}',
+ *   madeOn: 1,
+ *   label: "Keep",
+ *   under: Level.noLevel,
+ *   below: "",
+ *   undone: RowState.noUndo
+ * })
+ * const untouched = RowState.Untouched.make({ undone: RowState.noUndo })
+ *
+ * RowState.sawIt({ row, command: { saw: 4 } }) // => true
+ * RowState.sawIt({ row, command: { saw: 3 } }) // => false
+ * RowState.sawIt({ row: untouched, command: { saw: 0 } }) // => true
+ * ```
+ *
+ * @category behavior
+ * @since 0.0.0
+ */
+export const sawIt = (act: { readonly row: State; readonly command: { readonly saw: number } }): boolean =>
+  State.guards.Decided(act.row) ? act.command.saw === act.row.change : act.command.saw === 0
+
+/**
+ * The row holds this very act already: this step, from this person, with this text on the matching it was made on. A
+ * copy of a press that was recorded is known by it, and is answered as the first time, with nothing new.
+ *
+ * **Example** (A copy of the press, and another press)
+ *
+ * ```ts
+ * import * as Change from "../Review/Change.schema.ts"
+ * import * as Level from "./Level.schema.ts"
+ * import * as RowState from "./Row.state.ts"
+ *
+ * const row = RowState.Decided.make({
+ *   importId: Change.ImportKey.make("imp-1"),
+ *   organizationId: "org-1",
+ *   change: 4,
+ *   by: "dana",
+ *   step: "s-1",
+ *   flags: '{"kept":true}',
+ *   madeOn: 1,
+ *   label: "Keep",
+ *   under: Level.noLevel,
+ *   below: "",
+ *   undone: RowState.noUndo
+ * })
+ *
+ * RowState.holdsThisAct({ row, step: "s-1", by: "dana", flags: '{"kept":true}', madeOn: 1 }) // => true
+ * RowState.holdsThisAct({ row, step: "s-2", by: "dana", flags: '{"kept":true}', madeOn: 1 }) // => false
+ * RowState.holdsThisAct({ row, step: "s-1", by: "ana", flags: '{"kept":true}', madeOn: 1 }) // => false
+ * ```
+ *
+ * @category behavior
+ * @since 0.0.0
+ */
+export const holdsThisAct = (act: {
+  readonly row: State
+  readonly step: string
+  readonly by: string
+  readonly flags: string
+  readonly madeOn: number
+}): boolean =>
+  State.guards.Decided(act.row) &&
+  act.row.step === act.step &&
+  act.row.by === act.by &&
+  onItsMatching(act.row) === onItsMatching(act)
+
+/**
+ * The row's last undo is this one: the same change taken back, in the same step, by the same person. A copy of an undo
+ * that was recorded is known by it, and is answered as the first time, with nothing new.
+ *
+ * **Example** (A copy of the undo, and another undo)
+ *
+ * ```ts
+ * import * as Change from "../Review/Change.schema.ts"
+ * import * as RowState from "./Row.state.ts"
+ *
+ * const row = RowState.Undecided.make({
+ *   importId: Change.ImportKey.make("imp-1"),
+ *   organizationId: "org-1",
+ *   undone: RowState.Undone.make({ change: 4, step: "s-3", by: "dana" })
+ * })
+ *
+ * RowState.tookThisUndo({ row, undo: 4, step: "s-3", by: "dana" }) // => true
+ * RowState.tookThisUndo({ row, undo: 4, step: "s-5", by: "dana" }) // => false
+ * ```
+ *
+ * @category behavior
+ * @since 0.0.0
+ */
+export const tookThisUndo = (act: {
+  readonly row: State
+  readonly undo: number
+  readonly step: string
+  readonly by: string
+}): boolean => act.row.undone.change === act.undo && act.row.undone.step === act.step && act.row.undone.by === act.by
 
 // The sizes kept beside the decision under the current one are its texts' own: one comparison a rule.
 /**

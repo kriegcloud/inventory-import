@@ -5,8 +5,8 @@
 // one. It does not reach past a confirm that stands, nor into another opening of the import, and it is taken only from
 // a screen that has every change of the import: a row decided since on a screen the sender has not received keeps
 // that person's whole decision when the group goes, and the sender is shown it first (2026-11-22, by the rule on a
-// press from a screen that is behind). The one thing not to break: every check here that refuses an undo has its
-// rule below.
+// press from a screen that is behind). The one thing not to break: every check in `UndoGroup.decide`
+// (`UndoGroup.command.ts`) that refuses an undo has its rule in `UndoingGroup.transition.ts`.
 import * as Domain from "@alchemy.run/domain"
 import { Group } from "../Group/Group.aggregate.ts"
 import { Import } from "../Import/Import.aggregate.ts"

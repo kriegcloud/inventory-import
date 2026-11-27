@@ -2,7 +2,7 @@
 // `ImportState`: `ImportState.State`, `ImportState.Open`, `ImportState.guards.Open`.
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
-import { Columns } from "../Review/Change.schema.ts"
+import { Change, Columns } from "../Review/Change.schema.ts"
 
 /**
  * What every import that was staged and not removed keeps, whatever its status. `replaced` adds each confirm's
@@ -20,8 +20,8 @@ const staged = {
   ),
   matching: S.Int.pipe(S.annotateKey({ description: "The number of its last match" })),
   columns: Columns.pipe(S.annotateKey({ description: "Which column fills each field" })),
-  changes: S.Int.pipe(S.annotateKey({ description: "The number of its last change" })),
-  confirmedAt: S.Int.pipe(
+  changes: Change.pipe(S.annotateKey({ description: "The number of its last change" })),
+  confirmedAt: Change.pipe(
     S.annotateKey({ description: "The number of the last confirm that stands; 0 when none does" })
   ),
   inForce: S.Natural.pipe(S.annotateKey({ description: "Items its confirms created that are in force" })),
@@ -31,10 +31,10 @@ const staged = {
     })
   ),
   standing: S.Natural.pipe(S.annotateKey({ description: "Its confirms not taken back" })),
-  lastGroup: S.Int.pipe(
+  lastGroup: Change.pipe(
     S.annotateKey({ description: "The number of the last act on a group, its undo included; 0 when there was none" })
   ),
-  topGroup: S.Int.pipe(
+  topGroup: Change.pipe(
     S.annotateKey({ description: "The change of the last group still in force; 0 when there is none" })
   )
 }
@@ -236,10 +236,33 @@ export type State = typeof State.Type
  * }
  * ```
  *
- * @category behavior
+ * @category models
  * @since 0.0.0
  */
 export const { guards, cases, isAnyOf } = State
+
+/**
+ * **Details**
+ *
+ * A read that shows where an import is takes its status from here, so it cannot name a status no case has.
+ *
+ * @category models
+ * @since 0.0.0
+ */
+export const Status = S.Literals([
+  "Unstaged",
+  "Open",
+  "Imported",
+  "TakenBack",
+  "Removed"
+] satisfies ReadonlyArray<State["status"]>).annotate({ description: "Where an import is in its life, as a status" })
+/**
+ * The decoded value of `Status`: the `status` of one of `State`'s five cases.
+ *
+ * @category models
+ * @since 0.0.0
+ */
+export type Status = typeof Status.Type
 
 /**
  * A confirmed import's four outcomes add up to the rows in its file, as its command stated them: created, updated,

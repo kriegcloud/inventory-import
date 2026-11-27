@@ -9,7 +9,7 @@ import { CurrentActor } from "./Actor.context.ts"
  * The middleware every command of the model names: it provides `CurrentActor`, or fails with the kernel's
  * `NotSignedIn` when nobody is signed in, so no command of the model is taken.
  *
- * @category context
+ * @category middleware
  * @since 0.0.0
  */
 export class Session extends RpcMiddleware.Service<Session, { readonly provides: CurrentActor }>()(

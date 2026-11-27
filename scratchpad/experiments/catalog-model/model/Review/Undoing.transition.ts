@@ -14,16 +14,16 @@ import * as UndoRowStep from "./UndoRowStep.command.ts"
 /** What `Undoing` reads, before a step or after it: the import, and the row. */
 type States = { readonly life: ImportState.State; readonly row: RowState.State }
 /** One step `Undoing` takes: the states it read, the command, the events it recorded, and the states after. */
-type Step = {
+type Transition = {
   readonly before: States
   readonly after: States
   readonly command: UndoRowStep.Command
   readonly events: ReadonlyArray<StepUndone.Event | ActCounted.Event>
 }
 /** A rule of every step, answered from the step alone. */
-type Rule = (step: Step) => boolean
+type Rule = (transition: Transition) => boolean
 /** A rule of every step that asks who is acting. */
-type Asked = (step: Step) => Effect.Effect<boolean, never, CurrentActor>
+type Asked = (transition: Transition) => Effect.Effect<boolean, never, CurrentActor>
 
 /**
  * An undo is taken only on an open import, for its sender's own change, while it is the row's decision.

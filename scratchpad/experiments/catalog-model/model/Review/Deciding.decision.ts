@@ -11,10 +11,11 @@
 // `covered` and `asItReads` are the sender's word: the model cannot check them, so the screen must work them out from
 // what it has received, as the fold does. So a covered act that reads so is no change only once `saw` and the
 // matching pass: from a screen that is behind it is refused and held, not lost. The one thing not to break: every
-// check here that stands between an act and its record has its rule below, so one that is removed breaks a named rule
-// under Verify. The checks that choose between "no change" and a refusal, for an act that records nothing either way
-// (a press from a screen that is behind, a press sent twice), have none: a rule is checked only where something is
-// recorded. Each of those is held by a story and a mutant (mutants/README.md).
+// check in `DecideRow.decide` (`DecideRow.command.ts`) that stands between an act and its record has its rule in
+// `Deciding.transition.ts`, so one that is removed breaks a named rule under Verify. The checks that choose between
+// "no change" and a refusal, for an act that records nothing either way (a press from a screen that is behind, a
+// press sent twice), have none: a rule is checked only where something is recorded. Each of those is held by a story
+// and a mutant (packages/catalog/model/mutants/README.md).
 import * as Domain from "@alchemy.run/domain"
 import { Row } from "../Row/Row.aggregate.ts"
 import { Import } from "../Import/Import.aggregate.ts"

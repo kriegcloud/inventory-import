@@ -8,11 +8,12 @@ import * as ActCounted from "../Import/events/ActCounted.event.ts"
 import { Import } from "../Import/Import.aggregate.ts"
 import { ConfirmedSince, MatchedSince, NotOpen, NotPermitted } from "../Import/Import.rejection.ts"
 import * as ImportState from "../Import/Import.state.ts"
-import { CUT, letGo, Level, MOST_BELOW, noLevel, seal, sizesAreTrue } from "../Row/Level.schema.ts"
+import { Below, CUT, letGo, Level, noLevel, seal, sizesAreTrue } from "../Row/Level.schema.ts"
 import { Row } from "../Row/Row.aggregate.ts"
 import * as RowState from "../Row/Row.state.ts"
+import { tookThisUndo } from "../Row/Row.state.ts"
 import * as StepUndone from "../Row/StepUndone.event.ts"
-import { Change, ImportKey, RowKey, Step } from "./Change.schema.ts"
+import { Change, ImportKey, RowKey, Step, UNDO_LABEL } from "./Change.schema.ts"
 import { DecidedBeforeTheConfirm, GroupedAfter, GroupedSince, NotYourStep, UndoneSince } from "./Review.rejection.ts"
 
 /**
@@ -72,8 +73,7 @@ export class Command extends Domain.Command(
       sawUndone: Change,
       opening: S.Int,
       next: Level,
-      // A history is sealed only while it is at most `MOST_BELOW` long, so no true `below` is longer.
-      below: S.String.check(S.isMaxLength(MOST_BELOW))
+      below: Below
     },
     events: [StepUndone.Event, ActCounted.Event],
     rejects: [
@@ -92,36 +92,6 @@ export class Command extends Domain.Command(
   },
   { description: "Take back the sender's own decision on one row, bringing the level it uncovers" }
 ) {}
-
-/**
- * The row's last undo is this one: the same change taken back, in the same step, by the same person. A copy of an undo
- * that was recorded is known by it, and is answered as the first time, with nothing new.
- *
- * **Example** (A copy of the undo, and another undo)
- *
- * ```ts
- * import * as RowState from "../Row/Row.state.ts"
- * import * as UndoRowStep from "./UndoRowStep.command.ts"
- *
- * const row = RowState.Undecided.make({
- *   importId: "imp-1",
- *   organizationId: "org-1",
- *   undone: RowState.Undone.make({ change: 4, step: "s-3", by: "dana" })
- * })
- *
- * UndoRowStep.tookThisUndo({ row, undo: 4, step: "s-3", by: "dana" }) // => true
- * UndoRowStep.tookThisUndo({ row, undo: 4, step: "s-5", by: "dana" }) // => false
- * ```
- *
- * @category behavior
- * @since 0.0.0
- */
-export const tookThisUndo = (act: {
-  readonly row: RowState.State
-  readonly undo: number
-  readonly step: string
-  readonly by: string
-}): boolean => act.row.undone.change === act.undo && act.row.undone.step === act.step && act.row.undone.by === act.by
 
 /** What the decision reads for `UndoRowStep`: the import, and the row the command names. */
 type Reads = {
@@ -208,7 +178,7 @@ export const decide = Effect.fn("Undoing.decide")(function* ({ life, row }: Read
         change: life.state.changes + 1,
         step: cmd.step,
         row: cmd.row,
-        label: "undo",
+        label: UNDO_LABEL,
         holds: under.change,
         by: under.by,
         actor: actor.memberId,

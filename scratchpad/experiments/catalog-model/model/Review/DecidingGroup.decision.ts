@@ -2,8 +2,8 @@
 // one command, whatever the number of rows (Benjamin, 2026-11-22: "One unit per group"). It is taken only from a
 // screen that has every change of the import, so the rows it names are the ones the act fits now. It becomes the last
 // group in force and keeps which one was before it, so that its undo can put that one back as the last. The one thing
-// not to break: every check here that refuses an act has its rule below, so a check that is removed breaks a named
-// rule under Verify.
+// not to break: every check in `DecideGroup.decide` (`DecideGroup.command.ts`) that refuses an act has its rule in
+// `DecidingGroup.transition.ts`, so a check that is removed breaks a named rule under Verify.
 import * as Domain from "@alchemy.run/domain"
 import { Group } from "../Group/Group.aggregate.ts"
 import { Import } from "../Import/Import.aggregate.ts"

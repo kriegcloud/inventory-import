@@ -5,6 +5,9 @@
 // headings' own choices included, because one match can move more than one field's column.
 import * as S from "effect/Schema"
 
+/** The bound the model sets on an id and a step: never empty, at most 64 characters. */
+const ShortText = S.String.check(S.isMinLength(1), S.isMaxLength(64))
+
 /**
  * **Details**
  *
@@ -28,8 +31,7 @@ import * as S from "effect/Schema"
  * @category models
  * @since 0.0.0
  */
-export const ImportKey = S.String.check(S.isMinLength(1), S.isMaxLength(64))
-  .pipe(S.brand("ImportId"))
+export const ImportKey = ShortText.pipe(S.brand("ImportId"))
   .annotate({ description: "An import's id, as the model's commands take it" })
 /**
  * The decoded value of `ImportKey`: the contract's `ImportId`.
@@ -59,8 +61,7 @@ export type ImportKey = typeof ImportKey.Type
  * @category models
  * @since 0.0.0
  */
-export const RowKey = S.String.check(S.isMinLength(1), S.isMaxLength(64))
-  .pipe(S.brand("RowId"))
+export const RowKey = ShortText.pipe(S.brand("RowId"))
   .annotate({ description: "A row's id, as the model's commands take it" })
 /**
  * The decoded value of `RowKey`: the contract's `RowId`.
@@ -88,7 +89,7 @@ export type RowKey = typeof RowKey.Type
  * @category models
  * @since 0.0.0
  */
-export const Step = S.String.check(S.isMinLength(1), S.isMaxLength(64)).annotate({
+export const Step = ShortText.annotate({
   description: "The id the screen gives one act at the press; the rows of a group act share it"
 })
 /**
@@ -103,9 +104,11 @@ export type Step = typeof Step.Type
  * @category models
  * @since 0.0.0
  */
-export const Change = S.Int.annotate({ description: "A change of an import's review, named by its number; 0 for none" })
+export const Change = S.Int.annotate({
+  description: "A change of an import's review, named by its number; 0 for none, -1 for a level let go"
+})
 /**
- * The decoded value of `Change`: a whole number, 0 for none.
+ * The decoded value of `Change`: a whole number, 0 for none, -1 for a level let go.
  *
  * @category models
  * @since 0.0.0
@@ -254,3 +257,11 @@ export const Label = S.String.check(S.isMaxLength(200)).annotate({ description: 
  * @since 0.0.0
  */
 export type Label = typeof Label.Type
+
+/**
+ * What an undo is called among the acts the import counts, a row's undo or a group's.
+ *
+ * @category models
+ * @since 0.0.0
+ */
+export const UNDO_LABEL = "undo"

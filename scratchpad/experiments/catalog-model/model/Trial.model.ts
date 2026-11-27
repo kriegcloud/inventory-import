@@ -3,12 +3,13 @@
 import * as Domain from "@alchemy.run/domain"
 import * as Layer from "effect/Layer"
 import { DraftRows, DraftRowsLive } from "./Draft/DraftRows.projection.ts"
-import { ImportActs } from "./Draft/ImportActs.stream.ts"
+import { ImportActs, ImportActsLive } from "./Draft/ImportActs.stream.ts"
 import { ImportReview, ImportReviewLive } from "./Draft/ImportReview.query.ts"
+import { RowHolds } from "./Draft/RowHolds.view.ts"
 import { Group } from "./Group/Group.aggregate.ts"
 import { ForgetMember } from "./Import/ForgetMember.rewrite.ts"
 import { Import } from "./Import/Import.aggregate.ts"
-import { ImportStatus } from "./Import/ImportStatus.view.ts"
+import { ImportStatus, ImportStatusLive } from "./Import/ImportStatus.view.ts"
 import { Deciding } from "./Review/Deciding.decision.ts"
 import { DecidingGroup } from "./Review/DecidingGroup.decision.ts"
 import { Undoing } from "./Review/Undoing.decision.ts"
@@ -31,7 +32,7 @@ export class CatalogTrial extends Domain.Model(
   {
     aggregates: [Import, Row, Group],
     decisions: [Deciding, Undoing, DecidingGroup, UndoingGroup],
-    views: [ImportStatus],
+    views: [ImportStatus, RowHolds],
     policies: [SuggestOnAsk],
     projections: [DraftRows],
     streams: [ImportActs],
@@ -43,12 +44,15 @@ export class CatalogTrial extends Domain.Model(
 ) {}
 
 /**
- * Every Live of the trial blocks, as one Layer. It still needs a `DraftStore` and the `Suggester`.
+ * Every Live of the trial blocks, as one Layer: the two guarded reads' `validate`s, the projection, the query, the saga
+ * and the policy. It still needs a `DraftStore` and the `Suggester`.
  *
  * @category layers
  * @since 0.0.0
  */
 export const CatalogTrialHandlers = Layer.mergeAll(
+  ImportStatusLive,
+  ImportActsLive,
   DraftRowsLive,
   ImportReviewLive,
   SuggestionPassLive,

@@ -2,7 +2,7 @@
 import * as Domain from "@alchemy.run/domain"
 import { dual } from "effect/Function"
 import * as S from "effect/Schema"
-import { Change, Step } from "../../Review/Change.schema.ts"
+import { Change, Label, RowKey, Step } from "../../Review/Change.schema.ts"
 import * as ImportState from "../Import.state.ts"
 
 /**
@@ -18,8 +18,8 @@ export class Event extends Domain.Event(
   {
     change: Change,
     step: Step,
-    row: S.String,
-    label: S.String,
+    row: RowKey,
+    label: Label,
     holds: Change,
     by: S.String,
     actor: S.String,
@@ -39,6 +39,7 @@ export class Event extends Domain.Event(
  * **Example** (Count an act on a row)
  *
  * ```ts
+ * import * as Change from "../../Review/Change.schema.ts"
  * import * as ActCounted from "./ActCounted.event.ts"
  * import * as ImportState from "../Import.state.ts"
  *
@@ -46,7 +47,7 @@ export class Event extends Domain.Event(
  * const act = ActCounted.Event.make({
  *   change: 1,
  *   step: "press-1",
- *   row: "row-1",
+ *   row: Change.RowKey.make("row-1"),
  *   label: "Skip row",
  *   holds: 1,
  *   by: "member-1",

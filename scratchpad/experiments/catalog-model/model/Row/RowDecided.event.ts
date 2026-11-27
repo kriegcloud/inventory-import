@@ -2,7 +2,7 @@
 import * as Domain from "@alchemy.run/domain"
 import { dual } from "effect/Function"
 import * as S from "effect/Schema"
-import { Change, Flags, Step } from "../Review/Change.schema.ts"
+import { Change, Flags, ImportKey, Label, Step } from "../Review/Change.schema.ts"
 import { CUT, Level, MOST_BELOW, noLevel, seal } from "./Level.schema.ts"
 import * as RowState from "./Row.state.ts"
 
@@ -18,14 +18,14 @@ import * as RowState from "./Row.state.ts"
 export class Event extends Domain.Event(
   "RowDecided",
   {
-    importId: S.String,
+    importId: ImportKey,
     organizationId: S.String,
     change: Change,
     by: S.String,
     step: Step,
     flags: Flags,
     madeOn: S.Int,
-    label: S.String
+    label: Label
   },
   { description: "A row's decision was recorded, over the one it replaces" }
 ) {}
@@ -41,12 +41,13 @@ export class Event extends Domain.Event(
  * **Example** (A second decision keeps the first under it)
  *
  * ```ts
+ * import * as Change from "../Review/Change.schema.ts"
  * import * as RowState from "./Row.state.ts"
  * import * as RowDecided from "./RowDecided.event.ts"
  *
  * const decided = (change: number, by: string, step: string) =>
  *   RowDecided.Event.make({
- *     importId: "imp-1",
+ *     importId: Change.ImportKey.make("imp-1"),
  *     organizationId: "org-1",
  *     change,
  *     by,

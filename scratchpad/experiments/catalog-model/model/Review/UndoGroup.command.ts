@@ -1,4 +1,4 @@
-// One command of the review: the rejections only it returns, and what its decision decides of it.
+// One command of the review, and what its decision decides of it; it returns no rejection of its own.
 import * as Domain from "@alchemy.run/domain"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
@@ -11,7 +11,7 @@ import * as GroupCounted from "../Import/events/GroupCounted.event.ts"
 import { Import } from "../Import/Import.aggregate.ts"
 import { ConfirmedSince, NotOpen, NotPermitted, ReviewMovedOn } from "../Import/Import.rejection.ts"
 import * as ImportState from "../Import/Import.state.ts"
-import { Change, ImportKey, Step } from "./Change.schema.ts"
+import { Change, ImportKey, Step, UNDO_LABEL } from "./Change.schema.ts"
 import { DecidedBeforeTheConfirm, GroupedAfter, NotYourStep } from "./Review.rejection.ts"
 
 /**
@@ -89,7 +89,7 @@ export const decide = Effect.fn("UndoingGroup.decide")(function* ({ life, group 
         change,
         step: cmd.step,
         rows: group.state.count,
-        label: "undo",
+        label: UNDO_LABEL,
         by: actor.memberId,
         top: group.state.under
       })

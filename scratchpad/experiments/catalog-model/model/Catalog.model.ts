@@ -9,6 +9,7 @@ import * as Domain from "@alchemy.run/domain"
 import * as A from "effect/Array"
 import { Group } from "./Group/Group.aggregate.ts"
 import * as GroupState from "./Group/Group.state.ts"
+import { inForce } from "./Group/Group.state.ts"
 import { GroupEvent } from "./Group/GroupEvent.union.ts"
 import { Import } from "./Import/Import.aggregate.ts"
 import { ImportEvent } from "./Import/events/ImportEvent.union.ts"
@@ -25,20 +26,11 @@ import { dual } from "effect/Function"
 // What the invariants below are said in. An invariant of the model is searched, never proved: Verify runs it as it is
 // written and does not read its code, so it may call these. A relation is proved, so the two relations call nothing.
 
-/** An act on a group that was decided, in force or taken back. */
-type DecidedGroup = GroupState.Decided
-
 /** One instance as an invariant sees it: its name and what it holds. */
 type Held<State> = { readonly id: string; readonly state: State }
 
 /** An import that was staged and not removed: the cases that number changes. */
 type StagedImport = Exclude<ImportState.State, ImportState.Unstaged | ImportState.Removed>
-
-/**
- * Whether an act on a group still gives its rows what it decided. `undoneAt` is the change that took the act back, and
- * 0 says none did: a change is numbered from 1. Every invariant asks it here, so the 0 is read in one place.
- */
-const inForce = (group: DecidedGroup): boolean => group.undoneAt === 0
 
 /** Two decisions recorded by the same change of the same import. */
 const sameChangeOfOneImport = (
@@ -59,7 +51,7 @@ const noTwoHold = <State, Decided extends State>(
 /** `holds` of every act on a group that was decided, in force or taken back. */
 const everyDecidedGroup = (
   groups: ReadonlyArray<Held<GroupState.State>>,
-  holds: (group: DecidedGroup) => boolean
+  holds: (group: GroupState.Decided) => boolean
 ): boolean => A.every(groups, (group) => !GroupState.guards.Decided(group.state) || holds(group.state))
 
 /**
@@ -72,10 +64,10 @@ const everyGroupOfItsImport: {
       readonly Group: ReadonlyArray<Held<GroupState.State>>
       readonly Import: ReadonlyArray<Held<ImportState.State>>
     },
-    holds: (group: DecidedGroup, life: StagedImport) => boolean
+    holds: (group: GroupState.Decided, life: StagedImport) => boolean
   ): boolean
   (
-    holds: (group: DecidedGroup, life: StagedImport) => boolean
+    holds: (group: GroupState.Decided, life: StagedImport) => boolean
   ): (all: {
     readonly Group: ReadonlyArray<Held<GroupState.State>>
     readonly Import: ReadonlyArray<Held<ImportState.State>>
@@ -87,7 +79,7 @@ const everyGroupOfItsImport: {
       readonly Group: ReadonlyArray<Held<GroupState.State>>
       readonly Import: ReadonlyArray<Held<ImportState.State>>
     },
-    holds: (group: DecidedGroup, life: StagedImport) => boolean
+    holds: (group: GroupState.Decided, life: StagedImport) => boolean
   ): boolean =>
     everyDecidedGroup(all.Group, (group) =>
       A.every(

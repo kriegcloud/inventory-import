@@ -3,9 +3,9 @@
 import * as RowState from "./Row.state.ts"
 
 /** One step of a row: the states around what a decision recorded on it. */
-type Step = { readonly before: RowState.State; readonly after: RowState.State }
+type Transition = { readonly before: RowState.State; readonly after: RowState.State }
 /** A rule of every step, answered from the step alone. */
-type Rule = (step: Step) => boolean
+type Rule = (transition: Transition) => boolean
 
 /**
  * A row has no decision again only when nothing was under the one taken back.

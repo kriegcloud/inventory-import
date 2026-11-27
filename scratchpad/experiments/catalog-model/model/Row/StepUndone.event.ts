@@ -32,12 +32,13 @@ export class Event extends Domain.Event(
  * **Example** (Put back the decision under)
  *
  * ```ts
+ * import * as Change from "../Review/Change.schema.ts"
  * import * as Level from "./Level.schema.ts"
  * import * as RowState from "./Row.state.ts"
  * import * as StepUndone from "./StepUndone.event.ts"
  *
  * const decided = RowState.Decided.make({
- *   importId: "imp-1",
+ *   importId: Change.ImportKey.make("imp-1"),
  *   organizationId: "org-1",
  *   change: 4,
  *   by: "dana",

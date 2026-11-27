@@ -3,9 +3,9 @@
 import * as GroupState from "./Group.state.ts"
 
 /** One step of a group: the states around what a decision recorded on it. */
-type Step = { readonly before: GroupState.State; readonly after: GroupState.State }
+type Transition = { readonly before: GroupState.State; readonly after: GroupState.State }
 /** A rule of every step, answered from the step alone. */
-type Rule = (step: Step) => boolean
+type Rule = (transition: Transition) => boolean
 
 /**
  * A decided group keeps the rows it names. What a group decided never changes: its rows, what it does to them, its

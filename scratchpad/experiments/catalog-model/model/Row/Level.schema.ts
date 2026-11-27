@@ -5,6 +5,26 @@ import * as S from "effect/Schema"
 import { Change } from "../Review/Change.schema.ts"
 
 /**
+ * The fields of one decision, as a level keeps it under the current one and as a decided row holds the current one.
+ *
+ * **Details**
+ *
+ * The texts stay unbounded: a level that holds nothing (`noLevel`, `letGo`) has an empty step, and the level an undo
+ * brings is the sender's word.
+ *
+ * @category models
+ * @since 0.0.0
+ */
+export const decision = {
+  change: Change.pipe(S.annotateKey({ description: "The change that recorded it; 0 for none, -1 for one let go" })),
+  by: S.String.pipe(S.annotateKey({ description: "The member who made it" })),
+  step: S.String.pipe(S.annotateKey({ description: "The step it was made in" })),
+  flags: S.String.pipe(S.annotateKey({ description: "The decision's flags, as text" })),
+  madeOn: S.Int.pipe(S.annotateKey({ description: "The import's matching it was made on" })),
+  label: S.String.pipe(S.annotateKey({ description: "What the act was called on screen" }))
+}
+
+/**
  * **Details**
  *
  * A level holds the change that recorded it (0 when there is none, -1 for a level that was let go), who made it, in
@@ -43,12 +63,7 @@ import { Change } from "../Review/Change.schema.ts"
  */
 export class Level extends S.Opaque<Level, { readonly brand: unique symbol }>()(
   S.Struct({
-    change: Change.pipe(S.annotateKey({ description: "The change that recorded it; 0 for none, -1 for one let go" })),
-    by: S.String.pipe(S.annotateKey({ description: "The member who made it" })),
-    step: S.String.pipe(S.annotateKey({ description: "The step it was made in" })),
-    flags: S.String.pipe(S.annotateKey({ description: "The decision's flags, as text" })),
-    madeOn: S.Int.pipe(S.annotateKey({ description: "The import's matching it was made on" })),
-    label: S.String.pipe(S.annotateKey({ description: "What the act was called on screen" })),
+    ...decision,
     bySize: S.Int.pipe(S.annotateKey({ description: "How long `by` is" })),
     stepSize: S.Int.pipe(S.annotateKey({ description: "How long `step` is" })),
     flagsSize: S.Int.pipe(S.annotateKey({ description: "How long `flags` is" })),
@@ -95,8 +110,8 @@ export const letGo: Level = Level.make({
 })
 
 /**
- * The sizes a level names are its texts' own. An undo takes the level it brings only when this holds: two levels
- * seal to different texts only when their sizes are true.
+ * The sizes a level names are its texts' own. An undo takes the level it brings only when this holds: only then do two
+ * different levels never seal to the same text.
  *
  * **Example** (A size that is not its text's length)
  *
@@ -132,7 +147,8 @@ export const sizesAreTrue = (level: Level): boolean =>
 
 /**
  * A decision and everything below it as one text. Its numbers and the sizes of its texts come first, so two different
- * levels whose sizes are true never seal to the same text (`unseal`, in the row's test, reads one back).
+ * levels whose sizes are true never seal to the same text (`unseal`, in
+ * packages/catalog/model/test/Row.property.test.ts, reads one back).
  *
  * **Details**
  *
@@ -172,14 +188,34 @@ export const seal = (sealed: { readonly level: Level; readonly below: string }):
  * nobody is ever refused a decision because of the history, and the state stays far from the largest value an object
  * stores.
  *
- * @category models
+ * @category constants
  * @since 0.0.0
  */
 export const MOST_BELOW = 1_000_000
 /**
  * What stands for a history that was let go. It can never be a seal: a seal starts with a number.
  *
- * @category models
+ * @category constants
  * @since 0.0.0
  */
 export const CUT = "cut"
+
+/**
+ * **Details**
+ *
+ * A history is sealed only while it is at most `MOST_BELOW` long, so no true `below` a sender brings is longer. Not for
+ * the `below` a row or an undo's event holds: `seal` can grow a history past the bound before it is let go.
+ *
+ * @category models
+ * @since 0.0.0
+ */
+export const Below = S.String.check(S.isMaxLength(MOST_BELOW)).annotate({
+  description: "A sealed history as a command brings it: at most MOST_BELOW characters"
+})
+/**
+ * The decoded value of `Below`: a text of at most `MOST_BELOW` characters.
+ *
+ * @category models
+ * @since 0.0.0
+ */
+export type Below = typeof Below.Type

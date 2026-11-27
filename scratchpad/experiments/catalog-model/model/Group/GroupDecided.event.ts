@@ -1,8 +1,7 @@
 // One event of an act on a group, and what it makes of a group.
 import * as Domain from "@alchemy.run/domain"
 import { dual } from "effect/Function"
-import * as S from "effect/Schema"
-import { Change, Patch, Rows, Step } from "../Review/Change.schema.ts"
+import { Change } from "../Review/Change.schema.ts"
 import * as GroupState from "./Group.state.ts"
 
 /**
@@ -17,19 +16,7 @@ import * as GroupState from "./Group.state.ts"
  */
 export class Event extends Domain.Event(
   "GroupDecided",
-  {
-    importId: S.String,
-    organizationId: S.String,
-    change: Change,
-    by: S.String,
-    step: Step,
-    patch: Patch,
-    rows: Rows,
-    count: GroupState.Size,
-    madeOn: S.Int,
-    label: S.String,
-    under: Change
-  },
+  { ...GroupState.act, under: Change },
   { description: "One act on a group of rows was recorded: its rows, what it does to each, and whose it is" }
 ) {}
 
@@ -44,13 +31,14 @@ export class Event extends Domain.Event(
  * **Example** (Decide an untouched group)
  *
  * ```ts
+ * import * as Change from "../Review/Change.schema.ts"
  * import * as GroupState from "./Group.state.ts"
  * import * as GroupDecided from "./GroupDecided.event.ts"
  *
  * const decided = GroupDecided.evolve(
  *   GroupState.Untouched.make({}),
  *   GroupDecided.Event.make({
- *     importId: "imp-1",
+ *     importId: Change.ImportKey.make("imp-1"),
  *     organizationId: "org-1",
  *     change: 5,
  *     by: "ana",

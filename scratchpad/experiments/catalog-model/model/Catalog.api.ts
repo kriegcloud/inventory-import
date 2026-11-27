@@ -11,7 +11,7 @@ import { Catalog } from "./Catalog.model.ts"
  * It serves Verify's search and the nightly walks: no story sends through it. What a browser and what the server may
  * send are separate Apis, declared when the model is hosted.
  *
- * @category api
+ * @category apis
  * @since 0.0.0
  */
 export class CatalogApi extends Domain.Api(

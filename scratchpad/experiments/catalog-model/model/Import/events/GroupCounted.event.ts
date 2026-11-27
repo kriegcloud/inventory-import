@@ -2,7 +2,7 @@
 import * as Domain from "@alchemy.run/domain"
 import { dual } from "effect/Function"
 import * as S from "effect/Schema"
-import { Change, Step } from "../../Review/Change.schema.ts"
+import { Change, Label, Step } from "../../Review/Change.schema.ts"
 import * as ImportState from "../Import.state.ts"
 
 /**
@@ -15,7 +15,7 @@ import * as ImportState from "../Import.state.ts"
  */
 export class Event extends Domain.Event(
   "GroupCounted",
-  { change: Change, step: Step, rows: S.Natural, label: S.String, by: S.String, top: Change },
+  { change: Change, step: Step, rows: S.Natural, label: Label, by: S.String, top: Change },
   {
     description:
       "One act on a group of rows, or its undo, was taken: how many rows, who acted, which group is last in force"

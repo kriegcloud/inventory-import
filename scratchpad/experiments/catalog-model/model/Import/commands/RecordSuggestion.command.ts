@@ -1,4 +1,4 @@
-// One command of the import: the rejections only it returns, and what the import decides of it.
+// One command of the import, and what the import decides of it; it returns no rejection of its own.
 import * as Domain from "@alchemy.run/domain"
 import * as Effect from "effect/Effect"
 import { CurrentActor } from "../../Actor/Actor.context.ts"

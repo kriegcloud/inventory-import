@@ -13,16 +13,16 @@ import * as DecideGroup from "./DecideGroup.command.ts"
 /** What `DecidingGroup` reads, before a step or after it: the import, and the group. */
 type States = { readonly life: ImportState.State; readonly group: GroupState.State }
 /** One step `DecidingGroup` takes: the states it read, the command, the events it recorded, and the states after. */
-type Step = {
+type Transition = {
   readonly before: States
   readonly after: States
   readonly command: DecideGroup.Command
   readonly events: ReadonlyArray<GroupDecided.Event | GroupCounted.Event>
 }
 /** A rule of every step, answered from the step alone. */
-type Rule = (step: Step) => boolean
+type Rule = (transition: Transition) => boolean
 /** A rule of every step that asks who is acting. */
-type Asked = (step: Step) => Effect.Effect<boolean, never, CurrentActor>
+type Asked = (transition: Transition) => Effect.Effect<boolean, never, CurrentActor>
 
 /**
  * A group is decided only on an import that is open.

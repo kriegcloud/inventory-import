@@ -1,10 +1,10 @@
 ---
 type: Exploration
 title: Module taxonomy
-description: Whether the per-unit module shape tried on RPCs in beep-effect (one unit, role-named files, a contract door and a handler door) gives @alchemy.run/domain blocks, and the rest of this repository, one consistent structure. A reading from source and two experiments run: a command in its own file proves as before, and a registry of kinds refuses sixteen of the two contexts' 173 files.
+description: Whether the per-unit module shape tried on RPCs in beep-effect (one unit, role-named files, a contract door and a handler door) gives @alchemy.run/domain blocks, and the rest of this repository, one consistent structure. A reading from source and experiments run: the whole catalog model written to the shape verifies against the package's lock, with one trial block of each kind to come, and a registry of kinds refuses sixteen of the two contexts' 173 files.
 status: active
 stage: shape
-next: he reads `scratchpad/experiments/catalog-model` (the whole model in the shape, verified) and says whether it goes into `packages/catalog/model`; decisions 8 to 11 are answered (kind folders, the blocks to come, hosts and surfaces, sealed values); the rest of 6, and 7, are open
+next: he reads `scratchpad/experiments/catalog-model` (the whole model in the shape, verified) and says whether it goes into `packages/catalog/model`; decisions 8 to 11 are answered, 9d and 11b placed by the agent; the rest of 6, and 7, are open
 goals: []
 ---
 
@@ -27,8 +27,9 @@ protocol.handler.ts             ReaderRpcs.toLayer({ Posts: Handlers.Posts, ... 
 ```
 
 Everything below was read from this repository at `abc487d6` and the installed library at `e1c3e6d`
-(`node_modules/@alchemy.run/domain/src`). Two things were run: experiments 1 and 3, under "What I would try first". The rest
-is from reading, and each claim about the prover that only a run would settle is marked.
+(`node_modules/@alchemy.run/domain/src`). Two things were run: experiments 1 and 3, under "What I would try first";
+experiment 1 grew into `scratchpad/experiments/catalog-model`, the whole model in the shape. The rest is from
+reading, and each claim about the prover that only a run would settle is marked.
 
 ## What I think
 
@@ -69,8 +70,9 @@ Three things in the library key on it:
 - `evolve: { GroupDecided: ... }`, `Effect.catchTag("NotOpen", ...)`, `ImportEvent.guards.GroupCounted` and an Api's
   `commands: ["DecideGroup"]` all name a block by its tag.
 - An event is not owned by one command. `GroupCounted` is recorded by `DecideGroup` and folded by `Import`; `NotOpen`
-  is declared in `Import.aggregate.ts` and returned by all four decisions as well. An RPC has exactly one payload, one success and one failure; a command
-  has any number of events and rejections, shared with others. There is no slot to name.
+  is declared in `Import.aggregate.ts` and returned by all four decisions as well. An RPC has exactly one payload,
+  one success and one failure; a command has any number of events and rejections, shared with others. There is no
+  slot to name.
 - A hover over a decide would read `Effect<Event[], Rejection | Rejection | Rejection>`.
 
 The rule that gives the consistency he is after is the opposite one: **a block's exported name is its tag, and its
@@ -86,8 +88,8 @@ for every event. See decision 1 in [DECISIONS.md](DECISIONS.md).
 
 ### What is missing is not a shape, it is a list
 
-`laws block-files` knows seventeen endings, all for the library's blocks. Counted in `src` folders outside `foundation` and `ui`,
-the repository uses at least 49 file endings. What that shows:
+`laws block-files` knows seventeen endings, all for the library's blocks. Counted in `src` folders outside
+`foundation` and `ui`, the repository uses at least 49 file endings. What that shows:
 
 - `.rules.ts` is 72 files. An ending that fits everything classifies nothing.
 - A hand-written `Context.Service` port has three endings (`.port.ts`, `.store.ts`, `.gateway.ts`: 11 files) and the
@@ -154,6 +156,12 @@ second barrel in every folder. The prover's resolver matches exact export keys f
 
 ### A folder is a subdomain, a stem is a unit
 
+**Replaced on 2026-11-27.** The layout below is the first sketch. What stands is the brief's "The blocks of a
+model" and `scratchpad/experiments/catalog-model`: an event has a file of its own, a shared rejection stays in
+`<Noun>.rejection.ts`, the invariants' helpers stay in `Catalog.model.ts`, a kind with more than five files has a
+folder (decision 8), and point 2 below was not taken: a decision's file keeps its own name
+(`DecidingGroup.decision.ts`).
+
 No folder per block and no `index.ts` inside a package: the library's layout says the same ("Don't add barrel
 files"). Files that belong to one unit share a stem and sort together. The catalog's review, as it would read:
 
@@ -218,7 +226,8 @@ export class DecideGroup extends Domain.Command(
 ### Where implementations go
 
 I would not give every block a `.handler.ts` twin. In beep-effect the handler was split from the contract because it
-imports reader services a client must never load. A model package may import only the library and `effect`, so a
+imports reader services a client must never load. A model package may import the library, `effect`, the kernel
+and its own contract, and no driver, so a
 `XLive` beside its declaration cannot pull a driver in; the library's layout keeps it there for that reason, and the
 code that does need a driver already goes to `host` as an `.adapter.ts`. The package boundary is the second door.
 
@@ -242,8 +251,9 @@ of the model. Both are one rule: name a thing by what the rest of the code calls
 
 Three experiments, each a folder under `scratchpad/experiments/`, before any file in `packages/` moves:
 
-1. **A command in its own file, under the prover. Run on 2026-11-27: it holds.**
-   `scratchpad/experiments/command-file` proves three copies of `Import` with `Prove.report`: as it is, with
+1. **A command in its own file, under the prover. Run on 2026-11-27: it holds.** The experiment was dropped the
+   same day for `catalog-model`, which carries its findings; its files are in history at `ba3ac17f`.
+   `scratchpad/experiments/command-file` proved three copies of `Import` with `Prove.report`: as it is, with
    `MatchColumn` and its event in `MatchColumn.command.ts`, and with that command's `decide` moved there too. All
    three stand the same, 210 lines each, every rule proved for every command. A check deleted from the moved `decide`
    was caught (`AMatchIsMadeOnTheLastOne` no longer proved), so the prover reads a `decide` in another file. What it
@@ -257,7 +267,7 @@ Three experiments, each a folder under `scratchpad/experiments/`, before any fil
      the four decisions importing the moved names from their new files, is verified against a copy of the package's
      lock exactly as the unchanged copy is (nothing undone, nothing relocked, 134 rules required proved, three
      commands deep, `CI=true`).
-   - Not run: the stories, and the laws on the new files. The experiment's `NOTE.md` has the detail.
+   - Not run: the stories, and the laws on the new files. `catalog-model/NOTE.md` has the detail.
 2. **Export keys that carry the path and the kind.** One package, read by bun, `tsrs`, Vite and the prover. Not
    run. Experiment 3 gives its size for the two contexts: 150 export keys and 312 import statements, all rewritten.
    The doors it was meant to make checkable are checkable without it, by resolving each import through the
@@ -278,9 +288,11 @@ are kinds" above proposes for them; and one command to a `.command.ts` with its 
 replaced that last answer the same day: an event and a command each have a file, read as a namespace, with `evolve`
 beside the event and `decide` beside the command. He then answered the fifth: that shape is a law of
 `block-files`, with a named import of `Event` or `Command` refused. Decisions 6 and 7 were added by the brief. He
-then raised and answered 8 to 11: a folder for a kind with more than five files, the blocks to come placed by
-subject, one `.host.ts` with a surface file for each Api, and a `.sealed.ts` for each sealed value. Decision 10
-answers 6 for `Host.ts`; the rest of 6, and 7, are open.
+then raised 8 to 11 and answered all but two parts: a folder for a kind with more than five files, the blocks to
+come placed by subject, one `.host.ts` with a surface file for each Api, and a `.sealed.ts` for each sealed value.
+The agent placed rewrites and compactions (9d) and the Vault (11b), and named the flat modules' unions (under 8b).
+Decision 12 records his three calls that took the shape past decision 1. Decision 10 answers 6 for `Host.ts`; the
+rest of 6, and 7, are open.
 
 ## Trail
 
@@ -349,7 +361,7 @@ answers 6 for `Host.ts`; the rest of 6, and 7, are open.
   `Import/events/`), 53 files, verified against the unchanged lock.
 - 2026-11-27: he asked for the library's other blocks planned for now: query, policy, view, projection, saga and
   external system, then the cluster host, the MCP and CLI surfaces, rewrites and compactions, sealed values and the
-  Vault. Decisions 9, 10 and 11 place each, and the brief has a table of the 24 planned blocks by module. One trial
+  Vault. Decisions 9, 10 and 11 place each, and the brief has a table of the 26 planned blocks by module. One trial
   block of each read and reaction kind, and a rewrite, sits in its decided home in `catalog-model` with a story
   that passes. Listed in the real model on a copy, they leave the lock as it is; Verify then asks for the saga and
   policy to be followed or skipped by name, and for the external system to be answered. A compaction, a sealed

@@ -8,16 +8,16 @@ import { ImportCommand } from "./commands/ImportCommand.union.ts"
 import { ImportEvent } from "./events/ImportEvent.union.ts"
 
 /** One step of an import: the states around a command, and the events it recorded. */
-type Step = {
+type Transition = {
   readonly before: ImportState.State
   readonly after: ImportState.State
   readonly command: ImportCommand
   readonly events: ReadonlyArray<ImportEvent>
 }
 /** A rule of every step, answered from the step alone. */
-type Rule = (step: Step) => boolean
+type Rule = (transition: Transition) => boolean
 /** A rule of every step that asks who is acting. */
-type Asked = (step: Step) => Effect.Effect<boolean, never, CurrentActor>
+type Asked = (transition: Transition) => Effect.Effect<boolean, never, CurrentActor>
 
 /**
  * The status becomes Imported only by a confirm.

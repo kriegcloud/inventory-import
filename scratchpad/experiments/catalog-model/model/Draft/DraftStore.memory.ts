@@ -15,7 +15,7 @@ const byId = Order.mapInput(Order.String, (row: DraftRow) => row.id)
 
 /**
  * The draft store in memory: a row recorded again under the same id replaces the first, and a page holds one
- * import's rows after the cursor, in order of id.
+ * organization's import's rows after the cursor, in order of id, with the last id as the cursor when more follow.
  *
  * @category layers
  * @since 0.0.0
@@ -27,16 +27,32 @@ export const DraftStoreMemory = Layer.effect(
       record: Effect.fn("DraftStore.record")(function* (rows: ReadonlyArray<DraftRow>) {
         yield* Ref.update(held, (all) => A.reduce(rows, all, (acc, row) => HashMap.set(acc, row.id, row)))
       }),
-      forImport: Effect.fn("DraftStore.forImport")(function* (importId: ImportKey, page: Domain.Query.PageRequest) {
+      remove: Effect.fn("DraftStore.remove")(function* (ids: ReadonlyArray<string>) {
+        yield* Ref.update(held, HashMap.removeMany(ids))
+      }),
+      forImport: Effect.fn("DraftStore.forImport")(function* (
+        organizationId: string,
+        importId: ImportKey,
+        page: Domain.Query.PageRequest
+      ) {
         const all = yield* Ref.get(held)
-        const after = all.pipe(
+        const after = O.fromUndefinedOr(page.after)
+        const following = all.pipe(
           HashMap.values,
           A.fromIterable,
-          A.filter((row) => row.importId === importId && (page.after === undefined || row.id > page.after)),
+          A.filter(
+            (row) =>
+              row.organizationId === organizationId &&
+              row.importId === importId &&
+              !O.exists(after, (cursor) => row.id <= cursor)
+          ),
           A.sort(byId)
         )
-        const entries = A.take(after, page.take)
-        const cursor = after.length > entries.length ? O.getOrNull(O.map(A.last(entries), (row) => row.id)) : null
+        const entries = A.take(following, page.take)
+        const cursor = O.match(A.last(entries), {
+          onNone: () => null,
+          onSome: (row) => (following.length > entries.length ? row.id : null)
+        })
         return { entries, cursor }
       })
     })

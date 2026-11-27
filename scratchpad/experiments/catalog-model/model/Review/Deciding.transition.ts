@@ -8,23 +8,24 @@ import * as ImportState from "../Import/Import.state.ts"
 import { ImportEvent } from "../Import/events/ImportEvent.union.ts"
 import { CUT, MOST_BELOW, seal } from "../Row/Level.schema.ts"
 import * as RowState from "../Row/Row.state.ts"
+import { sawIt } from "../Row/Row.state.ts"
 import * as RowDecided from "../Row/RowDecided.event.ts"
 import * as DecideRow from "./DecideRow.command.ts"
-import { changesNothing, sawIt } from "./DecideRow.command.ts"
+import { changesNothing } from "./DecideRow.command.ts"
 
 /** What `Deciding` reads, before a step or after it: the import, and the row. */
 type States = { readonly life: ImportState.State; readonly row: RowState.State }
 /** One step `Deciding` takes: the states it read, the command, the events it recorded, and the states after. */
-type Step = {
+type Transition = {
   readonly before: States
   readonly after: States
   readonly command: DecideRow.Command
   readonly events: ReadonlyArray<RowDecided.Event | ActCounted.Event>
 }
 /** A rule of every step, answered from the step alone. */
-type Rule = (step: Step) => boolean
+type Rule = (transition: Transition) => boolean
 /** A rule of every step that asks who is acting. */
-type Asked = (step: Step) => Effect.Effect<boolean, never, CurrentActor>
+type Asked = (transition: Transition) => Effect.Effect<boolean, never, CurrentActor>
 
 /**
  * A row is decided only on an import that is open.

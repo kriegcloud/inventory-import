@@ -13,16 +13,16 @@ import * as UndoGroup from "./UndoGroup.command.ts"
 /** What `UndoingGroup` reads, before a step or after it: the import, and the group. */
 type States = { readonly life: ImportState.State; readonly group: GroupState.State }
 /** One step `UndoingGroup` takes: the states it read, the command, the events it recorded, and the states after. */
-type Step = {
+type Transition = {
   readonly before: States
   readonly after: States
   readonly command: UndoGroup.Command
   readonly events: ReadonlyArray<GroupUndone.Event | GroupCounted.Event>
 }
 /** A rule of every step, answered from the step alone. */
-type Rule = (step: Step) => boolean
+type Rule = (transition: Transition) => boolean
 /** A rule of every step that asks who is acting. */
-type Asked = (step: Step) => Effect.Effect<boolean, never, CurrentActor>
+type Asked = (transition: Transition) => Effect.Effect<boolean, never, CurrentActor>
 
 /**
  * A group's undo is taken only on an open import, of a decided group that `undo` recorded and its sender made.

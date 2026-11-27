@@ -7,6 +7,7 @@ import { Session } from "../Actor/Session.middleware.ts"
 import { Group } from "../Group/Group.aggregate.ts"
 import * as GroupState from "../Group/Group.state.ts"
 import * as GroupDecided from "../Group/GroupDecided.event.ts"
+import { Size } from "../Group/Size.schema.ts"
 import * as GroupCounted from "../Import/events/GroupCounted.event.ts"
 import { Import } from "../Import/Import.aggregate.ts"
 import { ConfirmedSince, MatchedSince, NotOpen, NotPermitted, ReviewMovedOn } from "../Import/Import.rejection.ts"
@@ -49,7 +50,7 @@ export class Command extends Domain.Command(
       madeOn: S.Int,
       patch: Patch,
       rows: Rows,
-      count: GroupState.Size,
+      count: Size,
       label: Label
     },
     events: [GroupDecided.Event, GroupCounted.Event],

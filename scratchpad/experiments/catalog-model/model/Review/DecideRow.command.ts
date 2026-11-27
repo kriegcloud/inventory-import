@@ -1,4 +1,5 @@
-// One command of the review: the rejections only it returns, and what its decision decides of it.
+// One command of the review: the rejections only it returns, what its decision decides of it, and what the decision's
+// rules ask of an act of it (`changesNothing`).
 import * as Domain from "@alchemy.run/domain"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
@@ -10,9 +11,10 @@ import { ConfirmedSince, MatchedSince, NotOpen, NotPermitted } from "../Import/I
 import * as ImportState from "../Import/Import.state.ts"
 import { Row } from "../Row/Row.aggregate.ts"
 import * as RowState from "../Row/Row.state.ts"
+import { holdsThisAct } from "../Row/Row.state.ts"
 import * as RowDecided from "../Row/RowDecided.event.ts"
 import { Change, Flags, ImportKey, Label, RowKey, Step } from "./Change.schema.ts"
-import { GroupedSince, UndoneSince } from "./Review.rejection.ts"
+import { GroupedSince, UndoneSince, whose } from "./Review.rejection.ts"
 
 /**
  * **Details**
@@ -24,7 +26,7 @@ import { GroupedSince, UndoneSince } from "./Review.rejection.ts"
  */
 export class DecidedSince extends Domain.Rejection(
   "DecidedSince",
-  { by: S.String, change: Change },
+  whose,
   { description: "Someone decided the row since the sender last saw it: whose decision is there" }
 ) {}
 
@@ -39,7 +41,7 @@ export class DecidedSince extends Domain.Rejection(
  */
 export class PutBackSince extends Domain.Rejection(
   "PutBackSince",
-  { by: S.String, change: Change },
+  whose,
   { description: "The decision the sender saw was taken back, and an older one is there again: whose" }
 ) {}
 
@@ -112,12 +114,13 @@ export class Command extends Domain.Command(
  * **Example** (The row's own text, and the sender's word)
  *
  * ```ts
+ * import * as Change from "./Change.schema.ts"
  * import * as Level from "../Row/Level.schema.ts"
  * import * as RowState from "../Row/Row.state.ts"
  * import * as DecideRow from "./DecideRow.command.ts"
  *
  * const row = RowState.Decided.make({
- *   importId: "imp-1",
+ *   importId: Change.ImportKey.make("imp-1"),
  *   organizationId: "org-1",
  *   change: 4,
  *   by: "dana",
@@ -154,87 +157,6 @@ export const changesNothing = (act: {
   act.command.covered
     ? act.command.asItReads
     : RowState.leavesAsItIs({ row: act.row, flags: act.command.flags, madeOn: act.command.madeOn })
-
-/**
- * The act's sender has seen what the row holds: its decision, by the number of the change, or that it has none.
- *
- * **Example** (By the number of the change)
- *
- * ```ts
- * import * as Level from "../Row/Level.schema.ts"
- * import * as RowState from "../Row/Row.state.ts"
- * import * as DecideRow from "./DecideRow.command.ts"
- *
- * const row = RowState.Decided.make({
- *   importId: "imp-1",
- *   organizationId: "org-1",
- *   change: 4,
- *   by: "dana",
- *   step: "s-1",
- *   flags: '{"kept":true}',
- *   madeOn: 1,
- *   label: "Keep",
- *   under: Level.noLevel,
- *   below: "",
- *   undone: RowState.noUndo
- * })
- * const untouched = RowState.Untouched.make({ undone: RowState.noUndo })
- *
- * DecideRow.sawIt({ row, command: { saw: 4 } }) // => true
- * DecideRow.sawIt({ row, command: { saw: 3 } }) // => false
- * DecideRow.sawIt({ row: untouched, command: { saw: 0 } }) // => true
- * ```
- *
- * @category behavior
- * @since 0.0.0
- */
-export const sawIt = (act: { readonly row: RowState.State; readonly command: { readonly saw: number } }): boolean =>
-  RowState.guards.Decided(act.row) ? act.command.saw === act.row.change : act.command.saw === 0
-
-/**
- * The row holds this very act already: this step, from this person, with this text on the matching it was made on. A
- * copy of a press that was recorded is known by it, and is answered as the first time, with nothing new.
- *
- * **Example** (A copy of the press, and another press)
- *
- * ```ts
- * import * as Level from "../Row/Level.schema.ts"
- * import * as RowState from "../Row/Row.state.ts"
- * import * as DecideRow from "./DecideRow.command.ts"
- *
- * const row = RowState.Decided.make({
- *   importId: "imp-1",
- *   organizationId: "org-1",
- *   change: 4,
- *   by: "dana",
- *   step: "s-1",
- *   flags: '{"kept":true}',
- *   madeOn: 1,
- *   label: "Keep",
- *   under: Level.noLevel,
- *   below: "",
- *   undone: RowState.noUndo
- * })
- *
- * DecideRow.holdsThisAct({ row, step: "s-1", by: "dana", flags: '{"kept":true}', madeOn: 1 }) // => true
- * DecideRow.holdsThisAct({ row, step: "s-2", by: "dana", flags: '{"kept":true}', madeOn: 1 }) // => false
- * DecideRow.holdsThisAct({ row, step: "s-1", by: "ana", flags: '{"kept":true}', madeOn: 1 }) // => false
- * ```
- *
- * @category behavior
- * @since 0.0.0
- */
-export const holdsThisAct = (act: {
-  readonly row: RowState.State
-  readonly step: string
-  readonly by: string
-  readonly flags: string
-  readonly madeOn: number
-}): boolean =>
-  RowState.guards.Decided(act.row) &&
-  act.row.step === act.step &&
-  act.row.by === act.by &&
-  RowState.onItsMatching(act.row) === RowState.onItsMatching(act)
 
 /** What the decision reads for `DecideRow`: the import, and the row the command names. */
 type Reads = {

@@ -11,7 +11,7 @@ import { Import } from "./Import.aggregate.ts"
  * It is pure and has no Live. It keeps every event, and replaces a `SuggestionRecorded` of the member with one whose
  * `by` is empty, so the import's count of suggestions stays as it was.
  *
- * @category behavior
+ * @category rewrites
  * @since 0.0.0
  */
 export class ForgetMember extends Domain.Rewrite(

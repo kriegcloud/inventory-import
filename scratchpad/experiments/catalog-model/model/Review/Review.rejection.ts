@@ -4,6 +4,17 @@ import * as S from "effect/Schema"
 import { Change } from "./Change.schema.ts"
 
 /**
+ * Whose a decision or an undo on a row is, and the change that recorded it: what a refusal that names one hands back.
+ *
+ * @category models
+ * @since 0.0.0
+ */
+export const whose = {
+  by: S.String.pipe(S.annotateKey({ description: "The member whose act it is" })),
+  change: Change.pipe(S.annotateKey({ description: "The change that recorded it" }))
+}
+
+/**
  * **Details**
  *
  * It hands back no number: the screen learns the last group act only by receiving it, so nothing it is told here lets
@@ -48,7 +59,7 @@ export class GroupedAfter extends Domain.Rejection(
  */
 export class UndoneSince extends Domain.Rejection(
   "UndoneSince",
-  { by: S.String, change: Change },
+  whose,
   { description: "An undo landed on the row that the sender's screen had not received: whose, and of which change" }
 ) {}
 

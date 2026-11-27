@@ -150,6 +150,11 @@ A patch never goes the other way: nothing lands on a release branch first.
   release branch's with a branch on the remote whose name only ends as the real one does, and production's also
   with the branch's head as the commit checked and only a tag whose name ends as the release's does on it. What an
   action does inside is not read. The workflow files are inputs of that test in `turbo.json`, so a change to one always runs it.
+  It holds each job's time limit too: 45 minutes for each of the three deploy jobs (Benjamin, 2026-11-26), longer
+  than the 30 minutes a deploy waits for the model's new views to be filled when the model's Worker names no
+  `backfillTimeout`. That default is read from the library's own code (`Cloudflare/Backfill.ts` in
+  `@alchemy.run/domain`), so a library whose default reaches the limit, or that no longer states one, fails the test;
+  a lower default passes. The time the job's other steps take beside the wait is not held.
 - **The repository's stack** (`packages/infra/src/GitHub.stack.ts`): only an admin may create, move or delete a `v*`
   tag, and a `release/*` branch is never force-pushed or deleted (admins may bypass both). The `production`
   environment requires Benjamin's approval and takes only a run whose ref is `main`. A workflow started by another

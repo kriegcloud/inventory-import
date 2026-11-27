@@ -3,14 +3,18 @@
 What the proofs and the stories of the review are worth is measured by breaking the model on purpose and seeing
 whether anything notices. A **mutant** is one change to the model's source, made in a copy of the package:
 
-- **check**: one check of a `decide` removed (`if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})` goes), 93 of them;
-- **field**: one field of an event given a wrong value (`by: actor.memberId` becomes `by: actor.organizationId`), 80;
+- **check**: one check of a `decide` removed (`if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})` goes), 113 of them;
+- **field**: one field of an event or a refusal given a wrong value (`by: actor.memberId` becomes
+  `by: actor.organizationId`), 105;
 - **nothing**: an accepted act made to record nothing (`return []` before the events), 11.
 
 They cover the import's seven commands (`src/Import/Import.aggregate.ts`) and the four decisions
 (`src/Review/{Deciding,Undoing,DecidingGroup,UndoingGroup}.decision.ts`). Each runs against its proof
-(`test/Import.prove.test.ts` or the decision's `test/*.prove.test.ts`) and both story files
-(`test/Review.story.test.ts`, `test/Group.story.test.ts`). The result is one of these classes:
+(`test/Import.prove.test.ts` or the decision's `test/*.prove.test.ts`) and the story files `mutants.json` names in
+`stories`: the two story files (`test/Review.story.test.ts`, `test/Group.story.test.ts`) and the Api's test
+(`test/CatalogApi.api.test.ts`), which sends every command through `Session` as nobody, a viewer and a member of
+another organization. A failing test of any of the three is a story in what follows. The result is one of these
+classes:
 
 | Class | What failed | What it means |
 | --- | --- | --- |
@@ -81,6 +85,32 @@ One was moved from a rule to a story when "held by a rule" came to mean a rule v
 check that an import is imported, or open, before a take-back). Without it the prover cannot read the take-back at
 all and gives every rule of the import as "not read", which is no rule noticing. Its stories hold it.
 
+Thirty-seven more came, and fourteen were written again, when the import's commands and the four decisions came to
+ask the person's role first, then answer an import of another organization, or one never staged, as not found before
+any check of its state (2026-11-27: the role before the organization, as today's handlers do; another organization's
+id staged again answered with today's not-found sentence). Written again against the code as it is, each keeping its
+key: the role's check in each command and decision (`stage-viewer` and the ten `*-permitted`, which until then
+removed one check of the organization and the role together), and the check that a row or a group is of the import
+the act names (`row-rowowner`, `undo-rowowner`, `gundo-groupowner`), which answers not found now. New: the not-found
+check removed in each of the seven commands and the four decisions (`*-notfound`); in `StageImport` the part of it that
+asks whether the import is another organization's (`stage-otherorg`: without it a second staging by the same
+organization is answered not found, not `AlreadyStaged`); the `required` of every `NotPermitted`
+(`*-notpermitted-required`, `"editor"` made `"admin"`) and the `reason` of every `ImportNotFound`
+(`*-importnotfound-reason`, and `row-rowowner-…`, `undo-rowowner-…`, `gundo-groupowner-…` for the owners' checks),
+each given a wrong value. Each keeps what its first run found. That first run of every mutant, 229, did not pass:
+it exited 1, with 12 mutants `weaker` than they were recorded, and 52 mutants' expectations were recorded again
+from what it found, then run on their own, all 52 as recorded. The 229 as
+recorded now were then run together, once, on 2026-11-27 (`--all --jobs 6`, load average 10 to 21, 3,429 s of wall
+time, `row-open` the longest at 2,026 s): exit 0, every one as recorded, 136 held by a rule, 38 by the proof with no
+rule, 55 by a story only, none by neither, none out of time. The not-found check is held by
+`OnlyItsOwnOrganizationChangesAnImport` in six commands and in the four decisions (the decisions' own
+`OnlyItsOwnOrganizationChanges…` too); in `StageImport` by the stories only (`stage-notfound`: without it the import is
+refused `AlreadyStaged`, which records nothing, so no rule can tell the two answers apart). The role's check is held by
+`AViewerChangesNothing`, and in the decisions by their `AViewerChangesNo…` as well; `stage-otherorg`, every `required`
+and every `reason` by the stories. `stage-staged` was kept again with four rules, not six: with another organization's
+import answered not found first, a second staging that `AlreadyStaged` no longer refuses is the same organization's,
+and `AnImportNeverChangesOrganization` and `OnlyItsOwnOrganizationChangesAnImport` have nothing to notice.
+
 ## Where they run
 
 The sample is the turbo task `mutants:sample` (`bun run --cwd packages/catalog/model mutants:sample`), part of
@@ -91,37 +121,47 @@ Neither is in `bun run check` or in CI's main job.
 
 ## Commands
 
-From `packages/catalog/model` (the runner finds its paths from its own place, so any folder works):
+The runner is the repository's own command, `beep mutants <package folder>`
+(`packages/tooling/tool/cli/src/commands/Mutants/`), which reads this package's `mutants.json` and nothing else of
+it. From the root:
 
 ```sh
-python3 -I mutants/run.py --sample              # nine fast mutants, about 25 s
-python3 -I mutants/run.py --all --jobs 4        # all 192
-python3 -I mutants/run.py --all --except row-open   # all but the ones named
-python3 -I mutants/run.py --only confirm-sum,group-madeon
-python3 -I mutants/run.py --list                # every mutant, and nothing run
+bun run beep mutants packages/catalog/model --sample              # the nine of the sample, about 25 s
+bun run beep mutants packages/catalog/model --all --jobs 4        # all 229
+bun run beep mutants packages/catalog/model --all --except row-open   # all but the ones named
+bun run beep mutants packages/catalog/model --only confirm-sum,group-madeon
+bun run beep mutants packages/catalog/model --list                # every mutant, and nothing run
 ```
 
-Flags: `--jobs N` (mutants at once, default 2), `--keep` (keep each copy in `.mutants/<key>/`, with its
-`result.json` and `vitest.log`), `--no-baseline`, `--nice N` (default 10), `--timeout S` (seconds before a run is
-stopped, default 3600), `--except key1,key2` (leave these out; a run left with nothing fails), `--proof-limit S`
-(seconds a proof test may take, set in each copy only; it must be below `--timeout`, since a run stopped from outside
-leaves no result to read). It needs `bun install` to have run (it uses the repository's `node_modules/.bin/vitest`) and
-`node` on the path, and nothing else: Python 3, standard library only.
+From this package's folder the same is `beep-cli mutants . --sample`, which is what its `mutants:sample` and
+`mutants` scripts run (`--all`, two at a time unless `--jobs` follows).
+
+Flags: `--jobs N` (mutants at once, default 2), `--keep` (keep each copy, with its `result.json` and `vitest.log`),
+`--no-baseline`, `--nice N` (default 10), `--timeout S` (seconds before a run is stopped, default 3600),
+`--except key1,key2` (leave these out; a run left with nothing fails), `--proof-limit S` (seconds a proof test may
+take, set in each copy only; it must be below `--timeout`, since a run stopped from outside leaves no result to read).
+Exactly one of `--all`, `--sample`, `--only` and `--list`. It needs `bun install` to have run (it uses the
+repository's `node_modules/vitest`) and `node` on the path.
 
 What a run does: every chosen mutant is first checked to apply to the package's text, and one kept as held by a
 rule to record each of its rules as violated (a `trialRules` entry on any other standing is refused: the prover giving
-up holds nothing); then, for each proof file the
-chosen mutants use, the unchanged copy is run once (`baseline`; when it fails the run stops with exit 2, since every
-mutant would look held). Then each mutant: the package's `src/`, `test/`, `package.json`, `tsconfig*.json` and
-`vitest.config.ts` copied to `.mutants/<key>/` (the two configs' `../../../` made two levels deeper), the change made,
-and vitest run in the copy on the proof and the two story files with its JSON reporter. One line a mutant (key,
-class, seconds, how it compares with the trial, what failed), then the counts by target and the times. Everything
-goes to `.mutants/results.tsv` (git-ignored). The package's own files are never written.
+up holds nothing); then, for each proof file the chosen mutants use, the unchanged copy is run once (`baseline`; when
+it fails the run stops and fails, since every mutant would look held). Then each mutant: the package's `src/`,
+`test/`, `package.json`, `tsconfig*.json` and `vitest.config.ts` copied to
+`.scratch/mutants-packages-catalog-model/<key>.<run>/` at the root (git ignores `.scratch/`), a folder exactly as deep
+as the package, so `../../../vitest.shared.ts` and every other path that leaves the package reach the same file from
+the copy, with nothing in it rewritten; the change made, and vitest run in the copy on the proof and the story files
+with its JSON reporter. The copy is removed when its run ends, however it ends, a failure or Ctrl-C included (`--keep`
+keeps it). One line a mutant (key, class, seconds, how it compares with the trial, what failed), then the counts by
+target and the times. Every result goes to `.scratch/mutants-packages-catalog-model/results.tsv`. The package's own
+files are never written.
 
 It exits 1 when a mutant is held by `neither`, when all that is known of one is a `timeout`, when one is `weaker`
-(above), when a mutant does not apply, or when a run gave no result; each is printed with its change and what ran,
-and a `weaker` one with the rules no longer named. A mutant held by a rule where a story was kept is printed as an
-`improvement`, and is not a failure. The unchanged copy must pass with no test out of time, or nothing more is run.
+(above), when a mutant does not apply, when a run gave no result, or when the unchanged copy does not pass; each is
+printed with its change and what ran, and a `weaker` one with the rules no longer named. A mutant held by a rule
+where a story was kept is printed as an `improvement`, and is not a failure. The unchanged copy must pass with no test
+out of time, or nothing more is run. (The Python runner this replaced, `run.py`, stopped with exit 2 on a baseline
+that failed; the command exits 1, as every rule of the CLI does.)
 
 ## What it costs
 
@@ -162,7 +202,7 @@ the 18 of a group's undo with the second, 25 s); the other 140 were not run agai
 
 ## The sample
 
-Nine mutants, named with their reason in `SAMPLE` in `run.py`: only the import's commands and the two group
+Nine mutants, named with their reason in `sample` in `mutants.json`: only the import's commands and the two group
 decisions, whose proofs take a second or a few; DecideRow and UndoRowStep are left out, since a broken rule there
 takes the prover minutes to confirm. Among them a check, a field and "records nothing", each held by a rule and by a
 story only as recorded (`group-nothing` is held by its stories, and the proof's "some state lets it record" notices
@@ -171,7 +211,7 @@ it too: class `proof`).
 ## Adding a mutant when a check is added to a `decide`
 
 Every check that refuses an act should have a mutant that removes it, and so should every field of a new event. Add
-an object to `mutants.json`:
+an object to `mutants` in `mutants.json`:
 
 ```json
 {
@@ -198,7 +238,8 @@ an object to `mutants.json`:
   (`Effect.fn("Import.ConfirmImport")`); for a decision, its `decide` (`Effect.fn("Deciding.decide")`); for a field,
   that, then the event (`RowDecided.make({`).
 - `until`: where the region ends: the next handler, `    evolve: {` after the last one, `    transitions: {` for a
-  decision, `})` for a field of an event written over several lines, `\n` for one written on one line.
+  decision, `})` for a field of an event written over several lines, `\n` for one written on one line. Left out, the
+  region runs to the end of the file.
 - `old`, `new`: the exact text, indentation and line ends included. A removed check is its whole line or lines,
   ending with `\n`, and `new` is `""`. `old` must occur exactly once between the anchors and `until`, or the runner
   refuses the mutant.
@@ -207,6 +248,34 @@ an object to `mutants.json`:
   enough). `trialRules`: the rules seen to break, each of which must stay named (`"Violated <rule>"` or the bare
   name; only the name is compared). `trialStories`: the stories seen to fail.
 
-Then run it alone (`--only <key> --keep`) and read `.mutants/<key>/vitest.log` if it is not what you expect. When
-the source is reformatted, a mutant whose `old` no longer matches is refused by name: rewrite its text from the file,
-never by guessing.
+Then run it alone (`--only <key> --keep`) and read `vitest.log` in its copy under
+`.scratch/mutants-packages-catalog-model/` if it is not what you expect (remove the copy after). When the source is
+reformatted, a mutant whose `old` no longer matches is refused by name: rewrite its text from the file, never by
+guessing.
+
+## A second model package
+
+The runner knows nothing of this package. A model package that wants its mutants run adds:
+
+1. `mutants/mutants.json` beside its `src`, the three lists above: `stories` (its test files of examples, from the
+   package's folder), `sample` (the keys `--sample` runs, each with its `why`) and `mutants` (each naming its own
+   `file`, `proof` and `target`). The schema is `MutantsFile` in
+   `packages/tooling/tool/cli/src/commands/Mutants/Mutants.schema.ts`; a file it does not decode stops the run with
+   the field named.
+2. In its `package.json`: `"mutants": "beep-cli mutants . --all"` and `"mutants:sample": "beep-cli mutants . --sample"`.
+3. In its `turbo.json`: the tasks `mutants` and `mutants:sample`, each depending on `//#patches:installed`, on
+   `@beep/repo-cli#transit` (the runner's own source) and on the `transit` of what its model is built on, with as
+   inputs what its proofs read, every block ending Verify reads, its story files and what they import, and
+   `mutants/**`. `bun run beep laws model-inputs` refuses a file the model or those tests reach that no input names:
+   for these two tasks it walks from `mutants/mutants.json` and from every file it names (each story file, each
+   mutant's `proof` and `file`) as well as from the model, so a story file left out of the inputs is refused by name,
+   with what it imports, and so is a name in `mutants.json` that is no file of the package.
+4. For the nightly, a step that runs `bunx turbo run mutants --filter=<its package name> --force`, beside the
+   catalog's in `.github/workflows/proofs-nightly.yml`.
+
+The package sits three folders or more below the root (`packages/<context>/model`): its copies are made as deep as it
+is. A rule is read as held only where a proof's failure names it as the runner reads it: the report's own lines
+(`Prove.render`, as `whatBroke` in `test/proving.ts` keeps them: `✗ <rule>`, and under it
+`✗ <command>: <how it stands>`), or each rule's standing and name compared as `'violated  <rule>  <command>'` (an
+`expect(rules, said).toEqual([...])` of the lines a test builds with `standingOf`). A proof that fails in other words
+makes its mutants `proof`, never `rule`.

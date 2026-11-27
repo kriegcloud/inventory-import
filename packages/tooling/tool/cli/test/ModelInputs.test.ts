@@ -177,6 +177,51 @@ describe("laws model-inputs", () => {
     })
   )
 
+  // Before, a story file the mutants file names, and what it imports, passed when no input of the mutants' tasks read
+  // it: the walk started only from files the inputs already match, and turbo replayed an old run when it changed.
+  it.effect("walks the mutants' tasks from every file their mutants file names, and refuses one that is no file", () =>
+    Effect.gen(function* () {
+      const inputs = ["src/**/*.decision.ts", "test/**/*.prove.test.ts", "mutants/**"]
+      const report = yield* inTree(
+        {
+          "packages/shop/package.json": json({ name: "@x/shop", beep: { layer: "model" } }),
+          "packages/shop/turbo.json": json({ tasks: { mutants: { inputs }, "mutants:sample": { inputs } } }),
+          "packages/shop/src/Pay.decision.ts": "export const pay = 1\n",
+          "packages/shop/test/Pay.prove.test.ts": "export const proved = 1\n",
+          "packages/shop/test/Pay.api.test.ts": 'import { session } from "./session.ts"\n',
+          "packages/shop/test/session.ts": "export const session = 1\n",
+          "packages/shop/mutants/mutants.json": json({
+            stories: ["test/Pay.api.test.ts", "test/Gone.story.test.ts"],
+            sample: [],
+            mutants: [
+              {
+                key: "pay-check",
+                target: "Pay",
+                kind: "check",
+                file: "src/Pay.decision.ts",
+                anchors: ["export"],
+                old: "1",
+                new: "2",
+                proof: "test/Pay.prove.test.ts",
+                expect: "rule",
+                trialRules: [],
+                trialStories: []
+              }
+            ]
+          })
+        },
+        Effect.map(modelInputs(), render(modelInputsSentence))
+      )
+      expect(printed(report).slice(1)).toEqual([
+        "err:   packages/shop/mutants/mutants.json names test/Gone.story.test.ts, which is no file of packages/shop: write the path of the test it means",
+        'err:   packages/shop/test/Pay.api.test.ts, which packages/shop/mutants/mutants.json names, is in no input of mutants in packages/shop/turbo.json: add "test/**/*.test.ts" to its inputs',
+        'err:   packages/shop/test/session.ts, which packages/shop/test/Pay.api.test.ts imports, is in no input of mutants in packages/shop/turbo.json: add "test/session.ts" to its inputs',
+        'err:   packages/shop/test/Pay.api.test.ts, which packages/shop/mutants/mutants.json names, is in no input of mutants:sample in packages/shop/turbo.json: add "test/**/*.test.ts" to its inputs',
+        'err:   packages/shop/test/session.ts, which packages/shop/test/Pay.api.test.ts imports, is in no input of mutants:sample in packages/shop/turbo.json: add "test/session.ts" to its inputs'
+      ])
+    })
+  )
+
   it.effect("cuts a ?query and a #hash off before the path is resolved, and holds the file itself", () =>
     Effect.gen(function* () {
       const report = yield* inTree(

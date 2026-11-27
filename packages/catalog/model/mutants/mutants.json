@@ -1,4 +1,43 @@
 {
+  "stories": ["test/Review.story.test.ts", "test/Group.story.test.ts", "test/CatalogApi.api.test.ts"],
+  "sample": [
+    {
+      "key": "confirm-sum",
+      "why": "check, rule: the counts' sum removed; OutcomesAddUpToTheRows breaks"
+    },
+    {
+      "key": "group-madeon",
+      "why": "check, rule: a group on an older matching taken; AGroupIsMadeOnTheMatchingNow breaks"
+    },
+    {
+      "key": "match-same",
+      "why": "check, story: the same columns recorded as a match; no rule says it, a story does"
+    },
+    {
+      "key": "gundo-decided",
+      "why": "check, story: an undo of a step that decided no group; the trial's prover stayed PROVED"
+    },
+    {
+      "key": "gundo-groupcounted-top",
+      "why": "field, rule: the import's last group in force after an undo; a rule of UndoGroup"
+    },
+    {
+      "key": "stage-f-rows",
+      "why": "field, story: the staged file's row count off by one; no rule of the import reads it"
+    },
+    {
+      "key": "group-groupdecided-label",
+      "why": "field, story: a group's label; no rule reads labels"
+    },
+    {
+      "key": "stage-nothing",
+      "why": "nothing, story: a stage that records nothing; no rule says an act is taken"
+    },
+    {
+      "key": "group-nothing",
+      "why": "nothing, story: its stories, and the proof's \"some state lets it record\" (class proof)"
+    }
+  ],
   "mutants": [
     {
       "key": "stage-viewer",
@@ -7,12 +46,84 @@
       "file": "src/Import/Import.aggregate.ts",
       "anchors": ["Effect.fn(\"Import.StageImport\")"],
       "until": "Effect.fn(\"Import.MatchColumn\")",
-      "old": "        if (actor.role === \"viewer\") return yield* NotPermitted.make({})\n",
+      "old": "        if (actor.role === \"viewer\") return yield* NotPermitted.make({ required: \"editor\" })\n",
       "new": "",
       "proof": "test/Import.prove.test.ts",
       "expect": "rule",
       "trialRules": ["AViewerChangesNothing"],
-      "trialStories": ["Review: a viewer may not stage a file; an editor stages it, once"]
+      "trialStories": [
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer may not stage a file; an editor stages it, once"
+      ]
+    },
+    {
+      "key": "stage-notfound",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.StageImport\")"],
+      "until": "Effect.fn(\"Import.MatchColumn\")",
+      "old": "        if (!ImportState.guards.Unstaged(s) && actor.organizationId !== s.organizationId) {\n          return yield* ImportNotFound.make({ reason: NoImportThere })\n        }\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
+      ]
+    },
+    {
+      "key": "stage-otherorg",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.StageImport\")"],
+      "until": "Effect.fn(\"Import.MatchColumn\")",
+      "old": " && actor.organizationId !== s.organizationId) {",
+      "new": ") {",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: an editor of Prairie is answered every case by the import's state, never as the sender",
+        "Review: a viewer may not stage a file; an editor stages it, once",
+        "Review: a removed import takes nothing more: no suggestion, no match, no take-back, no reopen, no second staging"
+      ]
+    },
+    {
+      "key": "stage-notpermitted-required",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.StageImport\")"],
+      "until": "Effect.fn(\"Import.MatchColumn\")",
+      "old": "NotPermitted.make({ required: \"editor\" })",
+      "new": "NotPermitted.make({ required: \"admin\" })",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer may not stage a file; an editor stages it, once"
+      ]
+    },
+    {
+      "key": "stage-importnotfound-reason",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.StageImport\")"],
+      "until": "Effect.fn(\"Import.MatchColumn\")",
+      "old": "ImportNotFound.make({ reason: NoImportThere })",
+      "new": "ImportNotFound.make({ reason: \"No import with that id.\" })",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
+      ]
     },
     {
       "key": "stage-staged",
@@ -28,14 +139,13 @@
       "trialRules": [
         "ARemovedImportStaysRemoved",
         "AnImportIsOpenedAgainOnlyByReopen",
-        "AnImportNeverChangesOrganization",
         "EveryChangeHasItsOwnNumber",
-        "TheMatchingMovesOnlyOnAnOpenImport",
-        "OnlyItsOwnOrganizationChangesAnImport"
+        "TheMatchingMovesOnlyOnAnOpenImport"
       ],
       "trialStories": [
-        "Review: a removed import takes nothing more: no suggestion, no match, no take-back, no reopen, no second staging",
-        "Review: a viewer may not stage a file; an editor stages it, once"
+        "CatalogApi.api: an editor of Prairie is answered every case by the import's state, never as the sender",
+        "Review: a viewer may not stage a file; an editor stages it, once",
+        "Review: a removed import takes nothing more: no suggestion, no match, no take-back, no reopen, no second staging"
       ]
     },
     {
@@ -76,14 +186,67 @@
       "file": "src/Import/Import.aggregate.ts",
       "anchors": ["Effect.fn(\"Import.MatchColumn\")"],
       "until": "Effect.fn(\"Import.RecordSuggestion\")",
-      "old": "        if (actor.organizationId !== s.organizationId || actor.role === \"viewer\") return yield* NotPermitted.make({})\n",
+      "old": "        if (actor.role === \"viewer\") return yield* NotPermitted.make({ required: \"editor\" })\n",
       "new": "",
       "proof": "test/Import.prove.test.ts",
       "expect": "rule",
-      "trialRules": ["AViewerChangesNothing", "OnlyItsOwnOrganizationChangesAnImport"],
+      "trialRules": ["AViewerChangesNothing"],
       "trialStories": [
-        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo",
-        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups"
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo"
+      ]
+    },
+    {
+      "key": "match-notfound",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.MatchColumn\")"],
+      "until": "Effect.fn(\"Import.RecordSuggestion\")",
+      "old": "        if (ImportState.guards.Unstaged(s) || actor.organizationId !== s.organizationId) {\n          return yield* ImportNotFound.make({ reason: NoImportThere })\n        }\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["OnlyItsOwnOrganizationChangesAnImport"],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
+      ]
+    },
+    {
+      "key": "match-notpermitted-required",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.MatchColumn\")"],
+      "until": "Effect.fn(\"Import.RecordSuggestion\")",
+      "old": "NotPermitted.make({ required: \"editor\" })",
+      "new": "NotPermitted.make({ required: \"admin\" })",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo"
+      ]
+    },
+    {
+      "key": "match-importnotfound-reason",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.MatchColumn\")"],
+      "until": "Effect.fn(\"Import.RecordSuggestion\")",
+      "old": "ImportNotFound.make({ reason: NoImportThere })",
+      "new": "ImportNotFound.make({ reason: \"No import with that id.\" })",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
       ]
     },
     {
@@ -177,14 +340,69 @@
       "file": "src/Import/Import.aggregate.ts",
       "anchors": ["Effect.fn(\"Import.RecordSuggestion\")"],
       "until": "Effect.fn(\"Import.ConfirmImport\")",
-      "old": "        if (actor.organizationId !== s.organizationId || actor.role === \"viewer\") return yield* NotPermitted.make({})\n",
+      "old": "        if (actor.role === \"viewer\") return yield* NotPermitted.make({ required: \"editor\" })\n",
       "new": "",
       "proof": "test/Import.prove.test.ts",
       "expect": "rule",
-      "trialRules": ["AViewerChangesNothing", "OnlyItsOwnOrganizationChangesAnImport"],
+      "trialRules": ["AViewerChangesNothing"],
       "trialStories": [
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
         "Review: a suggestion is recorded as its asker's and changes no number; a viewer's is refused",
-        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups"
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo"
+      ]
+    },
+    {
+      "key": "suggestion-notfound",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.RecordSuggestion\")"],
+      "until": "Effect.fn(\"Import.ConfirmImport\")",
+      "old": "        if (ImportState.guards.Unstaged(s) || actor.organizationId !== s.organizationId) {\n          return yield* ImportNotFound.make({ reason: NoImportThere })\n        }\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["OnlyItsOwnOrganizationChangesAnImport"],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
+      ]
+    },
+    {
+      "key": "suggestion-notpermitted-required",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.RecordSuggestion\")"],
+      "until": "Effect.fn(\"Import.ConfirmImport\")",
+      "old": "NotPermitted.make({ required: \"editor\" })",
+      "new": "NotPermitted.make({ required: \"admin\" })",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a suggestion is recorded as its asker's and changes no number; a viewer's is refused",
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo"
+      ]
+    },
+    {
+      "key": "suggestion-importnotfound-reason",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.RecordSuggestion\")"],
+      "until": "Effect.fn(\"Import.ConfirmImport\")",
+      "old": "ImportNotFound.make({ reason: NoImportThere })",
+      "new": "ImportNotFound.make({ reason: \"No import with that id.\" })",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
       ]
     },
     {
@@ -224,14 +442,67 @@
       "file": "src/Import/Import.aggregate.ts",
       "anchors": ["Effect.fn(\"Import.ConfirmImport\")"],
       "until": "Effect.fn(\"Import.TakeBackImport\")",
-      "old": "        if (actor.organizationId !== s.organizationId || actor.role === \"viewer\") return yield* NotPermitted.make({})\n",
+      "old": "        if (actor.role === \"viewer\") return yield* NotPermitted.make({ required: \"editor\" })\n",
       "new": "",
       "proof": "test/Import.prove.test.ts",
       "expect": "rule",
-      "trialRules": ["AViewerChangesNothing", "OnlyItsOwnOrganizationChangesAnImport"],
+      "trialRules": ["AViewerChangesNothing"],
       "trialStories": [
-        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo",
-        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups"
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo"
+      ]
+    },
+    {
+      "key": "confirm-notfound",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ConfirmImport\")"],
+      "until": "Effect.fn(\"Import.TakeBackImport\")",
+      "old": "        if (ImportState.guards.Unstaged(s) || actor.organizationId !== s.organizationId) {\n          return yield* ImportNotFound.make({ reason: NoImportThere })\n        }\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["OnlyItsOwnOrganizationChangesAnImport"],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
+      ]
+    },
+    {
+      "key": "confirm-notpermitted-required",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ConfirmImport\")"],
+      "until": "Effect.fn(\"Import.TakeBackImport\")",
+      "old": "NotPermitted.make({ required: \"editor\" })",
+      "new": "NotPermitted.make({ required: \"admin\" })",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo"
+      ]
+    },
+    {
+      "key": "confirm-importnotfound-reason",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ConfirmImport\")"],
+      "until": "Effect.fn(\"Import.TakeBackImport\")",
+      "old": "ImportNotFound.make({ reason: NoImportThere })",
+      "new": "ImportNotFound.make({ reason: \"No import with that id.\" })",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
       ]
     },
     {
@@ -357,14 +628,67 @@
       "file": "src/Import/Import.aggregate.ts",
       "anchors": ["Effect.fn(\"Import.TakeBackImport\")"],
       "until": "Effect.fn(\"Import.ReopenImport\")",
-      "old": "        if (actor.organizationId !== s.organizationId || actor.role === \"viewer\") return yield* NotPermitted.make({})\n",
+      "old": "        if (actor.role === \"viewer\") return yield* NotPermitted.make({ required: \"editor\" })\n",
       "new": "",
       "proof": "test/Import.prove.test.ts",
       "expect": "rule",
-      "trialRules": ["AViewerChangesNothing", "OnlyItsOwnOrganizationChangesAnImport"],
+      "trialRules": ["AViewerChangesNothing"],
       "trialStories": [
-        "Review: a viewer neither takes back nor reopens a confirmed import",
-        "Review: an admin of another organization neither takes back nor reopens this one's confirmed import"
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer neither takes back nor reopens a confirmed import"
+      ]
+    },
+    {
+      "key": "takeback-notfound",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.TakeBackImport\")"],
+      "until": "Effect.fn(\"Import.ReopenImport\")",
+      "old": "        if (ImportState.guards.Unstaged(s) || actor.organizationId !== s.organizationId) {\n          return yield* ImportNotFound.make({ reason: NoImportThere })\n        }\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["OnlyItsOwnOrganizationChangesAnImport"],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization neither takes back nor reopens this one's confirmed import",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
+      ]
+    },
+    {
+      "key": "takeback-notpermitted-required",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.TakeBackImport\")"],
+      "until": "Effect.fn(\"Import.ReopenImport\")",
+      "old": "NotPermitted.make({ required: \"editor\" })",
+      "new": "NotPermitted.make({ required: \"admin\" })",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer neither takes back nor reopens a confirmed import"
+      ]
+    },
+    {
+      "key": "takeback-importnotfound-reason",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.TakeBackImport\")"],
+      "until": "Effect.fn(\"Import.ReopenImport\")",
+      "old": "ImportNotFound.make({ reason: NoImportThere })",
+      "new": "ImportNotFound.make({ reason: \"No import with that id.\" })",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization neither takes back nor reopens this one's confirmed import",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
       ]
     },
     {
@@ -458,14 +782,67 @@
       "file": "src/Import/Import.aggregate.ts",
       "anchors": ["Effect.fn(\"Import.ReopenImport\")"],
       "until": "Effect.fn(\"Import.RemoveImport\")",
-      "old": "        if (actor.organizationId !== s.organizationId || actor.role === \"viewer\") return yield* NotPermitted.make({})\n",
+      "old": "        if (actor.role === \"viewer\") return yield* NotPermitted.make({ required: \"editor\" })\n",
       "new": "",
       "proof": "test/Import.prove.test.ts",
       "expect": "rule",
-      "trialRules": ["AViewerChangesNothing", "OnlyItsOwnOrganizationChangesAnImport"],
+      "trialRules": ["AViewerChangesNothing"],
       "trialStories": [
-        "Review: a viewer neither takes back nor reopens a confirmed import",
-        "Review: an admin of another organization neither takes back nor reopens this one's confirmed import"
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer neither takes back nor reopens a confirmed import"
+      ]
+    },
+    {
+      "key": "reopen-notfound",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ReopenImport\")"],
+      "until": "Effect.fn(\"Import.RemoveImport\")",
+      "old": "        if (ImportState.guards.Unstaged(s) || actor.organizationId !== s.organizationId) {\n          return yield* ImportNotFound.make({ reason: NoImportThere })\n        }\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["OnlyItsOwnOrganizationChangesAnImport"],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization neither takes back nor reopens this one's confirmed import",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
+      ]
+    },
+    {
+      "key": "reopen-notpermitted-required",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ReopenImport\")"],
+      "until": "Effect.fn(\"Import.RemoveImport\")",
+      "old": "NotPermitted.make({ required: \"editor\" })",
+      "new": "NotPermitted.make({ required: \"admin\" })",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer neither takes back nor reopens a confirmed import"
+      ]
+    },
+    {
+      "key": "reopen-importnotfound-reason",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ReopenImport\")"],
+      "until": "Effect.fn(\"Import.RemoveImport\")",
+      "old": "ImportNotFound.make({ reason: NoImportThere })",
+      "new": "ImportNotFound.make({ reason: \"No import with that id.\" })",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization neither takes back nor reopens this one's confirmed import",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
       ]
     },
     {
@@ -527,14 +904,67 @@
       "file": "src/Import/Import.aggregate.ts",
       "anchors": ["Effect.fn(\"Import.RemoveImport\")"],
       "until": "    evolve: {",
-      "old": "        if (actor.organizationId !== s.organizationId || actor.role === \"viewer\") return yield* NotPermitted.make({})\n",
+      "old": "        if (actor.role === \"viewer\") return yield* NotPermitted.make({ required: \"editor\" })\n",
       "new": "",
       "proof": "test/Import.prove.test.ts",
       "expect": "rule",
-      "trialRules": ["AViewerChangesNothing", "OnlyItsOwnOrganizationChangesAnImport"],
+      "trialRules": ["AViewerChangesNothing"],
       "trialStories": [
-        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo",
-        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups"
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo"
+      ]
+    },
+    {
+      "key": "remove-notfound",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.RemoveImport\")"],
+      "until": "    evolve: {",
+      "old": "        if (ImportState.guards.Unstaged(s) || actor.organizationId !== s.organizationId) {\n          return yield* ImportNotFound.make({ reason: NoImportThere })\n        }\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["OnlyItsOwnOrganizationChangesAnImport"],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
+      ]
+    },
+    {
+      "key": "remove-notpermitted-required",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.RemoveImport\")"],
+      "until": "    evolve: {",
+      "old": "NotPermitted.make({ required: \"editor\" })",
+      "new": "NotPermitted.make({ required: \"admin\" })",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo"
+      ]
+    },
+    {
+      "key": "remove-importnotfound-reason",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.RemoveImport\")"],
+      "until": "    evolve: {",
+      "old": "ImportNotFound.make({ reason: NoImportThere })",
+      "new": "ImportNotFound.make({ reason: \"No import with that id.\" })",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
       ]
     },
     {
@@ -1076,20 +1506,76 @@
       "file": "src/Review/Deciding.decision.ts",
       "anchors": ["Effect.fn(\"Deciding.decide\")"],
       "until": "    transitions: {",
-      "old": "      if (actor.organizationId !== life.state.organizationId || actor.role === \"viewer\") {\n        return yield* NotPermitted.make({})\n      }\n",
+      "old": "      if (actor.role === \"viewer\") return yield* NotPermitted.make({ required: \"editor\" })\n",
+      "new": "",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AViewerChangesNoRow", "Violated Import.AViewerChangesNothing"],
+      "trialStories": [
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo",
+        "Review: when a person is made a viewer, their next act on a row is refused, and an admin's confirm is taken"
+      ]
+    },
+    {
+      "key": "row-notfound",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (ImportState.guards.Unstaged(life.state) || actor.organizationId !== life.state.organizationId) {\n        return yield* ImportNotFound.make({ reason: NoImportThere })\n      }\n",
       "new": "",
       "proof": "test/Deciding.prove.test.ts",
       "expect": "rule",
       "trialRules": [
         "Violated Import.OnlyItsOwnOrganizationChangesAnImport",
-        "Violated Import.AViewerChangesNothing",
-        "Violated OnlyItsOwnOrganizationChangesTheRow",
-        "Violated AViewerChangesNoRow"
+        "Violated OnlyItsOwnOrganizationChangesTheRow"
       ],
       "trialStories": [
-        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo",
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
         "Review: an admin of another organization changes nothing in this one's import, its rows or its groups",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
+      ]
+    },
+    {
+      "key": "row-notpermitted-required",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")"],
+      "until": "    transitions: {",
+      "old": "NotPermitted.make({ required: \"editor\" })",
+      "new": "NotPermitted.make({ required: \"admin\" })",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo",
         "Review: when a person is made a viewer, their next act on a row is refused, and an admin's confirm is taken"
+      ]
+    },
+    {
+      "key": "row-importnotfound-reason",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": [
+        "Effect.fn(\"Deciding.decide\")",
+        "ImportState.guards.Unstaged(life.state) ||",
+        "return yield* ImportNotFound"
+      ],
+      "until": "\n",
+      "old": "ImportNotFound.make({ reason: NoImportThere })",
+      "new": "ImportNotFound.make({ reason: \"No import with that id.\" })",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
       ]
     },
     {
@@ -1099,16 +1585,36 @@
       "file": "src/Review/Deciding.decision.ts",
       "anchors": ["Effect.fn(\"Deciding.decide\")"],
       "until": "    transitions: {",
-      "old": "      if (\n        !RowState.guards.Untouched(row.state) &&\n        (row.state.importId !== cmd.importId || row.state.organizationId !== life.state.organizationId)\n      ) {\n        return yield* NotPermitted.make({})\n      }\n",
+      "old": "      if (\n        !RowState.guards.Untouched(row.state) &&\n        (row.state.importId !== cmd.importId || row.state.organizationId !== life.state.organizationId)\n      ) {\n        return yield* ImportNotFound.make({ reason: NoImportThere })\n      }\n",
       "new": "",
       "proof": "test/Deciding.prove.test.ts",
       "expect": "rule",
       "trialRules": [
-        "Violated Row.ARowNeverChangesImportOrOrganization",
-        "Violated OnlyItsOwnOrganizationChangesTheRow"
+        "Violated OnlyItsOwnOrganizationChangesTheRow",
+        "Violated Row.ARowNeverChangesImportOrOrganization"
       ],
       "trialStories": [
-        "Review: a row or a group kept under another organization's name is not changed, even by its maker"
+        "Review: a row or a group kept under another organization's or import's name is not changed, even by its maker"
+      ]
+    },
+    {
+      "key": "row-rowowner-importnotfound-reason",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": [
+        "Effect.fn(\"Deciding.decide\")",
+        "row.state.organizationId !== life.state.organizationId)",
+        "return yield* ImportNotFound"
+      ],
+      "until": "\n",
+      "old": "ImportNotFound.make({ reason: NoImportThere })",
+      "new": "ImportNotFound.make({ reason: \"No import with that id.\" })",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a row or a group kept under another organization's or import's name is not changed, even by its maker"
       ]
     },
     {
@@ -1713,19 +2219,74 @@
       "file": "src/Review/Undoing.decision.ts",
       "anchors": ["Effect.fn(\"Undoing.decide\")"],
       "until": "    transitions: {",
-      "old": "      if (actor.organizationId !== life.state.organizationId || actor.role === \"viewer\") {\n        return yield* NotPermitted.make({})\n      }\n",
+      "old": "      if (actor.role === \"viewer\") return yield* NotPermitted.make({ required: \"editor\" })\n",
+      "new": "",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AViewerChangesNoRow", "Violated Import.AViewerChangesNothing"],
+      "trialStories": [
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo"
+      ]
+    },
+    {
+      "key": "undo-notfound",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (ImportState.guards.Unstaged(life.state) || actor.organizationId !== life.state.organizationId) {\n        return yield* ImportNotFound.make({ reason: NoImportThere })\n      }\n",
       "new": "",
       "proof": "test/Undoing.prove.test.ts",
       "expect": "rule",
       "trialRules": [
         "Violated Import.OnlyItsOwnOrganizationChangesAnImport",
-        "Violated Import.AViewerChangesNothing",
-        "Violated OnlyItsOwnOrganizationChangesTheRow",
-        "Violated AViewerChangesNoRow"
+        "Violated OnlyItsOwnOrganizationChangesTheRow"
       ],
       "trialStories": [
-        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo",
-        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups"
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
+      ]
+    },
+    {
+      "key": "undo-notpermitted-required",
+      "target": "UndoRowStep",
+      "kind": "field",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")"],
+      "until": "    transitions: {",
+      "old": "NotPermitted.make({ required: \"editor\" })",
+      "new": "NotPermitted.make({ required: \"admin\" })",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo"
+      ]
+    },
+    {
+      "key": "undo-importnotfound-reason",
+      "target": "UndoRowStep",
+      "kind": "field",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": [
+        "Effect.fn(\"Undoing.decide\")",
+        "ImportState.guards.Unstaged(life.state) ||",
+        "return yield* ImportNotFound"
+      ],
+      "until": "\n",
+      "old": "ImportNotFound.make({ reason: NoImportThere })",
+      "new": "ImportNotFound.make({ reason: \"No import with that id.\" })",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
       ]
     },
     {
@@ -1735,13 +2296,33 @@
       "file": "src/Review/Undoing.decision.ts",
       "anchors": ["Effect.fn(\"Undoing.decide\")"],
       "until": "    transitions: {",
-      "old": "      if (\n        !RowState.guards.Untouched(row.state) &&\n        (row.state.importId !== cmd.importId || row.state.organizationId !== life.state.organizationId)\n      ) {\n        return yield* NotPermitted.make({})\n      }\n",
+      "old": "      if (\n        !RowState.guards.Untouched(row.state) &&\n        (row.state.importId !== cmd.importId || row.state.organizationId !== life.state.organizationId)\n      ) {\n        return yield* ImportNotFound.make({ reason: NoImportThere })\n      }\n",
       "new": "",
       "proof": "test/Undoing.prove.test.ts",
       "expect": "rule",
-      "trialRules": ["Violated OnlyItsOwnOrganizationChangesTheRow"],
+      "trialRules": ["Violated AnUndoIsOfARowOfTheImportItNames", "Violated OnlyItsOwnOrganizationChangesTheRow"],
       "trialStories": [
-        "Review: a row or a group kept under another organization's name is not changed, even by its maker"
+        "Review: a row or a group kept under another organization's or import's name is not changed, even by its maker"
+      ]
+    },
+    {
+      "key": "undo-rowowner-importnotfound-reason",
+      "target": "UndoRowStep",
+      "kind": "field",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": [
+        "Effect.fn(\"Undoing.decide\")",
+        "row.state.organizationId !== life.state.organizationId)",
+        "return yield* ImportNotFound"
+      ],
+      "until": "\n",
+      "old": "ImportNotFound.make({ reason: NoImportThere })",
+      "new": "ImportNotFound.make({ reason: \"No import with that id.\" })",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a row or a group kept under another organization's or import's name is not changed, even by its maker"
       ]
     },
     {
@@ -2050,18 +2631,71 @@
       "file": "src/Review/DecidingGroup.decision.ts",
       "anchors": ["Effect.fn(\"DecidingGroup.decide\")"],
       "until": "    transitions: {",
-      "old": "      if (actor.organizationId !== life.state.organizationId || actor.role === \"viewer\") {\n        return yield* NotPermitted.make({})\n      }\n",
+      "old": "      if (actor.role === \"viewer\") return yield* NotPermitted.make({ required: \"editor\" })\n",
       "new": "",
       "proof": "test/DecidingGroup.prove.test.ts",
       "expect": "rule",
-      "trialRules": [
-        "Violated Import.OnlyItsOwnOrganizationChangesAnImport",
-        "Violated Import.AViewerChangesNothing",
-        "Violated AViewerChangesNoGroup"
-      ],
+      "trialRules": ["Violated AViewerChangesNoGroup", "Violated Import.AViewerChangesNothing"],
       "trialStories": [
-        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo",
-        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups"
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo"
+      ]
+    },
+    {
+      "key": "group-notfound",
+      "target": "DecideGroup",
+      "kind": "check",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (ImportState.guards.Unstaged(life.state) || actor.organizationId !== life.state.organizationId) {\n        return yield* ImportNotFound.make({ reason: NoImportThere })\n      }\n",
+      "new": "",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated Import.OnlyItsOwnOrganizationChangesAnImport"],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
+      ]
+    },
+    {
+      "key": "group-notpermitted-required",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "NotPermitted.make({ required: \"editor\" })",
+      "new": "NotPermitted.make({ required: \"admin\" })",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo"
+      ]
+    },
+    {
+      "key": "group-importnotfound-reason",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": [
+        "Effect.fn(\"DecidingGroup.decide\")",
+        "ImportState.guards.Unstaged(life.state) ||",
+        "return yield* ImportNotFound"
+      ],
+      "until": "\n",
+      "old": "ImportNotFound.make({ reason: NoImportThere })",
+      "new": "ImportNotFound.make({ reason: \"No import with that id.\" })",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
       ]
     },
     {
@@ -2183,19 +2817,74 @@
       "file": "src/Review/UndoingGroup.decision.ts",
       "anchors": ["Effect.fn(\"UndoingGroup.decide\")"],
       "until": "    transitions: {",
-      "old": "      if (actor.organizationId !== life.state.organizationId || actor.role === \"viewer\") {\n        return yield* NotPermitted.make({})\n      }\n",
+      "old": "      if (actor.role === \"viewer\") return yield* NotPermitted.make({ required: \"editor\" })\n",
+      "new": "",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AViewerChangesNoGroup", "Violated Import.AViewerChangesNothing"],
+      "trialStories": [
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo"
+      ]
+    },
+    {
+      "key": "gundo-notfound",
+      "target": "UndoGroup",
+      "kind": "check",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (ImportState.guards.Unstaged(life.state) || actor.organizationId !== life.state.organizationId) {\n        return yield* ImportNotFound.make({ reason: NoImportThere })\n      }\n",
       "new": "",
       "proof": "test/UndoingGroup.prove.test.ts",
       "expect": "rule",
       "trialRules": [
         "Violated Import.OnlyItsOwnOrganizationChangesAnImport",
-        "Violated Import.AViewerChangesNothing",
-        "Violated OnlyItsOwnOrganizationChangesTheGroup",
-        "Violated AViewerChangesNoGroup"
+        "Violated OnlyItsOwnOrganizationChangesTheGroup"
       ],
       "trialStories": [
-        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo",
-        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups"
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
+      ]
+    },
+    {
+      "key": "gundo-notpermitted-required",
+      "target": "UndoGroup",
+      "kind": "field",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "NotPermitted.make({ required: \"editor\" })",
+      "new": "NotPermitted.make({ required: \"admin\" })",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a viewer is refused every command NotPermitted, naming the editor role, and nothing is committed",
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo"
+      ]
+    },
+    {
+      "key": "gundo-importnotfound-reason",
+      "target": "UndoGroup",
+      "kind": "field",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": [
+        "Effect.fn(\"UndoingGroup.decide\")",
+        "ImportState.guards.Unstaged(life.state) ||",
+        "return yield* ImportNotFound"
+      ],
+      "until": "\n",
+      "old": "ImportNotFound.make({ reason: NoImportThere })",
+      "new": "ImportNotFound.make({ reason: \"No import with that id.\" })",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "CatalogApi.api: a member of another organization is answered every command as for an import that does not exist, and nothing is committed",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups",
+        "Review: an id no import has, and another organization's import in any state, are answered alike: not found"
       ]
     },
     {
@@ -2235,13 +2924,36 @@
       "file": "src/Review/UndoingGroup.decision.ts",
       "anchors": ["Effect.fn(\"UndoingGroup.decide\")"],
       "until": "    transitions: {",
-      "old": "      if (group.state.importId !== cmd.importId || group.state.organizationId !== life.state.organizationId) {\n        return yield* NotPermitted.make({})\n      }\n",
+      "old": "      if (group.state.importId !== cmd.importId || group.state.organizationId !== life.state.organizationId) {\n        return yield* ImportNotFound.make({ reason: NoImportThere })\n      }\n",
       "new": "",
       "proof": "test/UndoingGroup.prove.test.ts",
       "expect": "rule",
-      "trialRules": ["Violated OnlyItsOwnOrganizationChangesTheGroup"],
+      "trialRules": [
+        "Violated AGroupsUndoIsOfAGroupOfTheImportItNames",
+        "Violated OnlyItsOwnOrganizationChangesTheGroup"
+      ],
       "trialStories": [
-        "Review: a row or a group kept under another organization's name is not changed, even by its maker"
+        "Review: a row or a group kept under another organization's or import's name is not changed, even by its maker"
+      ]
+    },
+    {
+      "key": "gundo-groupowner-importnotfound-reason",
+      "target": "UndoGroup",
+      "kind": "field",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": [
+        "Effect.fn(\"UndoingGroup.decide\")",
+        "group.state.organizationId !== life.state.organizationId",
+        "return yield* ImportNotFound"
+      ],
+      "until": "\n",
+      "old": "ImportNotFound.make({ reason: NoImportThere })",
+      "new": "ImportNotFound.make({ reason: \"No import with that id.\" })",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a row or a group kept under another organization's or import's name is not changed, even by its maker"
       ]
     },
     {

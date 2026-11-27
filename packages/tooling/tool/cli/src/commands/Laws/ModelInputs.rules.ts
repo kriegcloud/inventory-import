@@ -6,7 +6,10 @@
  * model, from every `src/**\/*.model.ts` and `src/**\/*.api.ts`; and `prove`, which reads the blocks a proof runs, from
  * every `src/**\/*.aggregate.ts` and `src/**\/*.decision.ts`. Each task's walk also starts from every code file of the
  * package (`.ts`, `.tsx`, `.mts`, `.cts`; its `node_modules` and dot folders left out) that the task's own inputs
- * read: its tests, its proofs' helpers, its mutants, its vitest config, so what they import is held too. From each
+ * read: its tests, its proofs' helpers, its mutants, its vitest config, so what they import is held too. The walks of
+ * `mutants` and `mutants:sample` start as well from the package's `mutants/mutants.json` and every file it names (its
+ * story files, and each mutant's proof and the file it changes), since the runner runs those whether or not an input
+ * names them; a name that is no file of the package is refused. From each
  * start it walks the relative imports, file to file, anywhere they lead (the package's `src`, a folder beside it,
  * another package by a relative path), and refuses every file reached that no input glob of the task matches, naming
  * the task, the file and the glob to add: the file's ending under its top folder (`src/**\/*.view.ts`), the file
@@ -38,9 +41,21 @@ import type { RepoError } from "../../Cli.errors.ts"
 import { Repo } from "../../Repo.service.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 import { decodeJsonc, literally } from "../../Sync.rules.ts"
+import { LiteralKit } from "@beep/schema/LiteralKit"
+import { MutantsFile, mutantsFile } from "../Mutants/Mutants.schema.ts"
 import { readImports } from "./internal/importsCode.ts"
 
 const $I = $RepoCliId.create("commands/Laws/ModelInputs.rules")
+
+/**
+ * How a walk came to a file: a file imports it, or the package's mutants file names it.
+ *
+ * @category schemas
+ */
+export const ReachedBy = LiteralKit(["imports", "names"]).pipe(
+  $I.annoteSchema("ReachedBy", { description: "Whether a file is imported, or named by a mutants file" })
+)
+export type ReachedBy = typeof ReachedBy.Type
 
 /**
  * What `laws model-inputs` finds: every file a model reaches in the inputs of each task that reads it, or each one that
@@ -65,6 +80,7 @@ export const ModelInputsFinding = S.TaggedUnion({
     task: S.String.pipe(S.annotateKey({ description: "The task whose inputs do not read the file" })),
     file: S.String.pipe(S.annotateKey({ description: "The file reached, from the root" })),
     from: S.String.pipe(S.annotateKey({ description: "The file the walk that reaches it started from" })),
+    by: ReachedBy.pipe(S.annotateKey({ description: "Whether that file imports it or names it" })),
     turbo: S.String.pipe(S.annotateKey({ description: "The turbo.json that declares the task" })),
     glob: S.String.pipe(S.annotateKey({ description: "The input to add, by the file's ending" }))
   },
@@ -72,12 +88,18 @@ export const ModelInputsFinding = S.TaggedUnion({
     task: S.String.pipe(S.annotateKey({ description: "The task whose inputs take the file out" })),
     file: S.String.pipe(S.annotateKey({ description: "The file reached, from the root" })),
     from: S.String.pipe(S.annotateKey({ description: "The file the walk that reaches it started from" })),
+    by: ReachedBy.pipe(S.annotateKey({ description: "Whether that file imports it or names it" })),
     turbo: S.String.pipe(S.annotateKey({ description: "The turbo.json that declares the task" })),
     glob: S.String.pipe(S.annotateKey({ description: "The ! glob that takes it out, as written" }))
   },
   Unresolved: {
     file: S.String.pipe(S.annotateKey({ description: "The file that imports, from the root" })),
     specifier: S.String.pipe(S.annotateKey({ description: "The relative path it imports, as written" }))
+  },
+  NotAFile: {
+    file: S.String.pipe(S.annotateKey({ description: "The mutants file, from the root" })),
+    named: S.String.pipe(S.annotateKey({ description: "The path it names, from the package, as written" })),
+    dir: S.String.pipe(S.annotateKey({ description: "The package's folder, from the root" }))
   }
 }).pipe(
   $I.annoteSchema("ModelInputsFinding", {
@@ -109,16 +131,18 @@ export const modelInputsSentence: (finding: ModelInputsFinding) => Line = ModelI
     err(
       "model-inputs:check FAIL  a model reaches a file a task of its package does not read, so a change to it would replay an old pass:"
     ),
-  Unmatched: ({ task, file, from, turbo, glob }) =>
+  Unmatched: ({ task, file, from, by, turbo, glob }) =>
     err(
-      `  ${file}${file === from ? "" : `, which ${from} imports,`} is in no input of ${task} in ${turbo}: add "${glob}" to its inputs`
+      `  ${file}${file === from ? "" : `, which ${from} ${by},`} is in no input of ${task} in ${turbo}: add "${glob}" to its inputs`
     ),
-  TakenOut: ({ task, file, from, turbo, glob }) =>
+  TakenOut: ({ task, file, from, by, turbo, glob }) =>
     err(
-      `  ${file}${file === from ? "" : `, which ${from} imports,`} is taken out of the inputs of ${task} in ${turbo} by "${glob}": remove that glob, or narrow it so it leaves this file in`
+      `  ${file}${file === from ? "" : `, which ${from} ${by},`} is taken out of the inputs of ${task} in ${turbo} by "${glob}": remove that glob, or narrow it so it leaves this file in`
     ),
   Unresolved: ({ file, specifier }) =>
-    err(`  ${file} imports "${specifier}", which names no file: write the path of the file it means`)
+    err(`  ${file} imports "${specifier}", which names no file: write the path of the file it means`),
+  NotAFile: ({ file, named, dir }) =>
+    err(`  ${file} names ${named}, which is no file of ${dir}: write the path of the test it means`)
 })
 
 /** One task's inputs: the globs, or none written, which reads every file. */
@@ -277,10 +301,11 @@ interface Imported {
   readonly unresolved: ReadonlyArray<Unresolved>
 }
 
-/** One file the walk reached, and the file it started from. */
+/** One file the walk reached, the file it started from, and whether that file imports it or names it. */
 interface Reached {
   readonly file: string
   readonly from: string
+  readonly by: ReachedBy
 }
 
 /** One start's walk: the file it starts from, every file it reaches (itself first), and the imports naming no file. */
@@ -356,7 +381,7 @@ export const modelInputs = Effect.fn("ModelInputs.modelInputs")(function* () {
     const walk: Omit<Walk, "start"> = {
       found: seen,
       unresolved,
-      files: A.map(seen, (file): Reached => ({ file, from: start }))
+      files: A.map(seen, (file): Reached => ({ file, from: start, by: ReachedBy.Enum.imports }))
     }
     return walk
   })
@@ -388,13 +413,41 @@ export const modelInputs = Effect.fn("ModelInputs.modelInputs")(function* () {
       const text = yield* repo.text(turboFile)
       const turbo = yield* decodeJsonc(ModelTurbo)(turboFile, text)
       const tasks = [
-        { task: "verify", side: "model", declared: turbo.tasks.verify },
-        { task: "mutants", side: "model", declared: turbo.tasks.mutants },
-        { task: "mutants:sample", side: "model", declared: turbo.tasks["mutants:sample"] },
-        { task: "prove", side: "proof", declared: turbo.tasks.prove }
+        { task: "verify", side: "model", runsMutants: false, declared: turbo.tasks.verify },
+        { task: "mutants", side: "model", runsMutants: true, declared: turbo.tasks.mutants },
+        { task: "mutants:sample", side: "model", runsMutants: true, declared: turbo.tasks["mutants:sample"] },
+        { task: "prove", side: "proof", runsMutants: false, declared: turbo.tasks.prove }
       ] as const
       const held = A.filter(tasks, (one) => O.isSome(one.declared))
       if (!A.isReadonlyArrayNonEmpty(held)) return none
+      // What the mutants' runner runs whatever the inputs say: the mutants file, its story files, and each mutant's
+      // proof and the file it changes. The mutants' tasks walk from each, and from the mutants file itself.
+      const mutantsPath = repo.join(workspace.dir, mutantsFile)
+      const runsMutants = A.some(held, (one) => one.runsMutants) && (yield* repo.exists(mutantsPath))
+      const mutantsOf = runsMutants ? yield* Effect.asSome(repo.json(MutantsFile)(mutantsPath)) : O.none<MutantsFile>()
+      const names = O.match(mutantsOf, {
+        onNone: () => A.empty<string>(),
+        onSome: (file) => A.dedupe([...file.stories, ...A.flatMap(file.mutants, (m) => [m.proof, m.file])])
+      })
+      const checked = yield* Effect.forEach(
+        names,
+        (name) => Effect.map(isFile(repo.join(workspace.dir, name)), (there) => ({ name, there })),
+        { concurrency: 1 }
+      )
+      const notFiles = A.map(
+        A.filter(checked, (one) => !one.there),
+        (one) =>
+          ModelInputsFinding.cases.NotAFile.make({
+            file: repo.relative(mutantsPath, repo.root),
+            named: one.name,
+            dir: repo.relative(workspace.dir, repo.root)
+          })
+      )
+      const named = A.map(
+        A.filter(checked, (one) => one.there),
+        (one) => repo.join(workspace.dir, one.name)
+      )
+      const mutantsStarts = O.isSome(mutantsOf) ? A.prepend(named, mutantsPath) : A.empty<string>()
       // In the order of their paths, so the refusals come out the same on every machine.
       const listed = yield* repo.files(repo.join(workspace.dir, "src"))
       const everything = A.sort(listed, Order.String)
@@ -403,13 +456,19 @@ export const modelInputs = Effect.fn("ModelInputs.modelInputs")(function* () {
       const readingFor = (globs: ReadonlyArray<string>, file: string): Reading =>
         readingOf(globs, repo.relative(file, workspace.dir), repo.relative(file, repo.root))
       // Each task's starts: the blocks of its side first, then every code file of the package its inputs read.
-      const planned = A.map(held, ({ task, side, declared }) => {
+      const planned = A.map(held, ({ task, side, runsMutants: mutantsTask, declared }) => {
         const globs = O.flatMap(declared, (one) => one.inputs)
         const own = O.match(globs, {
           onNone: () => A.empty<string>(),
           onSome: (inputs) => A.filter(code, (file) => reads(readingFor(inputs, file)))
         })
-        return { task, globs, starts: A.dedupe(A.appendAll(A.filter(everything, startsOf[side]), own)) }
+        const extra = mutantsTask ? mutantsStarts : A.empty<string>()
+        return {
+          task,
+          globs,
+          mutantsTask,
+          starts: A.dedupe([...A.filter(everything, startsOf[side]), ...own, ...extra])
+        }
       })
       const walks: ReadonlyArray<Walk> = yield* Effect.forEach(
         A.dedupe(A.flatMap(planned, (one) => one.starts)),
@@ -421,22 +480,28 @@ export const modelInputs = Effect.fn("ModelInputs.modelInputs")(function* () {
         A.dedupeWith(written, (a, b) => a.file === b.file && a.specifier === b.specifier),
         (one) => ModelInputsFinding.cases.Unresolved.make(one)
       )
-      // Every file a task's starts reach, each once, with the first start that reaches it.
-      const reachedFrom = (starts: ReadonlyArray<string>): ReadonlyArray<Reached> => {
+      // Every file a task's starts reach, each once, with the first start that reaches it. For the mutants' tasks, a
+      // file the mutants file names is reached from it.
+      const reachedFrom = (starts: ReadonlyArray<string>, mutantsTask: boolean): ReadonlyArray<Reached> => {
         const files: ReadonlyArray<Reached> = A.flatMap(starts, (start) =>
           A.flatMap(
             A.filter(walks, (walk: Walk) => walk.start === start),
-            (walk: Walk): ReadonlyArray<Reached> => walk.files
+            (walk: Walk): ReadonlyArray<Reached> =>
+              A.map(walk.files, (one) =>
+                mutantsTask && one.file === start && A.contains(named, start)
+                  ? { file: start, from: mutantsPath, by: ReachedBy.Enum.names }
+                  : one
+              )
           )
         )
         return A.dedupeWith(files, (a, b) => a.file === b.file)
       }
-      const unmatched = A.flatMap(planned, ({ task, globs, starts }) =>
+      const unmatched = A.flatMap(planned, ({ task, globs, starts, mutantsTask }) =>
         O.match(globs, {
           // A task with no inputs reads every file of its package.
           onNone: () => A.empty<ModelInputsFinding>(),
           onSome: (inputs) =>
-            A.flatMap(reachedFrom(starts), ({ file, from }) => {
+            A.flatMap(reachedFrom(starts, mutantsTask), ({ file, from, by }) => {
               const reading = readingFor(inputs, file)
               const fromPackage = repo.relative(file, workspace.dir)
               const fromRoot = repo.relative(file, repo.root)
@@ -444,6 +509,7 @@ export const modelInputs = Effect.fn("ModelInputs.modelInputs")(function* () {
                 task,
                 file: fromRoot,
                 from: repo.relative(from, repo.root),
+                by,
                 turbo: repo.relative(turboFile, repo.root)
               }
               return O.match(reading.takenBy, {
@@ -461,7 +527,7 @@ export const modelInputs = Effect.fn("ModelInputs.modelInputs")(function* () {
       return {
         walked: A.map(walks, (walk) => walk.start),
         files: A.dedupe(A.flatMap(walks, (walk) => A.map(walk.files, (one) => one.file))),
-        findings: A.appendAll(unresolved, unmatched)
+        findings: [...notFiles, ...unresolved, ...unmatched]
       }
     }),
     { concurrency: 1 }

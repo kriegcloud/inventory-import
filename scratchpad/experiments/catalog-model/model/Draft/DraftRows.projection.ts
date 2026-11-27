@@ -9,7 +9,7 @@ import * as RowDecided from "../Row/RowDecided.event.ts"
 import * as StepUndone from "../Row/StepUndone.event.ts"
 import { DraftRow, DraftStore } from "./DraftStore.port.ts"
 import { ImportActs, RowActed } from "./ImportActs.stream.ts"
-import { RowHolds } from "./RowHolds.view.ts"
+import { RowHolds } from "../Row/RowHolds.view.ts"
 
 const reached = (state: RowState.State | null): state is RowState.Decided | RowState.Undecided =>
   RowState.guards.Decided(state) || RowState.guards.Undecided(state)

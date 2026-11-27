@@ -11,7 +11,6 @@ import * as ImportState from "../Import/Import.state.ts"
 import { Below, CUT, letGo, Level, noLevel, seal, sizesAreTrue } from "../Row/Level.schema.ts"
 import { Row } from "../Row/Row.aggregate.ts"
 import * as RowState from "../Row/Row.state.ts"
-import { tookThisUndo } from "../Row/Row.state.ts"
 import * as StepUndone from "../Row/StepUndone.event.ts"
 import { Change, ImportKey, RowKey, Step, UNDO_LABEL } from "./Change.schema.ts"
 import { DecidedBeforeTheConfirm, GroupedAfter, GroupedSince, NotYourStep, UndoneSince } from "./Review.rejection.ts"
@@ -132,15 +131,15 @@ export const decide = Effect.fn("Undoing.decide")(function* ({ life, row }: Read
   // 364 now). The row keeps its last undo only: a copy that arrives after another undo on the same row is not known,
   // and is refused as not its sender's step.
   if (cmd.opening !== life.state.confirms) {
-    if (tookThisUndo({ row: row.state, undo: cmd.undo, step: cmd.step, by: actor.memberId })) return []
+    if (RowState.tookThisUndo({ row: row.state, undo: cmd.undo, step: cmd.step, by: actor.memberId })) return []
     return yield* ConfirmedSince.make({})
   }
   if (cmd.sawGroup !== life.state.lastGroup) {
-    if (tookThisUndo({ row: row.state, undo: cmd.undo, step: cmd.step, by: actor.memberId })) return []
+    if (RowState.tookThisUndo({ row: row.state, undo: cmd.undo, step: cmd.step, by: actor.memberId })) return []
     return yield* GroupedSince.make({})
   }
   if (!RowState.guards.Decided(row.state) || row.state.by !== actor.memberId || row.state.change !== cmd.undo) {
-    if (tookThisUndo({ row: row.state, undo: cmd.undo, step: cmd.step, by: actor.memberId })) return []
+    if (RowState.tookThisUndo({ row: row.state, undo: cmd.undo, step: cmd.step, by: actor.memberId })) return []
     return yield* NotYourStep.make({})
   }
   // An undo landed on the row that the sender's screen has not received: another person decided over the sender's

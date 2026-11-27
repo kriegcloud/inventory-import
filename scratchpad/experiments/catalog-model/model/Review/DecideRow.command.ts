@@ -11,7 +11,6 @@ import { ConfirmedSince, MatchedSince, NotOpen, NotPermitted } from "../Import/I
 import * as ImportState from "../Import/Import.state.ts"
 import { Row } from "../Row/Row.aggregate.ts"
 import * as RowState from "../Row/Row.state.ts"
-import { holdsThisAct } from "../Row/Row.state.ts"
 import * as RowDecided from "../Row/RowDecided.event.ts"
 import { Change, Flags, ImportKey, Label, RowKey, Step } from "./Change.schema.ts"
 import { GroupedSince, UndoneSince, whose } from "./Review.rejection.ts"
@@ -195,13 +194,29 @@ export const decide = Effect.fn("Deciding.decide")(function* ({ life, row }: Rea
   // screen that is behind; a row's undo sent twice is answered the same way). It is asked inside each refusal, so
   // that its comparisons are not taken on every way through this `decide` by the prover.
   if (cmd.opening !== life.state.confirms) {
-    if (holdsThisAct({ row: row.state, step: cmd.step, by: actor.memberId, flags: cmd.flags, madeOn: cmd.madeOn })) {
+    if (
+      RowState.holdsThisAct({
+        row: row.state,
+        step: cmd.step,
+        by: actor.memberId,
+        flags: cmd.flags,
+        madeOn: cmd.madeOn
+      })
+    ) {
       return []
     }
     return yield* ConfirmedSince.make({})
   }
   if (cmd.sawGroup !== life.state.lastGroup) {
-    if (holdsThisAct({ row: row.state, step: cmd.step, by: actor.memberId, flags: cmd.flags, madeOn: cmd.madeOn })) {
+    if (
+      RowState.holdsThisAct({
+        row: row.state,
+        step: cmd.step,
+        by: actor.memberId,
+        flags: cmd.flags,
+        madeOn: cmd.madeOn
+      })
+    ) {
       return []
     }
     return yield* GroupedSince.make({})

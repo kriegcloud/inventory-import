@@ -18,7 +18,7 @@ import { Suggester } from "./Suggester.external.ts"
  * @category models
  * @since 0.0.0
  */
-export const PassKey = S.String.check(S.isMinLength(1))
+export const PassKey = S.String.check(S.isPattern(/^.+:\d+$/))
   .pipe(S.brand("PassKey"))
   .annotate({ description: "One ask for a suggestion, as `<importId>:<seq>` of its event" })
 /**

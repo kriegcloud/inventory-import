@@ -19,7 +19,7 @@ and `import-module`, dropped on 2026-11-27 (`scratchpad/LOG.md`; their files are
 | `baseline/` | the package's twelve files (`packages/catalog/model/src` at `a184783d`), copied unchanged: the control |
 | `model/` | the same model, 3 aggregates and 4 decisions, written to the taxonomy: 54 files, and 13 trial files |
 | `CatalogModel.test.ts` | Verify on each, against its own copy of the package's lock; it sets `CI` itself and compares each copy with the package's lock |
-| `model/Trial.model.ts`, `TrialBlocks.test.ts` | one trial block of each read and reaction kind, and a story for each |
+| `model/Trial.model.ts`, `TrialBlocks.test.ts` | a trial block of each read and reaction kind (two views), and what holds each |
 
 `bun run scratch:test catalog-model` runs both (about five minutes). One alone:
 `bunx vitest run experiments/catalog-model/CatalogModel.test.ts -t "every block in a file"` from `scratchpad/`.
@@ -28,7 +28,8 @@ and `import-module`, dropped on 2026-11-27 (`scratchpad/LOG.md`; their files are
 
 One block to a file, the file named `<Tag>.<kind>.ts`. An event's or a command's file is read as a namespace named
 for its stem, and a state's as `<Stem>State`, since `<Stem>` is its aggregate's class. A rejection, a rule, a union
-and a helper that a rule's text calls bare are named imports.
+and a helper that a rule's text calls bare are named imports; a `decide` reads a state's helper through the
+namespace (`RowState.holdsThisAct`).
 
 | File | Exports | Read as |
 | --- | --- | --- |
@@ -37,7 +38,7 @@ and a helper that a rule's text calls bare are named imports.
 | `<Noun>.state.ts` | each case by name, `State`, `guards`, `cases`, `isAnyOf`, the invariants, a field record its event shares, what is worked out of a state (`inForce`, `sawIt`) | `RowState.Decided`, `RowState.guards.Decided` |
 | `<Noun>.transition.ts` | every rule of a step, each under its own name | named imports, listed in the aggregate or the decision |
 | `<Union>.union.ts` | one tagged union, the file named for it (`ImportEvent.union.ts`, `RowEvent.union.ts`) | `ImportEvent.guards.ActCounted` |
-| `<Noun>.rejection.ts` | the rejections more than one command returns | named imports |
+| `<Noun>.rejection.ts` | the rejections more than one command returns, and a record of fields they share (`whose`); a rejection no command returns has its tag for a stem (`SuggesterUnavailable.rejection.ts`) | named imports |
 | `<Noun>.schema.ts` | a value several blocks share, with what is worked out of it | `Level`, `seal` |
 | `<Noun>.aggregate.ts`, `<Noun>.decision.ts` | the class, and nothing but a listing | `Import`, `Deciding` |
 
@@ -116,14 +117,15 @@ Two patches to the library made this possible, both in `packages/patches` with t
 
 ## The blocks to come, tried
 
-One trial block of each kind the model does not have yet, each in the home the exploration's decision 9 gives it,
+A trial block of each kind the model does not have yet (two of them views), each in the home the exploration's
+decision 9 gives it,
 listed in `CatalogTrial` beside the same aggregates and decisions. Trial blocks only: none is copied into a package.
 
 | File | Kind | Live |
 | --- | --- | --- |
 | `Import/ImportStatus.view.ts` | view, guarded | same file: its `validate` |
 | `Import/ForgetMember.rewrite.ts` | rewrite | none: it is pure |
-| `Draft/RowHolds.view.ts` | view, read by the projection only | none: no Api serves it |
+| `Row/RowHolds.view.ts` | view, guarded, beside the aggregate it is keyed by; the projection reads it | same file: its `validate` |
 | `Draft/ImportActs.stream.ts` | stream, guarded, with its one entry event | same file: its `validate` |
 | `Draft/DraftRows.projection.ts` | projection | same file, through `DraftStore` |
 | `Draft/DraftStore.port.ts`, `DraftStore.memory.ts` | port and its in-memory twin | |
@@ -140,7 +142,7 @@ What it found:
   import's life; two asks starting two passes of the saga, each calling the external system, and a refused call
   ending its pass `Rejected`; the projection keeping one row for each decided row through a second decision and an
   undo, the stream logging every act, the query paging by keyset and giving another organization an empty page; the
-  two guarded reads through an Api; the rewrite seen through the view, another member's event kept; and the
+  three guarded reads through an Api; the rewrite seen through the view, another member's event kept; and the
   in-memory store alone.
 - **The lock does not see them.** On a copy, not kept, with a view, policy, projection, stream, saga and query
   listed in `Catalog` itself: nothing relocked, the lock byte for byte the same, the search as before (19,862
@@ -149,18 +151,21 @@ What it found:
   the test says `allow: { skipped: [...] }`, and 90 of the 185 sequences it replays as stories end with the stubbed
   external system's call unanswered. A model with a saga that calls out needs its Verify given an adapter that
   answers, or the reaction skipped by name. This was one run on a copy since deleted; no kept test repeats it.
+- **Every view is a read an Api serves** unless the Api lists its views and leaves it out, so a view made only for
+  a projection (`RowHolds`) is guarded like the rest.
 - **A guarded read needs a Live.** A view or a stream that a client reads declares `middleware` and `rejects`, has a
   `validate` in its file (the library refuses the model without one), and needs the organization in what `validate`
   is given: the view's state, the stream's latest entry.
 - **A read is judged before it waits for the caller's own writes** (the library's `judgedRead`). A `validate` that
-  refuses a key with no state also refuses a person's read straight after their own command, so both guards refuse
+  refuses a key with no state also refuses a person's read straight after their own command, so the guards refuse
   only what belongs to another organization. Another organization can tell an import id in use from one that is
   not, and nothing more. The query has no such gap: its store is read by organization first.
 - **A story cannot reach a read's `validate`, nor deliver an event twice.** `Story.view` and `Story.streamed` read
   the hosts directly. The guards are tested through a test-local Api with the in-process client, and a replay at the
   store.
 - **The in-process client's read after its own commands gave nothing** until the command's receipt was passed as
-  `atLeast`, against what the Api's own documentation says. Seen twice; not traced.
+  `atLeast`, against what the Api's own documentation says. Seen twice. A reviewer read the cause in the library:
+  the function every client is built from (`nest`, in its `Api.ts`) keeps no receipt of a command it sent.
 - **A saga's key is its idempotency key.** Keyed by the import, only the first ask ever ran a pass. `SuggestionPass`
   is keyed by `<importId>:<seq>` of the ask's event, the import its input.
 - **A projection gets an aggregate's event and not its state.** `StepUndone` carries neither the decision it puts
@@ -181,7 +186,8 @@ What was awkward in the layout:
 
 - **A schema only its block uses sits in that block's file**: `Status` in the view's, `DraftRow` in the port's (as
   the library's own ledger example does), `PassKey` in the saga's. The other choice is a `.schema.ts` for each.
-- **A read module reaches into `Import/` for a rejection**: `ImportActs.stream.ts` imports `NotPermitted`.
+- **A read reaches into `Import/` for a rejection**: `ImportActs.stream.ts` and `RowHolds.view.ts` import
+  `NotPermitted`.
 - **`RowHolds` repeats the row's state as a view** only so that a projection can see it.
 
 Not tried here: a compaction and a sealed field (each changes an aggregate the lock holds), the Vault, and a host

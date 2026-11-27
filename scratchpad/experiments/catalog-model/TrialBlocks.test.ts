@@ -8,6 +8,7 @@ import { assertNone, assertSome } from "@effect/vitest/utils"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
 import { Actor, CurrentActor } from "./model/Actor/Actor.context.ts"
 import { Session } from "./model/Actor/Session.middleware.ts"
 import { DraftStore, DraftRow } from "./model/Draft/DraftStore.port.ts"
@@ -70,7 +71,11 @@ it.effect("an import that is staged reads as open, of its organization, at chang
     Story.provide(CurrentActor, ana),
     Story.when(StageImport.Command.make({ importId: id, rows: 3, columns: "sku=A" })),
     Story.then(Import.ref(id), staged),
-    Story.view(ImportStatus, Import.ref(id), { status: "Open", organizationId: "org_prairie", changes: 0 })
+    Story.view(ImportStatus, Import.ref(id), {
+      status: "Open",
+      organizationId: O.some("org_prairie"),
+      changes: 0
+    })
   )
 )
 
@@ -181,6 +186,7 @@ it.effect("an undo reads back the decision it puts back, an undo of the only dec
       id,
       RowActed.make({ row: r1, organizationId: "org_prairie", change: 1, label: UNDO_LABEL, by: "ana" })
     ),
+    Story.streamed(ImportActs, id),
     Story.query(ImportReview, { importId: id }, [])
   )
 )
@@ -279,7 +285,7 @@ layer(DraftStoreMemory)("the draft store in memory", (it) => {
 class TrialApi extends Domain.Api("TrialApi", {
   model: CatalogTrial,
   commands: ["StageImport", "DecideRow"],
-  views: ["ImportStatus"],
+  views: ["ImportStatus", "RowHolds"],
   streams: ["ImportActs"]
 }) {}
 
@@ -289,7 +295,7 @@ const actingAs = (actor: Actor) =>
 const Hosted = CatalogTrial.layer(handlers.pipe(Layer.provide(AnySuggestion))).pipe(Layer.provide(Domain.InMemory))
 
 layer(Hosted, { excludeTestServices: true })("the guarded reads, through an Api", (it) => {
-  it.effect("the import's organization reads its status and acts, another's read of them is refused NotPermitted", () =>
+  it.effect("the import's organization reads its status, acts and row; another's read of each is refused NotPermitted", () =>
     Effect.gen(function* () {
       const asAna = yield* TrialApi.clientInProcess.pipe(actingAs(ana))
       const asOmar = yield* TrialApi.clientInProcess.pipe(actingAs(omar))
@@ -309,24 +315,38 @@ layer(Hosted, { excludeTestServices: true })("the guarded reads, through an Api"
         label: "Keep"
       })
       const status = yield* asAna.ImportStatus.get(id, { atLeast: decidedRow })
-      expect(status).toMatchObject({ status: "Open", organizationId: "org_prairie", changes: 1 })
+      expect(status).toMatchObject({ status: "Open", organizationId: O.some("org_prairie"), changes: 1 })
       const acts = yield* asAna.ImportActs.peek(id, { atLeast: decidedRow })
       expect(acts).toMatchObject({ event: { row: r1, organizationId: "org_prairie", change: 1, by: "ana" } })
+      const held = yield* asAna.RowHolds.get(r1, { atLeast: decidedRow })
+      expect(held).toMatchObject({ status: "Decided", organizationId: "org_prairie", by: "ana" })
       const refusals = yield* Effect.all(
-        [Effect.flip(asOmar.ImportStatus.get(id)), Effect.flip(asOmar.ImportActs.peek(id))],
+        [
+          Effect.flip(asOmar.ImportStatus.get(id)),
+          Effect.flip(asOmar.ImportActs.peek(id)),
+          Effect.flip(asOmar.RowHolds.get(r1))
+        ],
         { concurrency: 1 }
       )
-      expect(A.map(refusals, (refusal) => refusal._tag)).toEqual(["NotPermitted", "NotPermitted"])
+      expect(A.map(refusals, (refusal) => refusal._tag)).toEqual(["NotPermitted", "NotPermitted", "NotPermitted"])
     }).pipe(Effect.scoped)
   )
 
   it.effect("an import nobody staged reads as nothing to every organization, so its id is told from one in use", () =>
     Effect.gen(function* () {
+      const asAna = yield* TrialApi.clientInProcess.pipe(actingAs(ana))
       const asOmar = yield* TrialApi.clientInProcess.pipe(actingAs(omar))
       const none = ImportKey.make("imp-none")
-      const status = yield* asOmar.ImportStatus.get(none)
-      const acts = yield* asOmar.ImportActs.peek(none)
-      expect([status, acts]).toEqual([null, null])
+      const seen = yield* Effect.all(
+        [
+          asAna.ImportStatus.get(none),
+          asAna.ImportActs.peek(none),
+          asOmar.ImportStatus.get(none),
+          asOmar.ImportActs.peek(none)
+        ],
+        { concurrency: 1 }
+      )
+      expect(seen).toEqual([null, null, null, null])
     }).pipe(Effect.scoped)
   )
 })

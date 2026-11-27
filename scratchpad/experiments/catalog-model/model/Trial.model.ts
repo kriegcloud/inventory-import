@@ -5,7 +5,7 @@ import * as Layer from "effect/Layer"
 import { DraftRows, DraftRowsLive } from "./Draft/DraftRows.projection.ts"
 import { ImportActs, ImportActsLive } from "./Draft/ImportActs.stream.ts"
 import { ImportReview, ImportReviewLive } from "./Draft/ImportReview.query.ts"
-import { RowHolds } from "./Draft/RowHolds.view.ts"
+import { RowHolds, RowHoldsLive } from "./Row/RowHolds.view.ts"
 import { Group } from "./Group/Group.aggregate.ts"
 import { ForgetMember } from "./Import/ForgetMember.rewrite.ts"
 import { Import } from "./Import/Import.aggregate.ts"
@@ -44,8 +44,8 @@ export class CatalogTrial extends Domain.Model(
 ) {}
 
 /**
- * Every Live of the trial blocks, as one Layer: the two guarded reads' `validate`s, the projection, the query, the saga
- * and the policy. It still needs a `DraftStore` and the `Suggester`.
+ * Every Live of the trial blocks, as one Layer: the three guarded reads' `validate`s, the projection, the query, the
+ * saga and the policy. It still needs a `DraftStore` and the `Suggester`.
  *
  * @category layers
  * @since 0.0.0
@@ -53,6 +53,7 @@ export class CatalogTrial extends Domain.Model(
 export const CatalogTrialHandlers = Layer.mergeAll(
   ImportStatusLive,
   ImportActsLive,
+  RowHoldsLive,
   DraftRowsLive,
   ImportReviewLive,
   SuggestionPassLive,

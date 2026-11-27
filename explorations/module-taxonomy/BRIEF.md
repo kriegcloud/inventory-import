@@ -88,7 +88,7 @@ kind. The experiment's test does both readings over the real tree in under a sec
 | --- | --- | --- |
 | `<Tag>.event.ts` | `Event`, `evolve` | `ImportStaged.Event`, `ImportStaged.evolve` |
 | `<Tag>.command.ts` | `Command`, `decide`, the rejections only it returns | `StageImport.Command`, `DecideRow.decide` |
-| `<Noun>.rejection.ts` | each rejection several commands return, by its own name | named imports |
+| `<Noun>.rejection.ts` | each rejection several commands return, by its own name, and a record of fields they share | named imports |
 | `<Noun>.state.ts` | each case by its name (a branded `S.Opaque` class), `State`, `guards`, `cases`, `isAnyOf`, each invariant, and what is worked out of a state | `ImportState.State`, `ImportState.Open`, `ImportState.guards.Open` |
 | `<Noun>.transition.ts` | each rule of a step, by its own name | named imports, listed by name |
 | `<Union>.union.ts` | one tagged union, the file named for it (decision 8b) | `ImportEvent.guards.ActCounted` |
@@ -101,6 +101,13 @@ file imports the event's to record it (`ImportStaged.Event.make(...)`). A starti
 `ImportState.Open.make({ organizationId, rows, columns })` is a staged import, and no `make` writes a `status`. No
 tag changes, so `guards`, `catchTag`, an Api's command list and the lock read as before. The whole model verified
 against the package's lock, the lock unchanged, with the two patches below installed.
+
+Three things the table's rows do not say, each in the verified model. `DecideRow.command.ts` also exports
+`changesNothing`: it reads what only the command says, and fourteen locked rules call it by that name, so the law of
+decision 2 allows a command's file a helper its decision's rules call. A rejection no command returns (an external
+system's) is a file with its tag for a stem, `SuggesterUnavailable.rejection.ts`. And a `decide` reads a state's
+helper through the state's namespace (`RowState.holdsThisAct`), while a rule's text calls one bare, by a named
+import, because the lock holds the text.
 
 **Folders (decision 8).** A kind with more than five files in its module moves into a folder named for the kind's
 plural, with its union beside the files it joins: `Import/commands/` (seven commands and `ImportCommand.union.ts`)
@@ -208,7 +215,7 @@ its home here (decision 9c). Its `NOTE.md` says what each needed and what Verify
 | `block-files` reading the registry | `module-kinds`, first slice | `packages/tooling/tool/cli/src/commands/Laws/BlockFiles.rules.ts` (its `placed`, `reserved`, `declarers`, `holds`, `besideItsOwn`, `homes`) and `test/BlockFiles.test.ts` |
 | Nine ports under `.port.ts` | `module-kinds`, first slice | the eight `.store.ts` files of `packages/catalog/model` and `packages/access/model`, and `packages/access/contract/src/Allowance/ModelAllowance.gateway.ts` |
 | `boundaries` asking the registry about each import's kind | `module-kinds`, later, when the first slice is merged | `packages/tooling/tool/cli/src/commands/Laws/Boundaries.rules.ts`; the reading in `scratchpad/experiments/kind-registry/KindRegistry.test.ts` |
-| `.event.ts`, `.state.ts`, `.transition.ts` and `.union.ts` as kinds, and the law of decision 2: stem is tag, a kind's export names, no named import of `Event` or `Command` | `module-kinds`, later, before the first event moves | `Kinds.registry.ts`, `BlockFiles.rules.ts` |
+| `.event.ts`, `.state.ts`, `.transition.ts` and `.union.ts` as kinds, and the law of decision 2: stem is tag, a kind's export names (with a helper its decision's rules call, as `changesNothing`), no named import of `Event` or `Command` | `module-kinds`, later, before the first event moves | `Kinds.registry.ts`, `BlockFiles.rules.ts` |
 | Every block of the catalog model in a file of its kind, read as a namespace | `module-kinds`, later, when no move of `alchemy-domain-uptake` is open on `packages/catalog/model` | `packages/catalog/model/src/Import/Import.aggregate.ts`; `scratchpad/experiments/catalog-model/model`; the 60 mutants |
 | The same for `Row`, `Group` and the four decisions: a decision is a listing, its `decide` in its command's file | `module-kinds`, later, after `Import` | `Row.aggregate.ts`, `Group.aggregate.ts`, the four `Review/*.decision.ts`; designed in `catalog-model/model` |
 | The folder rule of decision 8 as a count in `block-files` | `module-kinds`, later, with the move of `Import` | `BlockFiles.rules.ts` |

@@ -16,7 +16,7 @@ import * as ImportState from "./Import.state.ts"
 /**
  * **Details**
  *
- * `organizationId` is empty until the import is staged; `ImportStatusLive` reads it to judge who may see the rest.
+ * `organizationId` is none until the import is staged; `ImportStatusLive` reads it to judge who may see the rest.
  *
  * @category models
  * @since 0.0.0
@@ -24,8 +24,8 @@ import * as ImportState from "./Import.state.ts"
 export class Status extends S.Opaque<Status, { readonly brand: unique symbol }>()(
   S.Struct({
     status: ImportState.Status.pipe(S.annotateKey({ description: "Where the import is in its lifecycle" })),
-    organizationId: S.String.pipe(
-      S.annotateKey({ description: "The organization the import belongs to; empty until it is staged" })
+    organizationId: S.OptionFromNullOr(S.String).pipe(
+      S.annotateKey({ description: "The organization the import belongs to; none until it is staged" })
     ),
     changes: Change.pipe(
       S.annotateKey({ description: "The number of the import's last change; 0 before any" }),
@@ -52,9 +52,10 @@ export class ImportStatus extends Domain.View(
     from: [Import],
     key: Import,
     state: Status,
-    initial: Status.make({ status: "Unstaged", organizationId: "", askedBy: O.none() }),
+    initial: Status.make({ status: "Unstaged", organizationId: O.none(), askedBy: O.none() }),
     evolve: {
-      ImportStaged: (v, e) => Status.make({ ...v, status: "Open", organizationId: e.organizationId, changes: 0 }),
+      ImportStaged: (v, e) =>
+        Status.make({ ...v, status: "Open", organizationId: O.some(e.organizationId), changes: 0 }),
       ColumnMatched: (v, e) => Status.make({ ...v, changes: e.change }),
       ActCounted: (v, e) => Status.make({ ...v, changes: e.change }),
       GroupCounted: (v, e) => Status.make({ ...v, changes: e.change }),
@@ -75,9 +76,10 @@ export class ImportStatus extends Domain.View(
  *
  * **Details**
  *
- * An import with no status yet reads as nothing, to everyone. It cannot be refused: the library judges a read before it
- * waits for the caller's own writes (`atLeast`), so a refusal there would refuse the person who just staged it. So
- * another organization can tell an import id in use from one that is not, and sees nothing more.
+ * An import with no status yet, or not yet staged, reads as it is to everyone. It cannot be refused: the library
+ * judges a read before it waits for the caller's own writes (`atLeast`), so a refusal there would refuse the person
+ * who just staged it. So another organization can tell an import id in use from one that is not, and sees nothing
+ * more.
  *
  * @category layers
  * @since 0.0.0
@@ -86,7 +88,8 @@ export const ImportStatusLive = ImportStatus.toLayer(
   Effect.succeed(
     Effect.fn("ImportStatus.validate")(function* (_request, status) {
       const actor = yield* CurrentActor
-      if (O.exists(O.fromNullOr(status), (seen) => seen.organizationId !== actor.organizationId)) {
+      const owner = O.flatMap(O.fromNullOr(status), (seen) => seen.organizationId)
+      if (O.exists(owner, (organizationId) => organizationId !== actor.organizationId)) {
         return yield* NotPermitted.make({})
       }
     })

@@ -261,7 +261,7 @@ export type Label = typeof Label.Type
 /**
  * What an undo is called among the acts the import counts, a row's undo or a group's.
  *
- * @category models
+ * @category constants
  * @since 0.0.0
  */
 export const UNDO_LABEL = "undo"

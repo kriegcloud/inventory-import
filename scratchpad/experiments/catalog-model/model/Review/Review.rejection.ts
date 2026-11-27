@@ -1,4 +1,4 @@
-// The rejections more than one command of the review returns.
+// The rejections more than one command of the review returns, and the record of fields three of them share.
 import * as Domain from "@alchemy.run/domain"
 import * as S from "effect/Schema"
 import { Change } from "./Change.schema.ts"

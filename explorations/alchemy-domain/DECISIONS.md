@@ -952,3 +952,8 @@ days. I was told a receipt is kept for ever, and the kept queue of presses rests
 by every model in the model's Worker, so a kept press is never applied twice however old it is; each record's object
 grows by one row an act and is not trimmed. Rejected: a window after which a press is decided again, which would
 need a second decision on what an older press does. Reverse: a new decision by him.
+
+Built 2026-11-27 (`apps/model/src/Retention.ts`). The library takes `retention` on the platform, not on a model's
+Layer (`layerDurableObjects({ retention })`), and every model of the Worker is provided that one platform, so the one
+value is given once and holds for all of them. A test reads it through the library's own `retentionWindows`. Not
+checked: a receipt older than 30 days on a deploy.

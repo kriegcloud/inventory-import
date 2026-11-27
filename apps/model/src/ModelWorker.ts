@@ -26,6 +26,7 @@ import { address } from "./Address.ts"
 import { bindingsFromStack, boundDatabase } from "./Bindings.ts"
 import { modelD1 } from "./Database.ts"
 import { workerOn } from "./Models.ts"
+import { modelRetention } from "./Retention.ts"
 import { authDatabaseOver, secureCookiesSetting, sessionsOver } from "./SignIn.ts"
 
 /**
@@ -35,10 +36,12 @@ import { authDatabaseOver, secureCookiesSetting, sessionsOver } from "./SignIn.t
 export { ModelWorkerEnv, modelWorkerEnv } from "./Bindings.ts"
 
 /**
- * The platform of every model of the Worker: Cloudflare's Durable Objects, one set of options, with the Web Crypto
- * random source, which `Domain.InMemory` provides itself to a test.
+ * The platform of every model of the Worker: Cloudflare's Durable Objects, one set of options (receipts kept for
+ * ever, `Retention.ts`), with the Web Crypto random source, which `Domain.InMemory` provides itself to a test.
  */
-const DurableObjects = DomainCloudflare.layerDurableObjects().pipe(Layer.provideMerge(SecureRandom.layerWebCrypto))
+const DurableObjects = DomainCloudflare.layerDurableObjects({ retention: modelRetention }).pipe(
+  Layer.provideMerge(SecureRandom.layerWebCrypto)
+)
 
 /**
  * The one session lookup on this Worker (`sessionsOver`, which its test runs over stores in memory): Better Auth on

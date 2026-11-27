@@ -125,6 +125,10 @@ table and the stored rows agree.
   hand-back. Opening one starts CI and, by the deploy workflow, the pull request's preview (`docs/releasing.md`):
   that is the workflow's deploy, not the agent's. A sub-agent given a lane of a split commits and hands back; the
   agent that owns the branch pushes and opens the pull request.
+- **Worktrees go under `.claude/worktrees/<lane>`**, where the Claude app puts them; the global rule that puts
+  workstation apps' worktrees under `~/YeeBois/workstation-apps/worktrees/` does not cover this repository. Once a
+  worktree's commit is in main and it is clean, remove it (`git worktree remove`, then `git worktree prune`); one
+  with changes or an unmerged branch may be another session's, so it is listed for Benjamin, never removed.
 - **Never** commit a secret. Never push to `main` or a `release/*` branch, force-push, push a tag, merge a pull
   request or deploy unless Benjamin asks in that message.
 

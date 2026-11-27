@@ -1,3 +1,6 @@
+import * as Config from "effect/Config"
+import * as ConfigProvider from "effect/ConfigProvider"
+import * as Effect from "effect/Effect"
 import { neverTriedAgain, retriedReporters } from "./vitest.retries.ts"
 
 // What every package's vitest.config.ts shares, so a test's limit is one decision and not one per file.
@@ -15,7 +18,21 @@ import { neverTriedAgain, retriedReporters } from "./vitest.retries.ts"
 // package uses these, the vendored kit's too (vendor sync writes them into its configs) and the scratchpad.
 
 /**
- * The limits of a fast test and of a hook, and where the package keeps vitest's module cache. Vitest keeps one cache
+ * How long the longest properties run, from one variable: `PROPERTY_RUNS=short`, which CI sets on a pull request,
+ * gives them fewer runs; unset (or `full`) gives today's counts, which a workstation, the push to main and the
+ * nightly run, each with the variable unset so their results share one hash (Benjamin's
+ * decision of 2026-11-26, explorations/ideal-architecture/DECISIONS.md, "CI speed: the split, the seeds, the cache
+ * and the run counts"). A test reads it with `inject("propertyRuns")`. The `test` task names the variable in its
+ * `env` (turbo.json), so it reaches the task under strict `envMode` and a result made at one count is never
+ * replayed at the other. Unset is `full`; any other value stops every test run before it starts, with the value named.
+ */
+const propertyRuns = Effect.runSync(
+  Config.Literals(["full", "short"], "PROPERTY_RUNS").pipe(Config.withDefault("full")).parse(ConfigProvider.fromEnv())
+)
+
+/**
+ * The limits of a fast test and of a hook, where the package keeps vitest's module cache, and the run counts of the
+ * longest properties (above). Vitest keeps one cache
  * folder for the whole repository by default and empties it after a change to `bun.lock`; the first package's tests
  * to start then emptied it while other packages' tests were reading it, and those failed with ENOENT (seen here after
  * a merge, and in beep-effect, whose `vitest.shared.ts` gives each package its own folder for the same reason).
@@ -24,7 +41,8 @@ import { neverTriedAgain, retriedReporters } from "./vitest.retries.ts"
 export const limits = {
   testTimeout: 30_000,
   hookTimeout: 60_000,
-  fsModuleCachePath: "node_modules/.vitest-cache/fast"
+  fsModuleCachePath: "node_modules/.vitest-cache/fast",
+  provide: { propertyRuns }
 } as const
 
 /**

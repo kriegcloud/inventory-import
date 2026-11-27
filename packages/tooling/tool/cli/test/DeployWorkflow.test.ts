@@ -344,7 +344,7 @@ layer(here)("the deploy workflow", (it) => {
           when
         })
         const checkout = (given: Record<string, unknown>) => uses("actions/checkout@v4", given)
-        const node = (when = "always") => uses("actions/setup-node@v4", { "node-version": 22 }, when)
+        const node = (when = "always") => uses("actions/setup-node@v4", { "node-version-file": ".tool-versions" }, when)
         const bun = (when = "always") => uses("oven-sh/setup-bun@v2", { "bun-version-file": ".bun-version" }, when)
         // What a step is told is part of what it does: a guard given another commit to compare checks nothing.
         const runs = (named: string, does: string, when = "always", told: Record<string, string> = {}) => ({

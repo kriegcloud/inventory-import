@@ -18,8 +18,12 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  check:
-    name: Check, test and build
+  # The check is three jobs that start at once, so a run lasts as long as its longest part and not as long as their
+  # sum on one runner's four cores: the two longest tasks each have a runner (`web`, `slow`) and everything else
+  # shares a third (`rest`). The job named "Check, test and build" below waits for the three and is the name the
+  # rule on main requires (packages/infra/src/GitHub.stack.ts).
+  rest:
+    name: Check, test and build (all but the two longest)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # A job's permissions replace the workflow's: the bans' ledgers are compared, on a push, with the last commit of the
@@ -81,19 +85,26 @@ jobs:
           echo "No candidate holds the ledgers: the law takes its own base (the merge base with main; on main, HEAD^1)"
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .tool-versions
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
-      # Through turbo: type-check, lint, fast and slow tests, the production build, format and docs checks: `check:full`
-      # without the review model's proofs, its search and its other long tests, which the `proofs` job below runs.
+      # Through turbo: type-check, lint, the fast tests, the production build, format and docs checks and every law:
+      # `check:ci`, without the package the `web` job checks. The slow tests are the `slow` job's, and the review
+      # model's proofs, its search and its other long tests the `proofs` jobs'.
       # The runner has four cores. Turbo would start ten tasks at once and each test run a worker per core, which
       # made tests several times slower than they are and failed them on their limits; two tasks at a time with one
       # test worker each is what four cores carry (measured: docs/standards/engineering.md, "The check on CI").
       # `--continue` runs every task even after one fails, so a red run lists everything that is wrong.
+      # The longest properties run fewer times on a pull request (vitest.shared.ts; Benjamin's decision of
+      # 2026-11-26). A push leaves the variable unset, as a workstation does: turbo hashes unset apart from any value,
+      # so only unset lets a push and a workstation share a result made at today's counts.
+      - name: Fewer property runs on a pull request
+        if: ${{ github.event_name == 'pull_request' }}
+        run: echo "PROPERTY_RUNS=short" >> "$GITHUB_ENV"
       - name: Check, test and build
-        run: bun run check:ci -- --summarize --continue --concurrency=2
+        run: bun run check:ci -- --filter='!@inventory/catalog-web' --summarize --continue --concurrency=2
         env:
           VITEST_MAX_WORKERS: 1
       # The seven laws with a ledger, again, against the base the step above named: in the check above they compared
@@ -104,12 +115,83 @@ jobs:
         run: bunx turbo run //#promises:check //#diagnostics:check //#assertions:check //#dual:check //#readonly:check //#fast-refresh:check //#defaults:check --continue --concurrency=2
         env:
           LEDGER_BASE: ${{ steps.base.outputs.ledger_base }}
+      # Turbo's own time for each task of this job (`--summarize` writes it), kept with the run: what a change to
+      # the jobs is measured against (goals/ci-speed). The folder's name starts with a dot, which the action leaves
+      # out unless told.
+      - name: Keep turbo's times
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: turbo-runs-rest
+          path: .turbo/runs/*.json
+          include-hidden-files: true
+          if-no-files-found: warn
+
+  # The catalog's screens: their fast tests are the longest task of the check (the import's draft held against a
+  # model of it, over thousands of orderings), so the package has a runner to itself, with its type-check and lint.
+  web:
+    name: Check and test the catalog's screens
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .tool-versions
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      # The longest properties run fewer times on a pull request (vitest.shared.ts; Benjamin's decision of
+      # 2026-11-26). A push leaves the variable unset, as a workstation does: turbo hashes unset apart from any value,
+      # so only unset lets a push and a workstation share a result made at today's counts.
+      - name: Fewer property runs on a pull request
+        if: ${{ github.event_name == 'pull_request' }}
+        run: echo "PROPERTY_RUNS=short" >> "$GITHUB_ENV"
+      - name: Check, lint and test
+        run: bunx turbo run check lint test --filter=@inventory/catalog-web --summarize --continue --concurrency=2
+        env:
+          VITEST_MAX_WORKERS: 1
+      # Turbo's own time for each task of this job (`--summarize` writes it), kept with the run: what a change to
+      # the jobs is measured against (goals/ci-speed). The folder's name starts with a dot, which the action leaves
+      # out unless told.
+      - name: Keep turbo's times
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: turbo-runs-web
+          path: .turbo/runs/*.json
+          include-hidden-files: true
+          if-no-files-found: warn
+
+  # The slow tests (workerd, a real D1 database, sign-in), which turbo replays until what they read changes; the one
+  # test that calls a real service (`test:live`), which it never replays; and the data grid typed on in a real browser.
+  slow:
+    name: Slow tests and the data grid
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # The whole history, as these tests had it when they ran in the one check job.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .tool-versions
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: The slow tests and the live one
+        run: bunx turbo run test:slow test:live --summarize --continue --concurrency=2
+        env:
+          VITEST_MAX_WORKERS: 1
       # The data grid's typing, in a real browser: what is typed on a cell is what is stored. The runner image has
       # Chrome at this path (CHROME_BIN in actions/runner-images; the runs are on Ubuntu 26.04, whose image lists
       # Google Chrome as 24.04's does). The browser says its version first,
       # so a path that is wrong fails on that line with the path in it.
-      # It runs when the check above failed as well, so a red run says whether the grid still stores what is typed; the
-      # job still fails on the check's failure. Not on a cancelled run.
+      # It runs when the slow tests failed as well, so a red run says whether the grid still stores what is typed; the
+      # job still fails on their failure. Not on a cancelled run.
       - name: Type on the data grid
         if: ${{ !cancelled() }}
         run: |
@@ -117,23 +199,65 @@ jobs:
           bun run --cwd apps/inventory grid:keys
         env:
           CHROME_PATH: /usr/bin/google-chrome
+      # Turbo's own time for each task of this job (`--summarize` writes it), kept with the run: what a change to
+      # the jobs is measured against (goals/ci-speed). The folder's name starts with a dot, which the action leaves
+      # out unless told.
+      - name: Keep turbo's times
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: turbo-runs-slow
+          path: .turbo/runs/*.json
+          include-hidden-files: true
+          if-no-files-found: warn
 
-  # The review's model, apart from the job above: its proofs, the search of the whole model, the property that holds it
+  # The name the rule on main requires. It runs whatever became of the three, and is red unless each passed: a job
+  # that is skipped counts as passed for a required check, so this one is never skipped.
+  check:
+    name: Check, test and build
+    if: ${{ always() }}
+    needs: [rest, web, slow]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every part passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "rest, web, slow: $RESULTS"
+          for result in $RESULTS; do [ "$result" = success ] || exit 1; done
+
+  # The review's model, apart from the jobs above: its proofs, the search of the whole model, the property that holds it
   # against the review region (`fold`) and a sample of its mutants. Each is a turbo task that names what it reads: the
   # proofs, the search and the mutants rerun when the model's files, its stories or proofs, the mutants, the kernel,
   # the pinned library or a version the lockfile resolves for the package change; the fold reruns on any change to
-  # the web package or what it imports. Turbo's results come back from the last run on main through GitHub's cache
-  # and are saved only on main, so a pull request that leaves those alone replays them in seconds. Every night they
-  # run again with every mutant (proofs-nightly.yml).
-  proofs:
-    name: Proofs and search of the model
+  # the web package or what it imports. The three long ones start at once, a runner each: the proofs, the search,
+  # and the fold beside the mutants. Turbo's results come back from the last run on main through GitHub's cache
+  # and are saved only on main, each part under its own key, so a pull request that leaves those alone replays them
+  # in seconds. Every night they run again with every mutant (proofs-nightly.yml).
+  model:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      # One part failing does not stop the others: a red run says everything that is wrong.
+      fail-fast: false
+      matrix:
+        include:
+          - part: prove
+            name: The model's proofs
+            tasks: prove
+          - part: verify
+            name: The search of the model
+            tasks: verify
+          - part: fold
+            name: The model against the review region, and a sample of its mutants
+            tasks: fold mutants:sample
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .tool-versions
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
@@ -143,13 +267,15 @@ jobs:
       # kept on main and proves what changed.
       - name: Ask turbo what the results are filed under
         id: filed
+        env:
+          PART: ${{ matrix.part }}
         run: |
-          bunx turbo run prove verify fold mutants:sample --dry=json > "$RUNNER_TEMP/proofs.json"
+          bunx turbo run ${{ matrix.tasks }} --dry=json > "$RUNNER_TEMP/proofs.json"
           node -e '
             const { tasks } = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))
             const real = tasks.filter((task) => task.command !== "<NONEXISTENT>")
             if (real.length === 0) throw new Error("no package has any of these tasks")
-            console.log("key=proofs-" + real.map((task) => task.hash).join("-"))
+            console.log("key=proofs-" + process.env.PART + "-" + real.map((task) => task.hash).join("-"))
           ' "$RUNNER_TEMP/proofs.json" >> "$GITHUB_OUTPUT"
       - name: Bring back the results kept on main
         id: results
@@ -158,10 +284,10 @@ jobs:
           path: .turbo/cache
           key: ${{ steps.filed.outputs.key }}
           restore-keys: |
-            proofs-
+            proofs-${{ matrix.part }}-
       # Two tasks at a time and no more: the runner has four cores and each proof file starts its own solver.
-      - name: Prove, search, fold and a sample of the mutants
-        run: bunx turbo run prove verify fold mutants:sample --cache-dir=.turbo/cache --concurrency=2 --summarize
+      - name: Run this part
+        run: bunx turbo run ${{ matrix.tasks }} --cache-dir=.turbo/cache --concurrency=2 --summarize
       # Only what passed is kept (a failed step ends the job before this one), only from main, and only when the
       # results are new.
       - name: Keep the results for later runs
@@ -170,6 +296,32 @@ jobs:
         with:
           path: .turbo/cache
           key: ${{ steps.filed.outputs.key }}
+      # Turbo's own time for each task of this job (`--summarize` writes it), kept with the run: what a change to
+      # the jobs is measured against (goals/ci-speed). The folder's name starts with a dot, which the action leaves
+      # out unless told.
+      - name: Keep turbo's times
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: turbo-runs-${{ matrix.part }}
+          path: .turbo/runs/*.json
+          include-hidden-files: true
+          if-no-files-found: warn
+
+  # The name the rule on main requires, as `check` above is for its three.
+  proofs:
+    name: Proofs and search of the model
+    if: ${{ always() }}
+    needs: [model]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every part passed
+        env:
+          RESULT: ${{ needs.model.result }}
+        run: |
+          echo "prove, verify, fold with the mutants: $RESULT"
+          [ "$RESULT" = success ]
 
   # Gate 9 of the ERP vocabulary, apart from the jobs above (explorations/erp-ontology/DECISIONS.md, decision 114): a
   # reasoner reads the generated ontology with the thread's data and with each refused case, so a change that lets a
@@ -185,7 +337,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .tool-versions
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version

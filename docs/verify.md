@@ -200,8 +200,10 @@ tasks at once on the one machine, so the first mutants share it with the proofs,
 nightly runs those three in one job and the mutants on runners of their own. And by hand every mutant runs in the
 one task, two at a time, and `row-open` keeps the proof's own 50 minutes beside another mutant, where the nightly
 runs it alone with 100. It took 1,544 s on the workstation; on a slower machine run it as the nightly does
-(`packages/catalog/model/mutants/README.md`). `bun run check:ci` is `check:full` without them, for
-CI's main job. The rule on `main` names both jobs as required (`packages/infra/src/GitHub.stack.ts`); it holds once
+(`packages/catalog/model/mutants/README.md`). `bun run check:ci` is `check:full` without them and
+without the slow tests, for CI's check. In `ci.yml` the four run as three jobs that start at once (the proofs, the
+search, and the fold beside the sample), and the job named "Proofs and search of the model" waits for them. The
+rule on `main` names that job and the check's as required (`packages/infra/src/GitHub.stack.ts`); it holds once
 the repository's stack is deployed again (`goals/infra/PLAN.md`, step 14), and until then a red proofs job stops no
 merge.
 

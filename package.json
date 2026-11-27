@@ -15,14 +15,14 @@
   "type": "module",
   "scripts": {
     "check": "turbo run check lint test prove //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check //#refs:check //#tags:check //#imports:check //#deprecated:check //#try:check //#configs:check //#version-sync //#config-sync:check //#lockfile:check //#private-paths:check //#patches:check //#patches:prove //#patches:installed //#alchemy:check //#promises:check //#diagnostics:check //#assertions:check //#dual:check //#readonly:check //#fast-refresh:check //#defaults:check //#ontology-terms:check",
-    "check:full": "turbo run check lint test prove verify fold mutants:sample test:slow reason build //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check //#refs:check //#tags:check //#imports:check //#deprecated:check //#try:check //#configs:check //#version-sync //#config-sync:check //#lockfile:check //#private-paths:check //#patches:check //#patches:prove //#patches:installed //#alchemy:check //#promises:check //#diagnostics:check //#assertions:check //#dual:check //#readonly:check //#fast-refresh:check //#defaults:check //#ontology-terms:check",
-    "check:ci": "turbo run check lint test test:slow build //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check //#refs:check //#tags:check //#imports:check //#deprecated:check //#try:check //#configs:check //#version-sync //#config-sync:check //#lockfile:check //#private-paths:check //#patches:check //#patches:prove //#patches:installed //#alchemy:check //#promises:check //#diagnostics:check //#assertions:check //#dual:check //#readonly:check //#fast-refresh:check //#defaults:check //#ontology-terms:check",
+    "check:full": "turbo run check lint test prove verify fold mutants:sample test:slow test:live reason build //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check //#refs:check //#tags:check //#imports:check //#deprecated:check //#try:check //#configs:check //#version-sync //#config-sync:check //#lockfile:check //#private-paths:check //#patches:check //#patches:prove //#patches:installed //#alchemy:check //#promises:check //#diagnostics:check //#assertions:check //#dual:check //#readonly:check //#fast-refresh:check //#defaults:check //#ontology-terms:check",
+    "check:ci": "turbo run check lint test build //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check //#refs:check //#tags:check //#imports:check //#deprecated:check //#try:check //#configs:check //#version-sync //#config-sync:check //#lockfile:check //#private-paths:check //#patches:check //#patches:prove //#patches:installed //#alchemy:check //#promises:check //#diagnostics:check //#assertions:check //#dual:check //#readonly:check //#fast-refresh:check //#defaults:check //#ontology-terms:check",
     "beep": "bun run packages/tooling/tool/cli/src/bin.ts --",
     "ontology:write": "bun packages/ontology/scripts/write.ts",
     "dev": "bun run --cwd apps/inventory dev",
     "build": "turbo run build",
     "preview": "bun run --cwd apps/inventory preview",
-    "test": "turbo run test prove verify test:slow",
+    "test": "turbo run test prove verify test:slow test:live",
     "lint": "turbo run lint",
     "typecheck": "turbo run check",
     "db:reset": "bun run --cwd apps/inventory db:reset",
@@ -78,7 +78,6 @@
     "imports:fix": "bun packages/tooling/tool/cli/src/bin.ts laws effect-imports --write"
   },
   "devDependencies": {
-    "@beep/repo-cli": "workspace:*",
     "@effect/tsgo": "catalog:",
     "oxfmt": "^0.80.0",
     "oxlint": "catalog:",

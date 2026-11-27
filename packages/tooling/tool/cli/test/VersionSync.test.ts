@@ -235,6 +235,26 @@ describe("version-sync", () => {
       })
   )
 
+  it.effect("the Node that .tool-versions pins is of the major engines names, or a person pins another", () =>
+    Effect.gen(function* () {
+      const tree = (pin: string) => ({
+        "package.json": json({ name: "root", workspaces: ["packages/*"], engines: { node: ">=22" } }),
+        ".tool-versions": lines([`node ${pin}`])
+      })
+      const right = yield* run(tree("22.23.4"), [".tool-versions"])
+      expect(right.before).toEqual(["out: version-sync OK  1 place agrees with what it is derived from"])
+      const wrong = yield* run(tree("24.19.0"), [".tool-versions"])
+      const problem =
+        "err:   .tool-versions: line 1: Node 24.19.0 is pinned, and `engines.node` names Node 22: pin an exact 22.x.y, or change `engines.node` with it"
+      expect(wrong.before).toEqual([
+        "err: version-sync FAIL  1 problem needs a person, and no command repairs it",
+        problem
+      ])
+      // Nothing is written: which 22 to pin only a person knows.
+      expect(wrong.files[".tool-versions"]).toBe("node 24.19.0\n")
+    })
+  )
+
   it.effect(
     "a write leaves nothing for the next check when an Effect package lags `effect`, type-fest's pin included",
     () =>

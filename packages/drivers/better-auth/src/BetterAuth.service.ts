@@ -29,9 +29,9 @@ import { BetterAuthConfigError, BetterAuthError } from "./BetterAuth.errors.ts"
 import {
   AuthDriverOptions,
   AuthSecret,
-  AuthSession,
-  AuthSessionAnswer,
+  type AuthSession,
   authEndpointOf,
+  authSessionOf,
   resolveAuthSecret
 } from "./BetterAuth.schema.ts"
 import { $BetterAuthId } from "./internal/identity.ts"
@@ -106,7 +106,6 @@ export class BetterAuth extends Context.Service<
             })
           })
         )
-        const decodeAnswer = S.decodeUnknownEffect(AuthSessionAnswer)
         const { basePath } = yield* S.decodeEffect(AuthDriverOptions)(auth.options).pipe(Effect.orDie)
 
         return BetterAuth.of({
@@ -125,15 +124,9 @@ export class BetterAuth extends Context.Service<
               try: () => auth.api.getSession({ headers }),
               catch: failedAt("session")
             })
-            const decoded = yield* decodeAnswer(answer).pipe(Effect.mapError(failedAt("session")))
-            yield* Effect.annotateCurrentSpan("auth.signedIn", O.isSome(decoded))
-            return O.map(decoded, (session) =>
-              AuthSession.make({
-                userId: session.session.userId,
-                email: session.user.email,
-                activeOrganizationId: session.session.activeOrganizationId
-              })
-            )
+            const session = yield* authSessionOf(answer).pipe(Effect.mapError(failedAt("session")))
+            yield* Effect.annotateCurrentSpan("auth.signedIn", O.isSome(session))
+            return session
           })
         })
       })

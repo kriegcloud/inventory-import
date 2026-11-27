@@ -15,6 +15,7 @@ import * as S from "effect/Schema"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
+import { NotSignedIn } from "@inventory/kernel/AccessError"
 import type { Member } from "@inventory/kernel/Member"
 
 const nobody: Atom.Atom<O.Option<Member>> = Atom.make(O.none<Member>())
@@ -45,6 +46,29 @@ export const member: Atom.Atom<O.Option<Member>> = Atom.readable((get) => get(ge
  */
 export const askWhoIsSignedIn = (registry: AtomRegistry.AtomRegistry): void =>
   registry.refresh(registry.get(memberSource))
+
+/**
+ * What a model's refusal for want of a member does to the page (web-06): a model call or a pushed read refused
+ * `NotSignedIn` is a typed error in the answer, never a 401 the HTTP client can see, so whatever reads it hands it here.
+ * It asks who is signed in, once (not when it is already being asked), and the refusal stays the read's failure;
+ * `answeredFor` leaves the page when the answer is somebody else or nobody. Anything else asks nothing: a lost
+ * connection is not a refusal.
+ */
+export const refusedForWantOfAMember = <E>(error: E): Effect.Effect<void> =>
+  S.is(NotSignedIn)(error)
+    ? Effect.flatMap(
+        Effect.serviceOption(AtomRegistry.AtomRegistry),
+        O.match({
+          onNone: () => Effect.void,
+          onSome: (registry) => Effect.sync(() => askedOnce(registry))
+        })
+      )
+    : Effect.void
+
+/** Who is signed in, asked again unless it is being asked already. */
+const askedOnce = (registry: AtomRegistry.AtomRegistry): void => {
+  if (!registry.get(whoIsSignedInAsked)) askWhoIsSignedIn(registry)
+}
 
 const neverAsked: Atom.Atom<boolean> = Atom.make(false)
 
@@ -203,6 +227,69 @@ export const asPressed = <A, E, R>(send: Effect.Effect<A, E, R>): Effect.Effect<
       }
     })
   )
+
+/** Done once the page is the given member's again: a read held for them waits here, and no longer than that. */
+export const onceBackAs = ({
+  key,
+  registry
+}: {
+  readonly registry: AtomRegistry.AtomRegistry
+  readonly key: string
+}): Effect.Effect<void> =>
+  Effect.callback<void>((resume) => {
+    if (registry.get(memberKey) === key) return resume(Effect.void)
+    const stop = registry.subscribe(memberKey, (now) => {
+      if (now !== key) return
+      stop()
+      resume(Effect.void)
+    })
+    return Effect.sync(stop)
+  })
+
+/**
+ * A model call as the page's member sends it, `elsewhere` being what it does when the person switched organization
+ * meanwhile. A model refuses for want of a member with a typed error in its answer, never a 401, and its client's
+ * middleware sees only the sending of a call, never its answer (node_modules/effect/src/rpc/RpcClient.ts,
+ * `onEffectRequest`: `next` is the send to the protocol, and the answer resumes the call on its own), so it is taken
+ * here, where the answer is read, as `ofThisPage` takes a 401: who is signed in is asked, once, and a call sent for
+ * a member waits for the answer. Still that member: it is sent once more, and refused again as it is. Somebody else
+ * or nobody: `answeredFor` leaves the page and the call never ends. Sent for nobody: its refusal is the caller's.
+ */
+const asPageMember =
+  (elsewhere: (input: { readonly registry: AtomRegistry.AtomRegistry; readonly key: string }) => Effect.Effect<void>) =>
+  <A, E, R>(call: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+    Effect.flatMap(
+      Effect.serviceOption(AtomRegistry.AtomRegistry),
+      O.match({
+        onNone: () => call,
+        onSome: (registry) => {
+          const sentFor = registry.get(memberKey)
+          return Effect.catchIf(call, S.is(NotSignedIn), (refused) => {
+            askedOnce(registry)
+            if (sentFor === "") return Effect.fail(refused)
+            // After what is running now: an ask made while the registry is between two states is taken up first.
+            return Effect.yieldNow.pipe(
+              Effect.andThen(onceSignedInKnown(registry)),
+              Effect.andThen(() =>
+                registry.get(memberKey) === sentFor ? call : Effect.andThen(elsewhere({ registry, key: sentFor }), call)
+              )
+            )
+          })
+        }
+      })
+    )
+
+/**
+ * A model read as the page's member asks it (web-03): refused for want of a member, it is asked again as `asPageMember`
+ * says; after the person's own switch of organization it waits until the page is theirs again, and is asked then.
+ */
+export const readAsPageMember = asPageMember(onceBackAs)
+
+/**
+ * A model command as the page's member sends it (web-03): refused for want of a member, it is sent again as
+ * `asPageMember` says; after the person's own switch of organization it is not sent, and says so (`notSentElsewhere`).
+ */
+export const sentAsPageMember = asPageMember(() => Effect.die(notSentElsewhere()))
 
 /**
  * What must end before the person's own switch of organization is sent, while the session is still the one they are

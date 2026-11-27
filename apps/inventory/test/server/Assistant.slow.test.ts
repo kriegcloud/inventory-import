@@ -13,13 +13,12 @@ import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import * as TestClock from "effect/testing/TestClock"
 import { Api } from "../../src/api/v1/Api.ts"
 import { AnsweredBy } from "@inventory/catalog-contract/Answer"
-import { ModelCallsUsedUp } from "@inventory/access-contract/ModelAllowance"
+import { dailyModelCalls } from "@inventory/usage-contract/ModelCall"
+import { ModelCallsUsedUp, usedUpWords } from "@inventory/usage-contract/ModelAllowance"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { ModelPolicy } from "@beep/openrouter/OpenRouterConfig"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
-import { dailyModelCalls } from "@inventory/access-contract/ModelAllowance"
 import { usedUpSentence } from "@inventory/catalog-model/AssistantHandler"
-import { usedUpWords } from "@inventory/access-contract/ModelAllowance"
 import { items } from "./support/columns.ts"
 import { as, TypedApp as TestApp, testAppWith } from "./support/app.ts"
 
@@ -188,12 +187,14 @@ layer(testAppWith(answering({ changes: [{ kind: "search", text: "  steel bracket
 )
 
 // The assistant draws on the organization's one daily allowance of model calls (`dailyModelCalls`), the same one the
-// check that the key works takes from. Once it is used up the rules answer and say so, and the check is refused, until a day has passed. The clock is the test clock: a day passes without waiting for one.
+// check that the key works takes from, counted by the Usage model (in memory here, as under `bun run dev`). Once it is
+// used up the rules answer and say so, and the check is refused, until midnight UTC. The clock is the test clock: it
+// starts at midnight UTC, and the next day comes without waiting for one.
 layer(testAppWith(answering({ changes: [{ kind: "sort", column: "name", direction: "asc" }], cannot: "" })))(
   "the table assistant and the day's allowance of model calls",
   (it) => {
     it.effect(
-      "takes a call from the shared allowance, then answers by the rules and says why, until a day passes",
+      "takes a call from the shared allowance, then answers by the rules and says why, until midnight UTC",
       () =>
         Effect.gen(function* () {
           const client = yield* HttpApiTest.groups(Api, ["assistant", "system"])
@@ -212,7 +213,7 @@ layer(testAppWith(answering({ changes: [{ kind: "sort", column: "name", directio
           // The allowance is the organization's, shared: the check that the key works is refused too, in words.
           const check = yield* client.system.checkAi().pipe(as("mem_marcus"), Effect.flip)
           expect(S.is(ModelCallsUsedUp)(check) ? check.reason : check).toBe(
-            `The day's ${dailyModelCalls} AI calls are used. They come back over the next day.`
+            `The day's ${dailyModelCalls} AI calls are used. They come back at midnight UTC.`
           )
           // Another organization has its own allowance.
           const elsewhere = yield* client.assistant.view(request("sort by name")).pipe(as("mem_tom"))

@@ -20,7 +20,7 @@ import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
-import { AllowanceTodayLive } from "../src/Allowance/AllowanceToday.view.ts"
+import { AllowanceTodayAnyone } from "./session.ts"
 import { UsageServerApi } from "../src/Usage.api.ts"
 import { Usage } from "../src/Usage.model.ts"
 import { UsageMemberApi } from "../src/UsageMember.api.ts"
@@ -36,7 +36,7 @@ const DEPTH = 3
  * runs a short sequence at the solver's first time, the epoch: the repository's patch
  * `packages/patches/alchemy-domain/04-a-found-sequence-keeps-its-time.patch` makes the story set that clock first.
  */
-const story = Story.make(Usage, { layer: AllowanceTodayLive })
+const story = Story.make(Usage, { layer: AllowanceTodayAnyone })
 
 /** The lock file as Verify writes it: each rule's kind and text, under the model's name. */
 const LockFile = S.fromJsonString(

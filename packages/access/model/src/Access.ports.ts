@@ -1,5 +1,5 @@
 /**
- * The ports of the access context, and the type that keeps its handlers on them. A handler may use the four ports,
+ * The ports of the access context, and the type that keeps its handlers on them. A handler may use the three ports,
  * the kernel's actor and agent and Effect's random source; anything else (a driver, SQL, another context's service)
  * does not type-check where the handler is registered.
  *
@@ -10,12 +10,11 @@ import type { CurrentAgent } from "@inventory/kernel/Agent"
 import type * as Effect from "effect/Effect"
 import type * as SecureRandom from "effect/crypto/SecureRandom"
 import type { AuditTrailStore } from "./Activity/AuditTrailStore.store.ts"
-import type { AllowanceStore } from "./Allowance/AllowanceStore.store.ts"
 import type { PeopleStore } from "./People/PeopleStore.store.ts"
 import type { MemberDirectory } from "./Session/MemberDirectory.store.ts"
 
-/** The four ports of the access context. */
-export type AccessPorts = MemberDirectory | PeopleStore | AuditTrailStore | AllowanceStore
+/** The three ports of the access context. */
+export type AccessPorts = MemberDirectory | PeopleStore | AuditTrailStore
 
 /** Everything a handler of the access context may require. */
 export type AccessHandlerContext = AccessPorts | CurrentActor | CurrentAgent | SecureRandom.SecureRandom

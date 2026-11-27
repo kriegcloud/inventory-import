@@ -214,7 +214,7 @@ force. Reopening puts it back in Review, where rows an earlier confirm created c
 
 ## 4. How the parts depend on each other
 
-From the imports in `src/`, `packages/access/host/src/AllowanceStore.adapter.ts`, `packages/catalog/model/src/Assistant/Assistant.handler.ts` and the two callers of `review`
+From the imports in `src/`, `src/server/Models.ts`, `packages/catalog/model/src/Assistant/Assistant.handler.ts` and the two callers of `review`
 (`packages/catalog/web/src/ReviewStep.screen.tsx`, `packages/catalog/model/src/Import/Imports.handler.ts`).
 
 ```mermaid
@@ -244,8 +244,9 @@ flowchart LR
 Dependencies point one way: the browser, the Worker and the domain all import the contract; the domain never imports a
 driver, a host or the server; and the browser never imports the server. The review screen and the confirm run the same
 pure `review` on the same staged rows and decisions, so the server refuses what the preview refused. Every model call
-first takes one from the organization's daily allowance in `modelCall`; when it is used up, or there is no key, the
-feature's rules answer.
+first takes one from the organization's daily allowance, a `TakeCall` sent to the usage model (`src/server/Models.ts`:
+over the service binding to the model's Worker, or in memory under `bun run dev`); when it is used up, or there is no
+key, the feature's rules answer. The `modelCall` table stays, unused, until move 7.
 
 <!-- The two sections below moved here from CLAUDE.md word for word on 2026-11-26 (goals/focus-and-friction, step 4). -->
 
@@ -288,7 +289,7 @@ sign-in secret into `.dev.vars` the first time).
   it, and the audit trail of uploads, imports, take-backs and changes of role.
 - **People** (`@inventory/access-web/People`): who is in the organization; an admin adds a person by the email they
   signed up with, changes a role or removes someone, and the organization always keeps an admin.
-- **One model service** (`@beep/openrouter`, set up by the app in `src/server/Model.ts` and asked through `@inventory/catalog-host/Model`) with **one daily allowance** (the access context's `ModelAllowanceGateway`, 40 calls a
+- **One model service** (`@beep/openrouter`, set up by the app in `src/server/Model.ts` and asked through `@inventory/catalog-host/Model`) with **one daily allowance** (the usage context's `ModelAllowanceGateway`, 40 calls a
   day per organization, taken before each call): every model feature draws on it, and when it is used up the feature
   says so in plain words and its rules answer. `GET /api/v1/system/status` says whether a model is on.
 
@@ -327,7 +328,7 @@ packages/client/         @inventory/client: the browser's seam to the API with n
                         writes and optimistic writes bound to a client; who is signed in, as an atom; `sayError`; the
                         early requests).
 packages/access/         The access context (who may do what), as four packages: contract/ (the session, people and
-                        audit-trail schemas, their API groups, the model allowance's gateway), model/ (rules, ports,
+                        audit-trail schemas and their API groups), model/ (rules, ports,
                         in-memory twins, handlers: no SQL, no HTTP), host/ (the D1 adapters, sign-in, the session
                         identity, the endpoints) and web/ (the session controller, sign-in, People, the audit events).
                         `bun run beep laws boundaries` holds which of them may import which.
@@ -341,7 +342,8 @@ packages/catalog/        The catalog context (items and the imports that write t
                         model and the allowance as the catalog asks them) and web/ (the import's steps, the Items page,
                         the editor, the assistant, the upload).
 packages/usage/          The usage context (the day's model calls), as two packages: contract/ (what the rest of the app
-                        may know: an organization's calls in a UTC day, and what a call is for) and model/ (the
+                        may know: an organization's calls in a UTC day, what a call is for and the allowance's gateway)
+                        and model/ (the
                         allowance as a model of `@alchemy.run/domain`: its aggregate, view, Apis, proof, stories and
                         mutants, hosted by apps/model).
 packages/kernel/, packages/drivers/   @inventory/kernel and the @beep drivers (d1, better-auth, openrouter). The kernel

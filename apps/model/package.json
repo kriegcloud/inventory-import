@@ -7,7 +7,11 @@
   "sideEffects": [],
   "exports": {
     "./package.json": "./package.json",
-    "./Worker": "./src/ModelWorker.ts"
+    "./Worker": "./src/ModelWorker.ts",
+    "./Models": "./src/Models.ts",
+    "./ModelRoutes": "./src/ModelRoutes.ts",
+    "./Session": "./src/Session.ts",
+    "./UsageHost": "./src/UsageHost.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
@@ -16,13 +20,18 @@
     "test:slow": "vitest run --project slow"
   },
   "dependencies": {
+    "@alchemy.run/better-auth": "2.0.0-beta.87-e1c3e6d",
     "@alchemy.run/cloudflare": "2.0.0-beta.87-e1c3e6d",
     "@alchemy.run/domain": "2.0.0-beta.87-e1c3e6d",
+    "@beep/better-auth": "workspace:*",
     "@beep/d1": "workspace:*",
+    "@cloudflare/workers-types": "catalog:",
+    "@inventory/access-host": "workspace:*",
     "@inventory/access-model": "workspace:*",
     "@inventory/kernel": "workspace:*",
     "@inventory/usage-model": "workspace:*",
     "alchemy": "2.0.0-beta.87-e1c3e6d",
+    "better-auth": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {

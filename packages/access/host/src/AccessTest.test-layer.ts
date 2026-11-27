@@ -1,3 +1,4 @@
+import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
@@ -8,6 +9,8 @@ import { NotSignedIn } from "@inventory/kernel/AccessError"
 import { CurrentActor } from "@inventory/kernel/Actor"
 import { Identity } from "@inventory/kernel/Identity"
 import { MemberId } from "@inventory/kernel/Ids"
+import { SessionLookup, SessionVerdict } from "@inventory/kernel/SessionLookup"
+import type * as Headers from "effect/http/Headers"
 import { MemberDirectory } from "@inventory/access-model/MemberDirectory"
 import { accessMemory } from "@inventory/access-model/Memory"
 import type { Activity } from "@inventory/kernel/Activity"
@@ -57,6 +60,32 @@ export const HeaderIdentity = /* @__PURE__ */ Layer.effect(
         )
       })
     )
+  })
+)
+
+/**
+ * The test implementation of the kernel's `SessionLookup`, the header identity's twin for what reads a session itself
+ * (the usage model the site's Worker runs in memory, the forwarding route's check of a live read's address): the
+ * member the header names, or `defaultMemberId` with none, as the directory gives them, trusted for a minute. Marked
+ * pure, so a production bundle, which never provides it, leaves it out. The Worker is given `SessionLookupLive`.
+ */
+export const HeaderSessions = /* @__PURE__ */ Layer.effect(
+  SessionLookup,
+  /* @__PURE__ */ Effect.gen(function* () {
+    const directory = yield* MemberDirectory
+    return SessionLookup.of({
+      verdictOf: Effect.fn("SessionLookup.verdictOf")(function* (headers: Headers.Headers) {
+        const id = yield* S.decodeEffect(ActingHeader)(headers[actingAsHeader]).pipe(Effect.option)
+        const member = O.isSome(id) ? yield* directory.byId(id.value) : O.none()
+        if (O.isNone(member))
+          return yield* NotSignedIn.make({ reason: "The test identity names no member of this app." })
+        const at = yield* DateTime.now
+        return SessionVerdict.judged({ member: member.value, at, sessionEnds: O.none() })
+      }),
+      memberNow: Effect.fn("SessionLookup.memberNow")(function* (member: Pick<Member, "id" | "organizationId">) {
+        return yield* directory.stillIn(member)
+      })
+    })
   })
 )
 

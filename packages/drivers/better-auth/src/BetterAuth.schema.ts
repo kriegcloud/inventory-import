@@ -64,7 +64,8 @@ export const AuthEmail = S.String.check(S.isMaxLength(254), S.isPattern(/^[^\s@]
 )
 
 /**
- * What a valid session cookie says: whose it is, and which organization they are working in.
+ * What a valid session cookie says: whose it is, which organization they are working in, and when the session ends
+ * unless it is renewed first.
  *
  * @category schemas
  */
@@ -75,17 +76,23 @@ export class AuthSession extends S.Opaque<AuthSession, { readonly brand: unique 
     activeOrganizationId: AuthOrganizationId.pipe(
       S.annotateKey({ description: "The organization the person last chose. None until they belong to one" }),
       S.OptionFromOptionalNullOr
+    ),
+    expiresAt: S.DateTimeUtc.pipe(
+      S.annotateKey({
+        description:
+          "When the session ends, as its stored row says now: a read pushed to the page is judged again by then"
+      })
     )
   }).pipe(
     $I.annoteSchema("AuthSession", {
-      description: "What a valid session cookie says: whose it is, and where they work"
+      description: "What a valid session cookie says: whose it is, where they work, and when it ends"
     })
   )
 ) {}
 
 /**
  * The part of Better Auth's `getSession` answer this driver reads: nobody, or a session and its user. Anything else in
- * it is ignored.
+ * it is ignored. Better Auth hands the session's end as a `Date`.
  *
  * @category schemas
  */
@@ -93,11 +100,32 @@ export const AuthSessionAnswer = S.OptionFromNullOr(
   S.Struct({
     session: S.Struct({
       userId: AuthUserId,
-      activeOrganizationId: AuthOrganizationId.pipe(S.OptionFromOptionalNullOr)
+      activeOrganizationId: AuthOrganizationId.pipe(S.OptionFromOptionalNullOr),
+      expiresAt: S.DateTimeUtcFromDate
     }),
     user: S.Struct({ email: AuthEmail })
   })
 ).pipe($I.annoteSchema("AuthSessionAnswer", { description: "Better Auth's getSession answer, as far as it is read" }))
+
+/**
+ * The session a `getSession` answer names, or none for nobody: what every construction of Better Auth hands its host,
+ * whichever Worker built it. A value that is no such answer fails with the schema's issue.
+ *
+ * @category behaviour
+ */
+export const authSessionOf = (answer: unknown) =>
+  S.decodeUnknownEffect(AuthSessionAnswer)(answer).pipe(
+    Effect.map(
+      O.map(({ session, user }) =>
+        AuthSession.make({
+          userId: session.userId,
+          email: user.email,
+          activeOrganizationId: session.activeOrganizationId,
+          expiresAt: session.expiresAt
+        })
+      )
+    )
+  )
 
 /**
  * The endpoint a Better Auth request is for, relative to its base path (`/sign-in/email`): the one request detail a

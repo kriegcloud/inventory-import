@@ -2,8 +2,9 @@
  * THE ONE SESSION LOOKUP. The kernel's `SessionLookup` on Better Auth and the member directory: the session cookie
  * names a user and their active organization, their membership there is the member, and the header a page names its
  * member in (`pageMemberHeader`) can only refuse, when the session's member is somebody else by then. The `/api/v1`
- * `Identity` middleware (`SessionIdentityLive`) rests on it now, and every model's `Session` middleware is to, so who
- * acts is decided by one rule (Benjamin, 2026-11-26, "A port in the kernel"); no model's `Session` Layer reads it yet.
+ * `Identity` middleware (`SessionIdentityLive`) rests on it, and so does every model's `Session` middleware (the usage
+ * model's on the model's Worker first, `apps/model/src/Session.ts`), so who acts is decided by one rule (Benjamin,
+ * 2026-11-26, "A port in the kernel").
  * The one thing not to break: nothing in a header or a payload names who acts.
  *
  * @packageDocumentation
@@ -26,9 +27,8 @@ import { signedIn, webHeadersOf } from "./internal/signedIn.ts"
 const pageKeyOf = (member: Member): string => `${member.id}/${member.organizationId}`
 
 /**
- * `SessionLookup` over Better Auth's session and the member directory. A verdict is trusted for a minute: Better
- * Auth's answer is not yet read for the session's own end (the driver decodes no `expiresAt`), so a session that
- * ends sooner is noticed at the next judgement, within that minute.
+ * `SessionLookup` over Better Auth's session and the member directory. A verdict is trusted for a minute at most,
+ * and never past the session's own end (`expiresAt`, as Better Auth's stored row says when it is read).
  *
  * @category layers
  */
@@ -52,7 +52,12 @@ export const SessionLookupLive: Layer.Layer<SessionLookup, never, BetterAuth | M
           })
         }
         const now = yield* DateTime.now
-        const verdict = SessionVerdict.judged({ member, at: now, sessionEnds: O.none() })
+        // The session's own end, as its stored row says now: a verdict is never trusted past it.
+        const verdict = SessionVerdict.judged({
+          member,
+          at: now,
+          sessionEnds: O.map(session, (signedInAs) => signedInAs.expiresAt)
+        })
         yield* Effect.annotateCurrentSpan(SessionVerdict.annotations(verdict))
         return verdict
       }),

@@ -31,10 +31,10 @@
     "@beep/d1": "workspace:*",
     "@beep/openrouter": "workspace:*",
     "@beep/schema": "workspace:*",
-    "@inventory/access-contract": "workspace:*",
     "@inventory/catalog-contract": "workspace:*",
     "@inventory/catalog-model": "workspace:*",
     "@inventory/kernel": "workspace:*",
+    "@inventory/usage-contract": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

@@ -206,8 +206,8 @@ what to send a small model, cost and tool loops, and model-written HTML. The mod
 to `AI_MODEL` in `wrangler.jsonc`, and `AI_MODEL` in `.dev.vars` can override it, so read it from
 `/api/v1/system/status`; do not hardcode a model name. One retry policy, `ModelPolicy` in `@beep/openrouter`: never add another; end every AI
 feature with `answeredByRules(...)` and show `answeredBy` on screen. **Every model call takes one call from the day's
-allowance first** (`ModelAllowanceGateway.take(purpose)` from `@inventory/access-contract/ModelAllowance`, before the
-call): a new model feature adds its purpose there (`ModelCallPurpose`) and in the `modelCall` table's check, and when the allowance is used up it says so and its rules
+allowance first** (`ModelAllowanceGateway.take(purpose)` from `@inventory/usage-contract/ModelAllowance`, before the
+call): a new model feature adds its purpose to `ModelCallPurpose` (`@inventory/usage-contract/ModelCall`), and when the allowance is used up it says so and its rules
 answer, as the table assistant does (`packages/catalog/model/src/Assistant/Assistant.handler.ts`).
 
 ## Comments and documentation

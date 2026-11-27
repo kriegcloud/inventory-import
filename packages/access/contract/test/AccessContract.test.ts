@@ -3,7 +3,6 @@
 // is null on the wire and none in code, and the email an admin types is the lookup key.
 import { describe, expect, it } from "@effect/vitest"
 import { AuditTrail } from "@inventory/access-contract/AuditTrail"
-import { AllowanceAnswer, ModelCallPurpose, taken, usedUp } from "@inventory/access-contract/ModelAllowance"
 import { AddPerson, AddPersonProblem, ChangeRole, EmailToFind } from "@inventory/access-contract/PeoplePayload"
 import { Person } from "@inventory/access-contract/Person"
 import {
@@ -33,9 +32,7 @@ const schemas: Readonly<Record<string, S.Top>> = {
   AddPerson,
   ChangeRole,
   AddPersonProblem,
-  AuditTrail,
-  ModelCallPurpose,
-  AllowanceAnswer
+  AuditTrail
 }
 
 describe("every schema generates only valid values", () => {
@@ -84,12 +81,4 @@ describe("the wire", () => {
       expect([key, Exit.isFailure(blank), Exit.isFailure(noEmail)]).toEqual(["sam.okafor@example.test", true, true])
     })
   )
-
-  it("an allowance answer is one of two cases", () => {
-    const say = AllowanceAnswer.match({ taken: () => "go", usedUp: (answer) => answer.reason })
-    expect([say(taken), say(usedUp("The day's 40 AI calls are used."))]).toEqual([
-      "go",
-      "The day's 40 AI calls are used."
-    ])
-  })
 })

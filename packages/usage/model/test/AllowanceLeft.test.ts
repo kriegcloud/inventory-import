@@ -9,7 +9,7 @@ import { CurrentActor } from "../src/Actor/Actor.context.ts"
 import { dailyModelCalls } from "@inventory/usage-contract/ModelCall"
 import { Allowance, CallTaken, TakeCall } from "../src/Allowance/Allowance.aggregate.ts"
 import { dayOf, leftOn } from "../src/Allowance/AllowanceLeft.rules.ts"
-import { AllowanceTodayLive } from "../src/Allowance/AllowanceToday.view.ts"
+import { AllowanceTodayAnyone } from "./session.ts"
 import { Usage } from "../src/Usage.model.ts"
 
 const lastMinute = DateTime.makeUnsafe("2026-11-26T23:59:59.999Z")
@@ -48,7 +48,7 @@ describe("leftOn", () => {
 describe("dayOf", () => {
   // The aggregate works the day out itself (the prover reads its own code); this holds the two to one number.
   it.effect("names the day the allowance counts a call against, on either side of midnight UTC", () =>
-    Story.make(Usage, { layer: AllowanceTodayLive })(
+    Story.make(Usage, { layer: AllowanceTodayAnyone })(
       Story.provide(CurrentActor, { organizationId: "org_prairie", memberId: "ana", role: "editor" }),
       Story.clock(DateTime.toEpochMillis(lastMinute)),
       Story.when(TakeCall.make({ organizationId: "org_prairie", purpose: "view" })),

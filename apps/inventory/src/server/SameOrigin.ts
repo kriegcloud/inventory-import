@@ -15,36 +15,55 @@ import { RequestSource, SameOrigin } from "@inventory/kernel/SameOrigin"
 // The one thing not to break: a write is taken only when the browser says it comes from this app's own pages. Do
 // not add "same-site" to the list (a sibling subdomain is another origin), and do not move the check after identity.
 
+/** What a refused cross-site write is told: the one sentence, here and on the forwarding route (ModelRoute.ts). */
+export const crossSiteReason =
+  "This request came from another site, so it was refused. Open the app itself and try again there."
+
+/**
+ * What the cross-site rule reads from `request`. `asWrite` judges it as a write whatever its method: a WebSocket
+ * upgrade is a GET, and it opens a live read that follows a person's data (ModelRoute.ts).
+ */
+export const requestSourceOf = ({
+  asWrite,
+  request
+}: {
+  readonly request: HttpServerRequest.HttpServerRequest
+  readonly asWrite: boolean
+}) =>
+  RequestSource.make({
+    method: asWrite ? "POST" : request.method,
+    fetchSite: Headers.get(request.headers, "sec-fetch-site"),
+    origin: Headers.get(request.headers, "origin"),
+    // The address the request was sent to, from the URL the runtime received and from its Host header.
+    own: A.dedupe(
+      A.map(
+        A.getSomes([O.liftThrowable(() => new URL(request.originalUrl))(), HttpServerRequest.toURL(request)]),
+        (url) => url.origin
+      )
+    )
+  })
+
+/** Logs a refused cross-site request with where the browser said it came from. */
+export const logRefused = (source: RequestSource) =>
+  Effect.logWarning("Refused a write from another site").pipe(
+    Effect.annotateLogs(
+      R.getSomes({
+        "http.origin": source.origin,
+        "http.sec_fetch_site": source.fetchSite
+      })
+    )
+  )
+
 /** The `SameOrigin` middleware: refuses a cross-site write with `CrossSiteRequest` (403) before identity is read. */
 export const SameOriginLive = Layer.succeed(
   SameOrigin,
   SameOrigin.of(
     Effect.fn("SameOrigin")(function* (httpEffect) {
       const request = yield* HttpServerRequest.HttpServerRequest
-      const source = RequestSource.make({
-        method: request.method,
-        fetchSite: Headers.get(request.headers, "sec-fetch-site"),
-        origin: Headers.get(request.headers, "origin"),
-        // The address the request was sent to, from the URL the runtime received and from its Host header.
-        own: A.dedupe(
-          A.map(
-            A.getSomes([O.liftThrowable(() => new URL(request.originalUrl))(), HttpServerRequest.toURL(request)]),
-            (url) => url.origin
-          )
-        )
-      })
+      const source = requestSourceOf({ request, asWrite: false })
       if (!RequestSource.allows(source)) {
-        yield* Effect.logWarning("Refused a write from another site").pipe(
-          Effect.annotateLogs(
-            R.getSomes({
-              "http.origin": source.origin,
-              "http.sec_fetch_site": source.fetchSite
-            })
-          )
-        )
-        return yield* CrossSiteRequest.make({
-          reason: "This request came from another site, so it was refused. Open the app itself and try again there."
-        })
+        yield* logRefused(source)
+        return yield* CrossSiteRequest.make({ reason: crossSiteReason })
       }
       return yield* httpEffect
     })

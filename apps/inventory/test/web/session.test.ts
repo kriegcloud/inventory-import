@@ -9,10 +9,12 @@ import { RegistryContext } from "@effect/atom-react"
 import * as A from "effect/Array"
 import * as Cause from "effect/Cause"
 import * as Context from "effect/Context"
+import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as MutableRef from "effect/MutableRef"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as Str from "effect/String"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import type * as Atom from "effect/reactivity/Atom"
@@ -765,5 +767,158 @@ describe("the screen that creates a first organization", () => {
       yield* settle
       expect([t.page.left, t.who()]).toEqual([[], "mem_dana/org_prairie"])
     })
+  )
+})
+
+/**
+ * A page of the app with the usage model's member client as the page builds it (`usageClientOver`: the session's
+ * client half included), over the protocol in process instead of the socket, to the usage model hosted in memory
+ * behind the model Worker's own session (`modelsOn`). Its session lookup keeps one cookie for the browser and refuses
+ * a call named for another member than the cookie's, as the one session lookup does. `named` is the page-member
+ * header of every call the model was sent, and `readAs` the cookie of every call it let in.
+ */
+const browserWithModel = Effect.fnUntraced(function* () {
+  const page = openPage({ ...pageStart() })
+  vi.resetModules()
+  const [root, member, session, models, modelApp, lookups, errors, members, ids, memberApi, access, Domain, Headers] =
+    yield* Effect.all(
+      [
+        Effect.promise(() => import("../../src/web/lib/root.ts")),
+        Effect.promise(() => import("@inventory/client/MemberAtoms")),
+        Effect.promise(() => import("@inventory/access-web/Session")),
+        Effect.promise(() => import("../../src/web/lib/models.ts")),
+        Effect.promise(() => import("@inventory/model-app/Models")),
+        Effect.promise(() => import("@inventory/kernel/SessionLookup")),
+        Effect.promise(() => import("@inventory/kernel/AccessError")),
+        Effect.promise(() => import("@inventory/kernel/Member")),
+        Effect.promise(() => import("@inventory/kernel/Ids")),
+        Effect.promise(() => import("@inventory/usage-model/MemberApi")),
+        Effect.promise(() => import("@inventory/access-contract/Access")),
+        Effect.promise(() => import("@alchemy.run/domain")),
+        Effect.promise(() => import("effect/http/Headers"))
+      ],
+      { concurrency: "unbounded" }
+    )
+  const server = { cookie: "mem_dana/org_prairie", named: A.empty<string>(), readAs: A.empty<string>() }
+  /** Who signs in on this browser, each by the cookie that is theirs ("mem_dana/org_prairie"). */
+  const personOf = (id: string) =>
+    members.Member.make({
+      id: ids.MemberId.make(id),
+      name: id,
+      role: "admin",
+      organizationId: ids.OrganizationId.make("org_prairie"),
+      organizationName: "prairie"
+    })
+  const people = R.fromEntries([
+    ["mem_dana/org_prairie", personOf("mem_dana")],
+    ["mem_marcus/org_prairie", personOf("mem_marcus")]
+  ])
+  const memberOfCookie = (cookie: string) => R.get(people, cookie)
+  const lookup = lookups.SessionLookup.of({
+    verdictOf: Effect.fn("SessionLookup.verdictOf")(function* (headers) {
+      const named = Headers.get(headers, access.pageMemberHeader)
+      server.named.push(O.match(named, { onNone: () => "nobody", onSome: (page) => page }))
+      const signedIn = yield* Effect.fromOption(memberOfCookie(server.cookie)).pipe(
+        Effect.mapError(() => errors.NotSignedIn.make({ reason: "Sign in to continue." }))
+      )
+      if (O.exists(named, (page) => page !== server.cookie)) {
+        return yield* errors.NotSignedIn.make({
+          reason: "This page was opened for somebody else than is signed in now. Load the page again."
+        })
+      }
+      server.readAs.push(server.cookie)
+      const at = yield* DateTime.now
+      return lookups.SessionVerdict.judged({ member: signedIn, at, sessionEnds: O.none() })
+    }),
+    memberNow: Effect.fn("SessionLookup.memberNow")(function* (asked) {
+      return yield* Effect.succeed(memberOfCookie(`${asked.id}/${asked.organizationId}`))
+    })
+  })
+  const hosted = yield* Layer.build(
+    modelApp.modelsOn({ platform: Domain.InMemory, sessions: Layer.succeed(lookups.SessionLookup, lookup) })
+  )
+  const layer = models
+    .usageClientOver(Domain.protocolInProcess(memberApi.UsageMemberApi))
+    .pipe(Layer.provide(Layer.succeedContext(hosted)))
+  const count = models.usageAtoms.query((usage) => usage.AllowanceToday.get("org_prairie"), {
+    keep: "unwatched",
+    reactivityKeys: O.none()
+  })
+  const registry = root.rootRegistry({ api: layer })
+  yield* settle
+  page.asked[0]?.answer(signedInAs({ who: "dana", organization: "prairie" }), 200)
+  yield* settle
+  registry.mount(count)
+  yield* settle
+  /** The day's count the page shows: none taken yet (no state), Dana's read and never anybody else's. */
+  const drawn = () => AsyncResult.value(registry.get(count))
+  /** Another tab of the browser signs in as Marcus: the cookie is his, and this tab has not heard of it. */
+  const marcusSignsInElsewhere = () => {
+    server.cookie = "mem_marcus/org_prairie"
+    page.kept[session.changedKey] = "another tab"
+  }
+  return { page, registry, server, count, drawn, marcusSignsInElsewhere, member }
+})
+
+describe("a call to the usage model, sent through the page's client", () => {
+  it.live("names the member the page is for, as every request of the HTTP client does", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const t = yield* browserWithModel()
+        expect([t.server.named, t.server.readAs, t.drawn()]).toEqual([
+          ["mem_dana/org_prairie"],
+          ["mem_dana/org_prairie"],
+          O.some(null)
+        ])
+      })
+    )
+  )
+
+  it.live("refused for want of a member, asks who is signed in once, and is never read as the one signed in now", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const t = yield* browserWithModel()
+        t.marcusSignsInElsewhere()
+        t.registry.refresh(t.count)
+        yield* settle
+        // Named for Dana, refused by the model's session; who is signed in is asked once, and the read is not said as
+        // failed meanwhile: it waits for the answer.
+        expect([t.server.named, t.page.asked.length, t.registry.get(t.member.whoIsSignedInAsked)]).toEqual([
+          ["mem_dana/org_prairie", "mem_dana/org_prairie"],
+          2,
+          true
+        ])
+        expect([t.registry.get(t.count).waiting, AsyncResult.isFailure(t.registry.get(t.count))]).toEqual([true, false])
+        t.page.asked[1]?.answer(signedInAs({ who: "marcus", organization: "prairie" }), 200)
+        yield* settle
+        // Marcus: the page is left, and nothing was read as him or sent again.
+        expect([t.page.left, t.server.readAs, t.server.named.length, t.drawn()]).toEqual([
+          ["/"],
+          ["mem_dana/org_prairie"],
+          2,
+          O.some(null)
+        ])
+      })
+    )
+  )
+
+  it.live("refused, then answered as Dana again (the cookie changed back): sent once more, as her", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const t = yield* browserWithModel()
+        t.marcusSignsInElsewhere()
+        t.registry.refresh(t.count)
+        yield* settle
+        t.server.cookie = "mem_dana/org_prairie"
+        t.page.asked[1]?.answer(signedInAs({ who: "dana", organization: "prairie" }), 200)
+        yield* settle
+        expect([t.page.left, t.server.named, t.server.readAs, t.registry.get(t.count).waiting]).toEqual([
+          [],
+          ["mem_dana/org_prairie", "mem_dana/org_prairie", "mem_dana/org_prairie"],
+          ["mem_dana/org_prairie", "mem_dana/org_prairie"],
+          false
+        ])
+      })
+    )
   )
 })

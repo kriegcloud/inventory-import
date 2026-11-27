@@ -19,6 +19,7 @@ import * as R from "effect/Record"
 import * as Str from "effect/String"
 import * as S from "effect/Schema"
 import * as DevTools from "effect/devtools/DevTools"
+import * as InMemoryPlatform from "@alchemy.run/domain/InMemory"
 import * as HttpClient from "effect/http/HttpClient"
 import * as HttpClientError from "effect/http/HttpClientError"
 import type * as HttpClientRequest from "effect/http/HttpClientRequest"
@@ -26,9 +27,10 @@ import type * as HttpClientResponse from "effect/http/HttpClientResponse"
 import type * as HttpRouter from "effect/http/HttpRouter"
 import * as HttpServer from "effect/http/HttpServer"
 import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware"
-import { actingAs, directoryFollowing, HeaderIdentity } from "@inventory/access-host/AccessTest"
+import { actingAs, directoryFollowing, HeaderIdentity, HeaderSessions } from "@inventory/access-host/AccessTest"
 import { accessServices } from "@inventory/access-host/Host"
 import { SessionIdentityLive } from "@inventory/access-host/SessionIdentity"
+import { SessionLookupLive } from "@inventory/access-host/SessionLookup"
 import { signIn } from "@inventory/access-host/SignIn"
 import { Activity } from "@inventory/kernel/Activity"
 import { ActivityId } from "@inventory/kernel/Ids"
@@ -49,7 +51,7 @@ import {
   ItemStoreMemory,
   SuggestionStoreMemory
 } from "@inventory/catalog-model/Memory"
-import { ModelAllowanceViaAccess } from "@inventory/catalog-host/ModelAllowance"
+import { ModelAllowanceViaUsage } from "@inventory/catalog-host/ModelAllowance"
 import type { ImportStore } from "@inventory/catalog-model/ImportStore"
 import type * as SqlClient from "effect/sql/SqlClient"
 
@@ -57,6 +59,7 @@ import type * as SqlClient from "effect/sql/SqlClient"
 type StoreNeeds = ImportStore | D1 | SqlClient.SqlClient
 import * as Observability from "../../../src/server/Observability.ts"
 import { SameOriginLive } from "../../../src/server/SameOrigin.ts"
+import { ModelAllowanceOverUsage, Models } from "../../../src/server/Models.ts"
 import { testAccountPassword } from "@inventory/access-host/TestAccounts"
 
 const migrations = new URL("../../../migrations/", import.meta.url)
@@ -137,6 +140,20 @@ export const noNetwork = standInHttp(unreachable)
 /** Sign-in for the in-memory app: nobody is ever signed in, and /api/auth/* is not there. A test double. */
 export const SignedOutAuth = BetterAuthTest.signedOut
 
+/**
+ * The app's models as `bun run dev` runs them: in memory, in this process (`Models.inMemoryOn`), on the session lookup
+ * given beside them. The memory host stamps each command with the clock the test app is built on (the test clock in a
+ * test's layer), not the wall clock `Domain.InMemory` reads, so a test moves the day by moving its clock. Each test app
+ * builds its own, so the day's count starts at nothing in every one.
+ */
+export const ModelsInMemory = Models.inMemoryOn(
+  Layer.unwrap(
+    Effect.clockWith((clock) =>
+      Effect.succeed(InMemoryPlatform.make({ now: () => clock.currentTimeMillisUnsafe() }).layer)
+    )
+  )
+)
+
 /** The whole app on a fresh test database, as the Worker composes it, with the header identity naming the actor. */
 export const TestApp = makeApp({
   database: TestDatabase,
@@ -145,7 +162,9 @@ export const TestApp = makeApp({
   production: false,
   docs: false,
   http: noNetwork,
-  limit: AddressLimit.open
+  limit: AddressLimit.open,
+  models: ModelsInMemory,
+  sessions: HeaderSessions
 }).pipe(Layer.provideMerge(DevToolsWhenAsked), Layer.provide(settingsLayer(testSettings)))
 
 /**
@@ -167,8 +186,8 @@ const seededLines = (at: DateTime.Utc): ReadonlyArray<Activity> =>
   )
 
 /**
- * The access context in memory, acting as `member` whatever a header says: its ports on the in-memory twins, the
- * session answer and the model allowance over them.
+ * The access context in memory, acting as `member` whatever a header says: its ports on the in-memory twins and the
+ * session answer over them.
  */
 const InMemoryAccess = (member: Member) =>
   accessServices({ production: false }).pipe(
@@ -176,15 +195,24 @@ const InMemoryAccess = (member: Member) =>
   )
 
 /**
+ * The app's models in memory for the in-memory app, with the allowance's gateway through them and the header session
+ * lookup in front, over the in-memory access context's directory.
+ */
+const InMemoryModels = ModelAllowanceOverUsage.pipe(
+  Layer.provideMerge(ModelsInMemory),
+  Layer.provideMerge(HeaderSessions)
+)
+
+/**
  * The catalog's stores for the in-memory app: its twins, on one state of their own. The model and the allowance are
- * the real adapters, on the test's model service and the in-memory access context.
+ * the real adapters, on the test's model service and the in-memory models.
  */
 const InMemoryStorage = Layer.mergeAll(
   Layer.mergeAll(ImportStoreMemory, ItemStoreMemory, SuggestionStoreMemory, AssistantLogMemory).pipe(
     Layer.provide(CatalogMemoryRef.layer)
   ),
   AnswererOpenRouter,
-  ModelAllowanceViaAccess
+  ModelAllowanceViaUsage
 )
 
 /**
@@ -209,11 +237,14 @@ export const inMemoryAppLimited = <E, R>({
   readonly http: Layer.Layer<HttpClient.HttpClient>
   /** The settings the app reads, as the Worker's `env` would give them. The caller supplies its starting settings. */
   readonly settings: Record<string, string>
-}) =>
-  makeRoutes({ docs, identity: HeaderIdentity, limit }).pipe(
+}) => {
+  const access = InMemoryAccess(member)
+  const models = InMemoryModels.pipe(Layer.provide(access))
+  return makeRoutes({ docs, identity: HeaderIdentity, limit }).pipe(
     Layer.provide(http),
-    Layer.provide(InMemoryStorage.pipe(Layer.provide(Layer.mergeAll(InMemoryAccess(member), ai)))),
-    Layer.provide(InMemoryAccess(member)),
+    Layer.provide(InMemoryStorage.pipe(Layer.provide(Layer.mergeAll(access, ai, models)))),
+    Layer.provide(models),
+    Layer.provide(access),
     Layer.provide(SignedOutAuth),
     Layer.provide(ai),
     Layer.provide(HttpServer.layerServices),
@@ -221,6 +252,7 @@ export const inMemoryAppLimited = <E, R>({
     Layer.provideMerge(DevToolsWhenAsked),
     Layer.provide(settingsLayer(settings))
   )
+}
 
 /** `inMemoryAppLimited` with no limit: what every test that is not about the coarse limit runs on. */
 export const inMemoryApp = <E, R>(options: {
@@ -238,17 +270,21 @@ export const inMemoryHandlers = <E, R>({
 }: {
   readonly member: Member
   readonly ai: Layer.Layer<OpenRouter, E, R>
-}) =>
-  Handlers.pipe(
+}) => {
+  const access = InMemoryAccess(member)
+  const models = InMemoryModels.pipe(Layer.provide(access))
+  return Handlers.pipe(
     Layer.provideMerge(HeaderIdentity),
     Layer.provideMerge(SameOriginLive),
     Layer.provideMerge(HttpApiMiddleware.layerProblemDetails({ includeDetails: true })),
-    Layer.provide(InMemoryStorage.pipe(Layer.provide(Layer.mergeAll(InMemoryAccess(member), ai)))),
-    Layer.provideMerge(InMemoryAccess(member)),
+    Layer.provide(InMemoryStorage.pipe(Layer.provide(Layer.mergeAll(access, ai, models)))),
+    Layer.provideMerge(models),
+    Layer.provideMerge(access),
     Layer.provide(SignedOutAuth),
     Layer.provide(ai),
     Layer.provideMerge(HttpServer.layerServices)
   )
+}
 
 const acting = MutableRef.make<MemberId>(MemberId.make("mem_dana"))
 
@@ -274,7 +310,13 @@ const handlersOn = <E, R>(
    */
   around: O.Option<Layer.Layer<ImportStore, never, StoreNeeds>>
 ) => {
-  const services = servicesWith({ ai, production: false })
+  // The usage model in memory reads its session the way the header identity does: whoever `as` named last.
+  const services = servicesWith({
+    ai,
+    production: false,
+    models: ModelsInMemory,
+    sessions: HeaderSessions.pipe(Layer.provide(directoryFollowing(() => MutableRef.get(acting))))
+  })
   return Handlers.pipe(
     Layer.provideMerge(HeaderIdentity),
     Layer.provideMerge(SameOriginLive),
@@ -423,7 +465,9 @@ export const signInApp = (options: {
         production: options.production,
         docs: false,
         http: noNetwork,
-        limit: options.limit
+        limit: options.limit,
+        models: ModelsInMemory,
+        sessions: SessionLookupLive
       }),
       SeededAccounts
     ).pipe(Layer.provide(settingsLayer({ ...testSettings, PWNED_PASSWORD_CHECK: "false", ...options.settings })))

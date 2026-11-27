@@ -1,45 +1,27 @@
 /**
- * The daily allowance of model calls, as another part of the app may ask for it. Every feature that asks a model
- * takes one call from its organization's allowance first; this is the only way in.
+ * The daily allowance of model calls, as another part of the app may ask for it: every feature that asks a model
+ * takes one call from its organization's allowance first, and this is the only way in. It moved here from the access
+ * contract at move 2's hosted half (Benjamin, 2026-11-27: "packages/usage/contract, which also takes the
+ * `ModelAllowance` gateway"), when its Layer became a `TakeCall` sent to the usage model's server Api over the service binding
+ * (the site's Worker, `apps/inventory/src/server/Models.ts`). Its shape did not change, so the catalog's port and the three askers
+ * (the table assistant, the suggestions, the check that the key works) did not either.
+ *
+ * The one thing not to break: the 40 come back together at midnight UTC (decision 25), and the sentence a person reads
+ * when they are used says so; a feature with a path by the rules answers by its rules instead of failing.
  *
  * @packageDocumentation
  */
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import type { CurrentActor } from "@inventory/kernel/Actor"
-import { aboutScheme } from "@inventory/kernel/TermsPointer"
 import { Sentence } from "@inventory/kernel/Text"
 import * as Context from "effect/Context"
 import type * as Effect from "effect/Effect"
-import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
-import { $AccessContractId } from "../internal/identity.ts"
+import * as Tuple from "effect/Tuple"
+import { $UsageContractId } from "../internal/identity.ts"
+import { dailyModelCalls, type ModelCallPurpose } from "./ModelCall.payload.ts"
 
-const $I = $AccessContractId.create("Allowance/ModelAllowance")
-
-/** How many model calls one organization may make in any 24 hours. Past it the rules answer until calls come back. */
-export const dailyModelCalls = 40
-
-/**
- * What a model call is for: the table assistant reading a request (`view`), the check that the key works, or
- * suggestions for an import's rows the rules cannot fix (`suggest`). The same three words the `modelCall` table's
- * check allows, and each the notation of a concept of `inv:ModelCallPurposeScheme` (report 18 section 5).
- *
- * @category schemas
- */
-export const ModelCallPurpose = LiteralKit(["view", "check", "suggest"]).pipe(
-  $I.annoteSchema("ModelCallPurpose", {
-    description:
-      "What a model call is for: the table assistant reading a request, the check that the key works, or suggestions for an import",
-    ...aboutScheme("inv:ModelCallPurposeScheme")
-  })
-)
-
-/**
- * The decoded value of `ModelCallPurpose`.
- *
- * @category models
- */
-export type ModelCallPurpose = typeof ModelCallPurpose.Type
+const $I = $UsageContractId.create("Allowance/ModelAllowance")
 
 /**
  * The two answers to "may I make a model call": one was taken, or the day's are used up.
@@ -91,6 +73,12 @@ export const usedUp = (reason: Sentence): AllowanceAnswer => UsedUp.make({ reaso
 export const usedUpWords = `The day's ${dailyModelCalls} AI calls are used`
 
 /**
+ * The sentence a person reads when the day's calls are used and nothing answers by its rules instead (the check that
+ * the key works): when they come back, at midnight UTC (decision 25; the sentence decided for move 2).
+ */
+export const usedUpSentence: Sentence = `${usedUpWords}. They come back at midnight UTC.`
+
+/**
  * The organization has used the day's model calls: nothing was asked. Every model feature draws on the same
  * allowance; a feature with a non-AI path answers by its rules instead of failing with this.
  *
@@ -116,8 +104,8 @@ export class ModelAllowanceGateway extends Context.Service<
   ModelAllowanceGateway,
   {
     /**
-     * One call from the actor's organization's allowance, taken before the call is made. The calls of the last 24
-     * hours count, so the allowance comes back by itself a day later.
+     * One call from the actor's organization's allowance, taken before the call is made, so a call that fails still
+     * counts. The day is a UTC day: the 40 come back together at midnight UTC.
      */
     readonly take: (purpose: ModelCallPurpose) => Effect.Effect<AllowanceAnswer, never, CurrentActor>
   }

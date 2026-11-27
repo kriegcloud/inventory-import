@@ -6,11 +6,15 @@
 // `leftOn` (`AllowanceLeft.rules.ts`) works it out from the state and today's day number.
 //
 // Who may read it: every member of the key's organization, viewers included, and nobody else (Benjamin, 2026-11-26:
-// "No screen yet; any member may read"). Before move 6 there is no member record to read, so `validate` compares the
-// key with the actor's organization; decision 22's check against the member record joins it then. The one thing not
-// to break: a filter never grants access, so every read of a key goes through `validate`.
+// "No screen yet; any member may read"). Before move 6 the member record is the `member` table, read through the
+// kernel's `SessionLookup`: `validate` compares the key with the actor's organization, then asks whether the record
+// still holds the actor (decision 22). The one thing not to break: a filter never grants access, so every read of a
+// key goes through `validate`.
 import * as Domain from "@alchemy.run/domain"
+import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
+import { SessionLookup } from "@inventory/kernel/SessionLookup"
 import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import { CurrentActor } from "../Actor/Actor.context.ts"
 import { Session } from "../Actor/Session.middleware.ts"
@@ -47,14 +51,23 @@ export class AllowanceToday extends Domain.View(
 ) {}
 
 /**
- * Who may read a key of `AllowanceToday`: a member of the organization the key is, whatever their role. A member of
- * another organization is refused `AllowanceNotFound`, on every read and on every change while they watch.
+ * Who may read a key of `AllowanceToday`: a member of the organization the key is, whatever their role, while the
+ * organization's record still holds them. A member of another organization is refused `AllowanceNotFound`, on every
+ * read and on every change while they watch; so is a member removed since their session was read, at the key's next
+ * change, so a page left open receives nothing more (decision 22). The member record is read through the kernel's
+ * `SessionLookup`, resolved when the Layer is built, since `validate` may read only what the middleware provides.
  */
 export const AllowanceTodayLive = AllowanceToday.toLayer(
-  Effect.succeed(
-    Effect.fn("AllowanceToday.validate")(function* (request) {
+  Effect.gen(function* () {
+    const sessions = yield* SessionLookup
+    return Effect.fn("AllowanceToday.validate")(function* (request) {
       const actor = yield* CurrentActor
       if (request.key.id !== actor.organizationId) return yield* AllowanceNotFound.make({})
+      const stillIn = yield* sessions.memberNow({
+        id: MemberId.make(actor.memberId),
+        organizationId: OrganizationId.make(actor.organizationId)
+      })
+      if (O.isNone(stillIn)) return yield* AllowanceNotFound.make({})
     })
-  )
+  })
 )

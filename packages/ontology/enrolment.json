@@ -16,11 +16,6 @@
     "as": "record"
   },
   {
-    "file": "packages/access/contract/src/Allowance/ModelAllowance.gateway.ts",
-    "export": "ModelCallPurpose",
-    "as": "scheme"
-  },
-  {
     "file": "packages/usage/contract/src/Allowance/ModelCall.payload.ts",
     "export": "ModelCallPurpose",
     "as": "scheme"

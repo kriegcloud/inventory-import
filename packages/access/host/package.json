@@ -18,7 +18,6 @@
     "./MemberDirectoryD1": "./src/MemberDirectory.adapter.ts",
     "./PeopleStoreD1": "./src/PeopleStore.adapter.ts",
     "./AuditTrailStoreD1": "./src/AuditTrailStore.adapter.ts",
-    "./AllowanceStoreD1": "./src/AllowanceStore.adapter.ts",
     "./AccessTest": "./src/AccessTest.test-layer.ts",
     "./AuthOptions": "./src/internal/authOptions.ts",
     "./TestAccounts": "./src/internal/TestAccounts.ts"

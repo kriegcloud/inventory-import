@@ -1,9 +1,8 @@
-// The one in-memory state the twins of the four ports share, so a person added through the people store can sign in
+// The one in-memory state the twins of the three ports share, so a person added through the people store can sign in
 // through the directory and their audit line reads back from the audit trail, as on D1.
-import { ModelCallPurpose } from "@inventory/access-contract/ModelAllowance"
 import { AccountEmail } from "@inventory/access-contract/SessionState"
 import { Activity } from "@inventory/kernel/Activity"
-import { MemberId, OrganizationId, UserId } from "@inventory/kernel/Ids"
+import { UserId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { DisplayName } from "@inventory/kernel/Text"
 import * as Context from "effect/Context"
@@ -36,16 +35,6 @@ export const MemoryMembership = S.Struct({
 /** The membership row held by the access twin. */
 export type MemoryMembership = typeof MemoryMembership.Type
 
-/** One model call taken from an organization's allowance. */
-export const MemoryCall = S.Struct({
-  organization: OrganizationId,
-  actor: MemberId,
-  purpose: ModelCallPurpose,
-  at: S.DateTimeUtc
-}).pipe($I.annoteSchema("MemoryCall", { description: "One model call charged to an organization" }))
-/** The charged model call held by the access twin. */
-export type MemoryCall = typeof MemoryCall.Type
-
 const emptyTable = <Schema extends S.Constraint>(row: Schema) =>
   S.Array(row).pipe(S.withConstructorDefault(Effect.succeed([])), S.withDecodingDefaultTypeKey(Effect.succeed([])))
 
@@ -53,8 +42,7 @@ const emptyTable = <Schema extends S.Constraint>(row: Schema) =>
 export const AccessMemoryState = S.Struct({
   accounts: emptyTable(MemoryAccount),
   memberships: emptyTable(MemoryMembership),
-  lines: emptyTable(Activity.pipe(S.toType)),
-  calls: emptyTable(MemoryCall)
+  lines: emptyTable(Activity.pipe(S.toType))
 }).pipe($I.annoteSchema("AccessMemoryState", { description: "The access tables in memory, initially empty" }))
 
 /** The decoded access tables held by the twin. */

@@ -22,7 +22,7 @@ import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { propose } from "@inventory/catalog-model/SuggestionsHandler"
 import { taken as callTaken, usedUp as callsUsedUp } from "@inventory/catalog-model/ModelAllowance"
 import { AnswererOpenRouter } from "@inventory/catalog-host/Model"
-import { usedUpWords } from "@inventory/access-contract/ModelAllowance"
+import { usedUpWords } from "@inventory/usage-contract/ModelAllowance"
 import { stage } from "./support/files.ts"
 
 const sourceOf = (suggestions: ReadonlyArray<Suggestion>, flags: Readonly<Record<string, RowDecisionFlags.Encoded>>) =>

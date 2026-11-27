@@ -2,7 +2,7 @@
   "name": "@inventory/access-contract",
   "version": "0.0.0",
   "private": true,
-  "description": "What the browser and the rest of the app may ask about who may do what: the session, the people of an organization, the audit trail's read side and the daily model allowance",
+  "description": "What the browser and the rest of the app may ask about who may do what: the session, the people of an organization and the audit trail's read side",
   "license": "MIT",
   "type": "module",
   "sideEffects": [],
@@ -13,8 +13,7 @@
     "./Person": "./src/People/Person.read.ts",
     "./PeoplePayload": "./src/People/People.payload.ts",
     "./PeopleRejection": "./src/People/People.rejection.ts",
-    "./AuditTrail": "./src/Activity/AuditTrail.read.ts",
-    "./ModelAllowance": "./src/Allowance/ModelAllowance.gateway.ts"
+    "./AuditTrail": "./src/Activity/AuditTrail.read.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",

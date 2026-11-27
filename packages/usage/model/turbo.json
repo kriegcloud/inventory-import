@@ -59,6 +59,7 @@
         "src/**/*.model.ts",
         "src/**/*.{view,query,projection,stream,policy,saga,external,api,middleware,context,rewrite,compaction,schema}.ts",
         "test/**/*.verify.test.ts",
+        "test/session.ts",
         "test/**/*.lock.json",
         "$TURBO_ROOT$/packages/kernel/package.json",
         "$TURBO_ROOT$/packages/kernel/src/**",

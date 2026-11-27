@@ -29,13 +29,21 @@ import * as Atom from "effect/reactivity/Atom"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import * as RpcClientError from "effect/rpc/RpcClientError"
 import * as Schedule from "effect/Schedule"
+import * as S from "effect/Schema"
 import * as Socket from "effect/socket/Socket"
 import * as Str from "effect/String"
 import * as Stream from "effect/Stream"
 import { vi } from "vitest"
 import { forgetReads, heldReadMembers, keepUnwatched, makeHolds, provideApi } from "@inventory/client/Api"
 import { modelHttpClient } from "@inventory/client/Http"
-import { keyOfMember, memberKey, provideMember } from "@inventory/client/MemberAtoms"
+import {
+  keyOfMember,
+  memberKey,
+  NotSentElsewhere,
+  provideMember,
+  provideWhoIsSignedInAsked
+} from "@inventory/client/MemberAtoms"
+import { NotSignedIn } from "@inventory/kernel/AccessError"
 import { makeModelAtoms } from "@inventory/client/Model"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
@@ -226,7 +234,11 @@ const firstSnapshot = (registry: AtomRegistry.AtomRegistry, counter: CounterId) 
   until(() => AsyncResult.value(registry.get(total(counter))))
 
 /** The command's result, once it has one other than `before`. */
-const answered = (registry: AtomRegistry.AtomRegistry, before: O.Option<unknown>, command: typeof bump) =>
+const answered = <A, E>(
+  registry: AtomRegistry.AtomRegistry,
+  before: O.Option<unknown>,
+  command: Atom.Atom<AsyncResult.AsyncResult<A, E>>
+) =>
   until(() => {
     const now = registry.get(command)
     return AsyncResult.isSuccess(now) && !now.waiting && !O.contains(before, now.value) ? O.some(now.value) : O.none()
@@ -634,5 +646,142 @@ describe("a live read's hold", () => {
       yield* Effect.sleep("20 millis")
       expect(registry.getNodes().has(later)).toBe(false)
     })
+  )
+})
+
+/** The model's session refusing a call: the page that sent it was opened for somebody else than is signed in now. */
+const nobodyAsNamed = NotSignedIn.make({
+  reason: "This page was opened for somebody else than is signed in now. Load the page again."
+})
+
+/** A live read that gave up on its connection, as the library ends it after its last reconnect. */
+const lostConnection = RpcClientError.RpcClientError.make({
+  reason: RpcClientError.RpcClientDefect.make({
+    message: "Live read CounterTotal.watch lost its connection",
+    cause: undefined
+  })
+})
+
+/** How the server answers a watch of `counter` before it is read: refused for want of a member, a lost connection, or not at all. */
+const refusalOf = (counter: CounterId): Effect.Effect<void, NotSignedIn | RpcClientError.RpcClientError> =>
+  counter === CounterIds.unsigned || counter === CounterIds.unsignedToo
+    ? Effect.fail(nobodyAsNamed)
+    : counter === CounterIds.lost
+      ? Effect.fail(lostConnection)
+      : Effect.void
+
+/**
+ * A watched counter whose watch the server refuses for want of a member (two counters), or which loses its
+ * connection (one), and any other as the model answers it.
+ */
+const guardedTotal = counting.watched((api, counter: CounterId) =>
+  Stream.unwrap(Effect.as(refusalOf(counter), api.CounterTotal.watch(counter)))
+)
+
+/** Refused for want of a member the first `refusals` times it is sent, then sent to the model. */
+const refusedFirst = (refusals: number) => {
+  const sent = MutableRef.make(0)
+  const refusedNow: Effect.Effect<void, NotSignedIn> = Effect.suspend(() =>
+    MutableRef.incrementAndGet(sent) <= refusals ? Effect.fail(nobodyAsNamed) : Effect.void
+  )
+  const press = counting.command<BumpInput>()(
+    (api, input, options) => Effect.andThen(refusedNow, api.Bump(input, options)),
+    { reactivityKeys: O.none() }
+  )
+  return { sent, press }
+}
+
+/**
+ * A page whose session is a stand-in that counts how often who is signed in is asked, and is then being asked until
+ * the test answers (`answer`), as the app's session is: the member it answers is who the page is for from then on.
+ */
+const askingPage = <R>(clientLayer: Layer.Layer<R>) => {
+  const signedIn = Atom.make(memberOf("mem_dana", "org_prairie")).pipe(Atom.keepAlive)
+  const asking = Atom.make(false).pipe(Atom.keepAlive)
+  const asks = MutableRef.make(0)
+  const session = Atom.readable(
+    (get) => get(signedIn),
+    () => {
+      MutableRef.increment(asks)
+      registry.set(asking, true)
+    }
+  )
+  const registry = AtomRegistry.make({
+    initialValues: [provideApi(clientLayer), provideMember(session), provideWhoIsSignedInAsked(asking)]
+  })
+  const answer = (who: ReturnType<typeof memberOf>) => {
+    registry.set(signedIn, who)
+    registry.set(asking, false)
+  }
+  return { registry, asks, answer }
+}
+
+/** What a watched counter or a command ended in, once it failed: the failure itself. */
+const failureOf = <A, E>(registry: AtomRegistry.AtomRegistry, atom: Atom.Atom<AsyncResult.AsyncResult<A, E>>) =>
+  until(() => {
+    const now = registry.get(atom)
+    return AsyncResult.isFailure(now) && !now.waiting ? O.some(now.cause.pipe(Cause.squash)) : O.none()
+  })
+
+describe("a model call refused for want of a member", () => {
+  it.live("a watched read: asks who is signed in once, also when two are refused together, and stays refused", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const host = yield* hosted(noExpiry.pipe(judging))
+        const t = askingPage(served(host).layer)
+        t.registry.mount(guardedTotal(CounterIds.unsigned))
+        t.registry.mount(guardedTotal(CounterIds.unsignedToo))
+        const first = yield* failureOf(t.registry, guardedTotal(CounterIds.unsigned))
+        const second = yield* failureOf(t.registry, guardedTotal(CounterIds.unsignedToo))
+        expect([first, second, MutableRef.get(t.asks)]).toEqual([nobodyAsNamed, nobodyAsNamed, 1])
+      })
+    )
+  )
+
+  it.live("a watched read that lost its connection asks nothing: it was not refused", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const host = yield* hosted(noExpiry.pipe(judging))
+        const t = askingPage(served(host).layer)
+        t.registry.mount(guardedTotal(CounterIds.lost))
+        const lost = yield* failureOf(t.registry, guardedTotal(CounterIds.lost))
+        expect([lost, MutableRef.get(t.asks)]).toEqual([lostConnection, 0])
+      })
+    )
+  )
+
+  it.live("a command: asks once, waits for the answer, and is sent once more for the same member", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const host = yield* hosted(noExpiry.pipe(judging))
+        const t = askingPage(served(host).layer)
+        const { sent, press } = refusedFirst(1)
+        t.registry.mount(press)
+        t.registry.set(press, { counterId: CounterIds.unsigned, by: 1 })
+        yield* until(() => O.liftPredicate(MutableRef.get(t.asks), (asks) => asks > 0))
+        // Asked, and held: not sent again until who is signed in is known.
+        yield* Effect.sleep("30 millis")
+        expect([MutableRef.get(t.asks), MutableRef.get(sent), t.registry.get(press).waiting]).toEqual([1, 1, true])
+        t.answer(memberOf("mem_dana", "org_prairie"))
+        const receipt = yield* answered(t.registry, O.none(), press)
+        expect([MutableRef.get(sent), receipt.version]).toEqual([2, 1])
+      })
+    )
+  )
+
+  it.live("a command, after the person's own switch of organization: not sent there, and said so", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const host = yield* hosted(noExpiry.pipe(judging))
+        const t = askingPage(served(host).layer)
+        const { sent, press } = refusedFirst(1)
+        t.registry.mount(press)
+        t.registry.set(press, { counterId: CounterIds.unsignedToo, by: 1 })
+        yield* until(() => O.liftPredicate(MutableRef.get(t.asks), (asks) => asks > 0))
+        t.answer(memberOf("mem_dana", "org_northline"))
+        const failed = yield* failureOf(t.registry, press)
+        expect([S.is(NotSentElsewhere)(failed), MutableRef.get(sent)]).toEqual([true, 1])
+      })
+    )
   )
 })

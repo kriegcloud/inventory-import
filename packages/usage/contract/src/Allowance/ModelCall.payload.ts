@@ -3,14 +3,12 @@
  * day, and what a call is for. The usage model's `TakeCall` is sent with these, and the usage model reads them from
  * here alone.
  *
- * Not yet the only copy: the access context's `ModelAllowance` gateway, which sends today, keeps its own
- * `dailyModelCalls` and `ModelCallPurpose` in `@inventory/access-contract`, and the catalog's memory host writes 40
- * itself. The boundaries law lets a contract import no other contract, and a model only its own context's contract,
- * so neither may read this one; the gateway moves to the usage context at move 2's hosted half.
+ * The only copy since move 2's hosted half: the `ModelAllowance` gateway beside it (`ModelAllowance.gateway.ts`) asks
+ * with these, and the access context's copy went with its old count. The catalog's memory host still writes 40 itself.
  *
  * The one thing not to break: the three purposes are the notations of `inv:ModelCallPurposeScheme`'s concepts and the
  * words the `modelCall` table's check allows. One added here is added to neither: add it to the scheme, the table's
- * check and the access copy as well.
+ * check as well.
  *
  * @packageDocumentation
  */

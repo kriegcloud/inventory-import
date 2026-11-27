@@ -11,6 +11,7 @@ import { $RepoCliId } from "@beep/identity/packages"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
+import { RepoFile } from "../../Sync.schema.ts"
 
 const $I = $RepoCliId.create("commands/Mutants/Mutants.schema")
 
@@ -43,18 +44,40 @@ export const Holder = LiteralKit(["rule", "story"]).pipe(
 export type Holder = typeof Holder.Type
 
 /**
+ * A mutant's key: letters, digits, `-` and `_`, starting with a letter or a digit. Its copy's folder is named after it
+ * and removed whole when its run ends, so a key holds no `/` and no `..` that would take that folder elsewhere.
+ *
+ * @category schemas
+ */
+export const MutantKey = S.String.check(S.isPattern(/^[A-Za-z0-9][A-Za-z0-9_-]*$/)).pipe(
+  $I.annoteSchema("MutantKey", { description: "A mutant's name: letters, digits, - and _, so never a path" })
+)
+
+/**
+ * A file named from the package's folder: relative, with no `.` or `..` segment, so joined to a copy it stays inside
+ * the copy. A mutant's change and the proof's time limit are written to it there.
+ *
+ * @category schemas
+ */
+export const PackageFile = RepoFile.pipe(
+  $I.annoteSchema("PackageFile", {
+    description: "A file from the package's folder: relative, with no . or .. segment, so it stays inside a copy"
+  })
+)
+
+/**
  * One mutant: the text `old`, found exactly once after its anchors and before `until`, replaced by `new` in `file`.
  *
  * @category schemas
  */
 export class Mutant extends S.Class<Mutant, { readonly brand: unique symbol }>($I`Mutant`)(
   {
-    key: S.NonEmptyString.pipe(S.annotateKey({ description: "Its name, unique in the package" })),
+    key: MutantKey.pipe(S.annotateKey({ description: "Its name, unique in the package" })),
     target: S.NonEmptyString.pipe(
       S.annotateKey({ description: "The command or decision it changes, as the summary groups them" })
     ),
     kind: MutantKind.pipe(S.annotateKey({ description: "What kind of change it is" })),
-    file: S.NonEmptyString.pipe(S.annotateKey({ description: "The file it changes, from the package's folder" })),
+    file: PackageFile.pipe(S.annotateKey({ description: "The file it changes, from the package's folder" })),
     anchors: S.NonEmptyArray(S.NonEmptyString).pipe(
       S.annotateKey({ description: "Texts found in this order; the change lands after the last" })
     ),
@@ -64,7 +87,7 @@ export class Mutant extends S.Class<Mutant, { readonly brand: unique symbol }>($
     ),
     old: S.NonEmptyString.pipe(S.annotateKey({ description: "The exact text replaced, line ends included" })),
     new: S.String.pipe(S.annotateKey({ description: "What it becomes; empty removes it" })),
-    proof: S.NonEmptyString.pipe(S.annotateKey({ description: "The proof file of its target, from the package" })),
+    proof: PackageFile.pipe(S.annotateKey({ description: "The proof file of its target, from the package" })),
     expect: Holder.pipe(S.annotateKey({ description: "What held it in its first run, and must go on holding it" })),
     trialRules: S.Array(S.String).pipe(
       S.annotateKey({ description: "The rules seen violated in that run, each of which must stay named" })
@@ -95,7 +118,7 @@ export class SampleEntry extends S.Class<SampleEntry, { readonly brand: unique s
  */
 export class MutantsFile extends S.Class<MutantsFile, { readonly brand: unique symbol }>($I`MutantsFile`)(
   {
-    stories: S.Array(S.NonEmptyString).pipe(
+    stories: S.Array(PackageFile).pipe(
       S.annotateKey({ description: "The test files of examples run beside each mutant's proof, from the package" })
     ),
     sample: S.Array(SampleEntry).pipe(S.annotateKey({ description: "The fast mutants `--sample` runs" })),

@@ -41,6 +41,9 @@ packages/patches/
   alchemy-domain/                              one folder for each patched package
     01-computed-instance-id.patch              one file for each defect: a header, then the diff
     03-a-schemas-own-guards.patch
+    04-a-rule-by-its-name.patch
+    05-a-structs-defaults.patch
+    06-a-found-sequence-keeps-its-time.patch
   alchemy-domain.patch                         what bun reads: built from the folder, never edited
   test/alchemy-domain/
     01-computed-instance-id/                   each patch's test, and the small code it runs
@@ -102,7 +105,7 @@ patch is held to more than its test passing:
   check ignored, a missing field allowed. `bun run --cwd packages/patches mutants` copies the installed package for
   each, makes the change in the copy and runs the test there, where it has to fail. A mutant the test lets through is
   a wrong model the test cannot tell from the right one: add the rule that tells them apart. Run it after any change
-  to such a patch or its test (26 mutants, about a minute; needs python3). It is not part of `bun run check`.
+  to such a patch or its test (31 mutants of two patches, about a minute; needs python3). It is not part of `bun run check`.
 - **The prover's own second opinion stays on.** A proof ends by running the real code on inputs picked for each path
   and comparing ("Agreed with the real code"): the test asserts that line, and it is what caught the one wrong model
   this patch had while it was written (a class the prover loads a second time, read as another class).
@@ -115,6 +118,17 @@ that must be written, `Schema.Void`).
 
 What the third patch does not do: it reads no pattern. A text held to a pattern (`S.isPattern`) is still a check the
 prover does not read, so a rule cannot be proved from it, and a guard asked of such a schema is "not supported".
+
+`05-a-structs-defaults` is of the same kind (Benjamin, 2026-11-27: "Yes, both patches"). The prover read
+`State.make({...})` of a struct as the fields written; the library's `make` also gives each field left out its
+constructor default. The patch reads a default that is a number, a text, a truth or `null` already there
+(`Effect.succeed(0)`, the tag of `Schema.tag`), in a struct held inside one too, and says "not supported" of any
+other: one worked out when asked for (`Effect.suspend`, `Effect.sync`), a list, an `Option`. It reads no default of an
+event's, a rejection's or a command's own class, which the prover builds another way. `Meter.aggregate.ts` beside its
+test holds what it answers, `Clocked.aggregate.ts` and `Listed.aggregate.ts` what it refuses.
+
+`04-a-rule-by-its-name` teaches the prover nothing: it changes what a lock keeps for a rule an aggregate lists by
+name, from the name to the rule's text where it is declared.
 
 ## Making a patch
 

@@ -303,6 +303,36 @@ describe("laws boundaries", () => {
     })
   )
 
+  // Before, the Worker's exception came ahead of the test-only check, so the stack's code imported the model app
+  // declared only in devDependencies and passed. Declared in peerDependencies, it is there for the code.
+  it.effect("refuses the Worker entry in src when the infra package declares the model app only for its tests", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        {
+          ...base,
+          "packages/infra/package.json": json({
+            name: "@x/infra",
+            beep: { family: "infra" },
+            devDependencies: { "@inventory/model-app": "workspace:*" }
+          }),
+          "packages/infra/src/stack.ts": 'import "@inventory/model-app/Worker"\n',
+          "packages/infra-peer/package.json": json({
+            name: "@x/infra-peer",
+            beep: { family: "infra" },
+            peerDependencies: { "@inventory/model-app": "workspace:*" }
+          }),
+          "packages/infra-peer/src/stack.ts": 'import "@inventory/model-app/Worker"\n',
+          "apps/model/package.json": pkg("@inventory/model-app", {})
+        },
+        Effect.map(boundaries(), render(boundariesSentence))
+      )
+      expect(printed(report)).toEqual([
+        "err: check-boundaries FAIL",
+        "err:   packages/infra/src/stack.ts imports @inventory/model-app, which @x/infra declares only for its tests (devDependencies): declare it in dependencies, or keep it in test"
+      ])
+    })
+  )
+
   // Report 14 section 7.2: the ontology package may use the foundation, the kernel and a context's contract package,
   // and nothing else of the repository's.
   it.effect("lets the ontology package use the foundation, the kernel and a context's contract, and nothing else", () =>

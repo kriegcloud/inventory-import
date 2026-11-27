@@ -27,13 +27,16 @@ if (files.some((file) => file.includes("hang"))) {
   const test = { title: "it holds", fullName: "it holds", status: "passed", failureMessages: [] }
   const results = files.map((file) => ({ name: root + "/" + file, status: "passed", message: "", assertionResults: [test] }))
   writeFileSync(output, JSON.stringify({ testResults: results }))
+  // Every test passed, and an error was thrown outside them: vitest ends with 1, and its report says nothing of it.
+  if (files.some((file) => file.includes("unhandled"))) process.exitCode = 1
 }
 `
 
 const tree = {
   "node_modules/vitest/vitest.mjs": standIn,
   "copy/test/a.test.ts": "",
-  "copy/test/hang.test.ts": ""
+  "copy/test/hang.test.ts": "",
+  "copy/test/unhandled.test.ts": ""
 }
 
 /** Gives `effect` the real service, built on the repository it runs in and let go when it ends. */
@@ -53,10 +56,25 @@ describe("the mutants' Vitest service", () => {
         const copy = repo.join(repo.root, "copy")
         const answer = yield* vitest.run({ copy, files: ["test/a.test.ts"], nice: 0, limit: 20 })
         expect(answer.stopped).toBe(false)
+        expect(answer.exit).toEqual(O.some(0))
         expect(O.map(answer.report, (report) => report.testResults.length)).toEqual(O.some(1))
         expect(Str.trim(answer.tail)).toBe("ran test/a.test.ts")
         const log = yield* repo.text(repo.join(copy, "vitest.log"))
         expect(Str.trim(log)).toBe("ran test/a.test.ts")
+      }).pipe(withVitest)
+    )
+  )
+
+  it.live("gives the code vitest ended with beside its report, where every test passed", () =>
+    inTree(
+      tree,
+      Effect.gen(function* () {
+        const repo = yield* Repo
+        const vitest = yield* Vitest
+        const copy = repo.join(repo.root, "copy")
+        const answer = yield* vitest.run({ copy, files: ["test/unhandled.test.ts"], nice: 0, limit: 20 })
+        expect(answer.exit).toEqual(O.some(1))
+        expect(O.map(answer.report, (report) => report.testResults.length)).toEqual(O.some(1))
       }).pipe(withVitest)
     )
   )
@@ -70,6 +88,7 @@ describe("the mutants' Vitest service", () => {
         const copy = repo.join(repo.root, "copy")
         const answer = yield* vitest.run({ copy, files: ["test/hang.test.ts"], nice: 0, limit: 2 })
         expect(answer.stopped).toBe(true)
+        expect(O.isNone(answer.exit)).toBe(true)
         expect(O.isNone(answer.report)).toBe(true)
         expect(Str.includes("ran test/hang.test.ts")(answer.tail)).toBe(true)
         expect(Str.includes("still proving the rule")(answer.tail)).toBe(true)

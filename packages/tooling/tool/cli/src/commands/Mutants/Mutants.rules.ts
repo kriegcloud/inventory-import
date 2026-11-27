@@ -27,6 +27,7 @@ import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import { dual } from "effect/Function"
 import * as HashMap from "effect/HashMap"
+import * as HashSet from "effect/HashSet"
 import * as Num from "effect/Number"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
@@ -387,15 +388,33 @@ export interface Read {
   readonly timeouts: ReadonlyArray<string>
   readonly unloaded: ReadonlyArray<string>
   readonly missing: ReadonlyArray<string>
+  /** The files asked for that ran with no test passed: all skipped, or none at all. */
+  readonly nonePassed: ReadonlyArray<string>
+}
+
+/** A test file a run was given: its path in the copy, absolute and normalized, and as the mutants file names it. */
+interface Asked {
+  readonly path: string
+  readonly name: string
 }
 
 /**
- * Reads vitest's report of a mutant's proof and story files.
+ * Reads vitest's report of a mutant's proof and story files. A file is matched by its whole path in the copy: vitest
+ * runs every file whose path holds a filter it is given, so `test/a.prove.test.ts` also runs
+ * `test/other/test/a.prove.test.ts`, and such a file is no file asked for, read for nothing.
  *
  * @category rules
  */
-const readReport = (report: VitestReport, proof: string, stories: ReadonlyArray<string>): Read => {
-  const perFile = A.map(report.testResults, (result) => {
+const readReport = (
+  report: VitestReport,
+  proof: Asked,
+  stories: ReadonlyArray<Asked>,
+  normalize: (path: string) => string
+): Read => {
+  const asked = A.dedupeWith(A.prepend(stories, proof), (a, b) => a.path === b.path)
+  const askedPaths = HashSet.fromIterable(A.map(asked, (file) => file.path))
+  const results = A.filter(report.testResults, (result) => HashSet.has(askedPaths, normalize(result.name)))
+  const perFile = A.map(results, (result) => {
     const failed = A.filter(result.assertionResults, (test) => TestStatus.is.failed(test.status))
     const label = Str.replace(".story", "")(fileOf(result.name))
     const title = (test: (typeof failed)[number]) =>
@@ -412,7 +431,7 @@ const readReport = (report: VitestReport, proof: string, stories: ReadonlyArray<
     const said = (test: (typeof failed)[number]) => A.filter(test.failureMessages, P.isString)
     const late = A.filter(failed, (test) => Str.includes(timedOut)(A.join(said(test), " ")))
     const real = A.filter(failed, (test) => !A.contains(late, test))
-    const isProof = Str.endsWith(proof)(result.name)
+    const isProof = normalize(result.name) === proof.path
     const why = isProof && real.length > 0 ? whyProof(A.flatMap(real, said)) : { rules: [], other: [] }
     return {
       unloaded: A.empty<string>(),
@@ -422,18 +441,26 @@ const readReport = (report: VitestReport, proof: string, stories: ReadonlyArray<
       stories: isProof ? A.empty<string>() : A.map(real, title)
     }
   })
-  const seen = A.map(report.testResults, (result) => fileOf(result.name))
-  const wanted = A.dedupe(A.prepend(A.map(stories, fileOf), fileOf(proof)))
+  const passedIn = HashSet.fromIterable(
+    A.map(
+      A.filter(results, (result) => A.some(result.assertionResults, (test) => TestStatus.is.passed(test.status))),
+      (result) => normalize(result.name)
+    )
+  )
+  const ran = HashSet.fromIterable(A.map(results, (result) => normalize(result.name)))
+  const names = (files: ReadonlyArray<Asked>) =>
+    A.sort(
+      A.map(files, (file) => file.name),
+      Order.String
+    )
   return {
     rules: A.flatMap(perFile, (f) => f.rules),
     other: A.flatMap(perFile, (f) => f.other),
     stories: A.flatMap(perFile, (f) => f.stories),
     timeouts: A.flatMap(perFile, (f) => f.timeouts),
     unloaded: A.flatMap(perFile, (f) => f.unloaded),
-    missing: A.sort(
-      A.filter(wanted, (name) => !A.contains(seen, name)),
-      Order.String
-    )
+    missing: names(A.filter(asked, (file) => !HashSet.has(ran, file.path))),
+    nonePassed: names(A.filter(asked, (file) => HashSet.has(ran, file.path) && !HashSet.has(passedIn, file.path)))
   }
 }
 
@@ -780,6 +807,7 @@ export const mutants = Effect.fn("Mutants.mutants")(function* (flags: MutantsFla
         })
         const notes = answer.stopped ? [`stopped after ${flags.timeout} s`] : []
         const ran = yield* took
+        const asked = (path: string): Asked => ({ path: repo.normalize(repo.join(copy, path)), name: path })
         return O.match(answer.report, {
           onNone: () =>
             Trial.cases.NoResult.make({
@@ -787,7 +815,28 @@ export const mutants = Effect.fn("Mutants.mutants")(function* (flags: MutantsFla
               took: ran,
               notes: [...notes, `no result: ${short(answer.tail, 200)}`]
             }),
-          onSome: (report) => trialOf(name, ran, readReport(report, proof, file.stories), notes)
+          onSome: (report) => {
+            const read = readReport(report, asked(proof), A.map(file.stories, asked), repo.normalize)
+            const trial = trialOf(name, ran, read, notes)
+            if (O.isSome(mutant) || !Trial.guards.Neither(trial)) return trial
+            // The unchanged copy passes only when each file it was given passed a test and vitest ended with 0: a file
+            // of skipped tests fails nothing and proves nothing, and an error thrown outside every test is in the code
+            // vitest ends with, not in its report.
+            const unproven = [
+              ...(read.nonePassed.length > 0 ? [`no test passed in ${A.join(read.nonePassed, ", ")}`] : []),
+              ...(O.contains(answer.exit, 0)
+                ? []
+                : [
+                    O.match(answer.exit, {
+                      onNone: () => "vitest ended with no code",
+                      onSome: (code) => `vitest ended with code ${code}`
+                    })
+                  ])
+            ]
+            return unproven.length === 0
+              ? trial
+              : Trial.cases.NoResult.make({ key: name, took: ran, notes: [...notes, ...unproven] })
+          }
         })
       },
       (run, name) => (flags.keep ? run : run.pipe(Effect.ensuring(removed(name))))

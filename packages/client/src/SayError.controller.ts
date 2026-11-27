@@ -240,9 +240,11 @@ const unreached: Said = {
   sentence: "Check the connection and try again. Nothing was lost on this page.",
   problems: []
 }
+// A server error does not say whether the request was applied: a command can be stored and its answer lost on the way
+// back, and a second press is a new command. So the sentence never says "nothing was changed"; it says to look first.
 const ourSide: Said = {
   title: "Something went wrong on our side",
-  sentence: "Nothing was changed. Try again; if it keeps happening, reload the page.",
+  sentence: "It may not have gone through. Reload the page to see what is stored before trying again.",
   problems: []
 }
 const tooMany: Said = {

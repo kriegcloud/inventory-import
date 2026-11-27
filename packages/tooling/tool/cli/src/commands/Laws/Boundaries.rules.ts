@@ -447,13 +447,14 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
                   if (!A.contains(declared, imported)) {
                     return A.of(BoundariesFinding.cases.Undeclared.make({ where, imported, name }))
                   }
+                  // Before the exceptions: the Worker's is for the code, so declared for the tests only it is not there.
+                  if (testOnly(imported)) return testOnlyFinding(imported)
                   if (!code && forStackTest(imported) && specifier === `${imported}/${localStackEntry}`) {
                     return A.empty<BoundariesFinding>()
                   }
                   if (code && forStack(imported) && specifier === `${imported}/${workerEntry}`) {
                     return A.empty<BoundariesFinding>()
                   }
-                  if (testOnly(imported)) return testOnlyFinding(imported)
                   return may(imported)
                     ? A.empty<BoundariesFinding>()
                     : A.of(BoundariesFinding.cases.ImportedAgainstRow.make({ where, imported }))

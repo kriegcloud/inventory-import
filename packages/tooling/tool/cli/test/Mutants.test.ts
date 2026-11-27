@@ -19,7 +19,14 @@ import {
   type MutantsFlags,
   mutantsSentence
 } from "../src/commands/Mutants/Mutants.rules.ts"
-import { Mutant, TestCase, TestFile, VitestReport } from "../src/commands/Mutants/Mutants.schema.ts"
+import {
+  Mutant,
+  MutantKey,
+  PackageFile,
+  TestCase,
+  TestFile,
+  VitestReport
+} from "../src/commands/Mutants/Mutants.schema.ts"
 import { Vitest, type VitestAnswer } from "../src/commands/Mutants/Vitest.service.ts"
 import { Repo } from "../src/Repo.service.ts"
 import { render } from "../src/Report.schema.ts"
@@ -168,6 +175,7 @@ const reported = (run: InCopy, tests: Tests): VitestAnswer => ({
       })
     })
   ),
+  exit: O.some(A.some([...tests.proof, ...tests.story], (test) => test.status === "failed") ? 1 : 0),
   stopped: false,
   tail: ""
 })
@@ -466,10 +474,10 @@ describe("beep mutants: what keeps a run from passing quietly", () => {
       )
       expect(dropped.report.failed).toBe(true)
       expect(ranLine(dropped, "sell-negative")).toEqual([
-        "out: sell-negative                        error        #s  error       files that did not run: Shop.story"
+        "out: sell-negative                        error        #s  error       files that did not run: test/Shop.story.test.ts"
       ])
       expect(errors(dropped)).toEqual([
-        'err: FAIL sell-negative: no result. Change in src/Shop.aggregate.ts: "      if (cmd.count < 0) return yield* Negative.make({})\\n" -> "". Ran test/Shop.prove.test.ts and the stories: files that did not run: Shop.story'
+        'err: FAIL sell-negative: no result. Change in src/Shop.aggregate.ts: "      if (cmd.count < 0) return yield* Negative.make({})\\n" -> "". Ran test/Shop.prove.test.ts and the stories: files that did not run: test/Shop.story.test.ts'
       ])
     })
   )
@@ -505,7 +513,7 @@ describe("beep mutants: what keeps a run from passing quietly", () => {
   it.effect("a run stopped at its limit gives no result, says so with what vitest printed, and fails the run", () =>
     Effect.gen(function* () {
       const result = yield* run({ only: O.some("sell-negative"), baseline: false }, tree, () =>
-        Effect.succeed({ report: O.none(), stopped: true, tail: "proving NeverNegative" })
+        Effect.succeed({ report: O.none(), exit: O.none(), stopped: true, tail: "proving NeverNegative" })
       )
       expect(result.report.failed).toBe(true)
       expect(ranLine(result, "sell-negative")).toEqual([
@@ -759,6 +767,170 @@ describe("beep mutants: what keeps a run from passing quietly", () => {
         expect(Str.includes("sits three folders or more below the repository's root")(refused.message)).toBe(true)
       })
     )
+  )
+})
+
+const skipped = (title: string) => TestCase.make({ title, fullName: title, status: "skipped", failureMessages: [] })
+
+/** The answer `answer` gives, with each test file's path in its report renamed as `rename` says. */
+const renamed =
+  (rename: (name: string, copy: string) => ReadonlyArray<string>, answer: Answer = asVitestDoes): Answer =>
+  (one) =>
+    Effect.map(answer(one), (given) => ({
+      ...given,
+      report: O.map(given.report, (report) =>
+        VitestReport.make({
+          testResults: A.flatMap(report.testResults, (file) =>
+            A.map(rename(file.name, one.copy), (name) => TestFile.make({ ...file, name }))
+          )
+        })
+      )
+    }))
+
+/** Runs `mutants` on `files` with the stand-in, and gives how it ended and the root's `vitest.shared.ts` after. */
+const runEnded = (given: Partial<MutantsFlags>, files: Record<string, string>) =>
+  inTree(
+    files,
+    Effect.gen(function* () {
+      const repo = yield* Repo
+      const seen = MutableRef.make<Seen>({ copies: [], files: [], proofs: [] })
+      const ended = yield* mutants(flags(given), () => Effect.void).pipe(
+        Effect.provideService(Vitest, standIn(repo, seen)),
+        Effect.result
+      )
+      const shared = yield* repo.text(repo.join(repo.root, "vitest.shared.ts"))
+      return { ended, shared, copies: MutableRef.get(seen).copies }
+    })
+  )
+
+describe("beep mutants: what a copy and the baseline are held to", () => {
+  it.effect("a report's file is matched by its whole path: another file whose path ends the same is no proof", () =>
+    Effect.gen(function* () {
+      // vitest runs every file whose path holds the filter, so test/alternate/test/Shop.prove.test.ts runs too.
+      const alternate = (name: string, copy: string) => `${copy}/test/alternate/${Str.slice(copy.length + 1)(name)}`
+      const onlyOther = yield* run(
+        { only: O.some("sell-negative"), baseline: false },
+        tree,
+        renamed((name, copy) => (Str.endsWith(proofFile)(name) ? [alternate(name, copy)] : [name]))
+      )
+      expect(onlyOther.report.failed).toBe(true)
+      expect(ranLine(onlyOther, "sell-negative")).toEqual([
+        "out: sell-negative                        error        #s  error       files that did not run: test/Shop.prove.test.ts"
+      ])
+      // Both ran, the proof asked for passing and the other failing: the other is read for nothing.
+      const besideIt = yield* run(
+        { only: O.some("sell-negative"), baseline: false },
+        tree,
+        renamed(
+          (name, copy) => (Str.endsWith(proofFile)(name) ? [name, alternate(name, copy)] : [name]),
+          (one) =>
+            Effect.map(asVitestDoes(one), (given) => ({
+              ...given,
+              report: O.map(given.report, (report) =>
+                VitestReport.make({
+                  testResults: A.map(report.testResults, (file, i) =>
+                    i === 0 && Str.endsWith(proofFile)(file.name)
+                      ? TestFile.make({ ...file, status: "passed", assertionResults: [passed("Shop is proved")] })
+                      : file
+                  )
+                })
+              )
+            }))
+        )
+      )
+      expect(ranLine(besideIt, "sell-negative")).toEqual([
+        "out: sell-negative                        neither      #s  neither     "
+      ])
+      expect(besideIt.report.failed).toBe(true)
+    })
+  )
+
+  it("a mutant's key holds no path, and every key of the form the packages use is one", () => {
+    expect(A.map(["sell-negative", "row-rowdecided-importId", "a_b", "7up"], S.is(MutantKey))).toEqual([
+      true,
+      true,
+      true,
+      true
+    ])
+    expect(A.map(["../../x", "a/b", "..", ".hidden", "", "a b"], S.is(MutantKey))).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ])
+    expect(A.map(["src/Shop.aggregate.ts", "test/Shop.prove.test.ts"], S.is(PackageFile))).toEqual([true, true])
+    expect(
+      A.map(["../../../vitest.shared.ts", "/etc/passwd", "src/../../x.ts", "./src/a.ts", ""], S.is(PackageFile))
+    ).toEqual([false, false, false, false, false])
+  })
+
+  it.effect("refuses a mutants file whose key would take a copy's folder out of the folder of copies", () =>
+    Effect.gen(function* () {
+      const result = yield* runEnded({ all: true }, holding([{ ...sellNegative, key: "../../escaped" }]))
+      expect(Result.isFailure(result.ended)).toBe(true)
+      expect(result.copies).toEqual([])
+    })
+  )
+
+  it.effect("refuses a mutant or a proof outside the package, and writes nothing there", () =>
+    Effect.gen(function* () {
+      const outside = mutant({ key: "shared-limits", old: "limits = {}", new: "limits = { x: 1 }", expect: "story" })
+      const written = yield* runEnded(
+        { all: true, baseline: false },
+        holding([{ ...outside, file: "../../../vitest.shared.ts", anchors: ["export"], until: "\n" }])
+      )
+      expect(Result.isFailure(written.ended)).toBe(true)
+      expect(written.shared).toBe("export const limits = {}\n")
+      expect(written.copies).toEqual([])
+      const proof = yield* runEnded(
+        { all: true, proofLimit: O.some(30) },
+        holding([{ ...sellNegative, proof: "../../../vitest.shared.ts" }])
+      )
+      expect(Result.isFailure(proof.ended)).toBe(true)
+      expect(proof.copies).toEqual([])
+    })
+  )
+
+  it.effect(
+    "the baseline fails when a file it was given passed no test, and passes with a test skipped beside one passed",
+    () =>
+      Effect.gen(function* () {
+        const allSkipped = yield* run({ sample: true }, tree, (one) =>
+          Effect.succeed(reported(one, { ...asTheTestsDo(one), proof: [skipped("Shop is proved")] }))
+        )
+        expect(allSkipped.lines).toEqual([
+          "err: BASELINE FAILS for test/Shop.prove.test.ts (# s): error no test passed in test/Shop.prove.test.ts\nevery mutant would look held; nothing more is run"
+        ])
+        const oneSkipped = yield* run({ sample: true }, tree, (one) =>
+          Effect.succeed(
+            reported(one, { ...asTheTestsDo(one), proof: [...asTheTestsDo(one).proof, skipped("Shop is fast")] })
+          )
+        )
+        expect(oneSkipped.report.failed).toBe(false)
+        expect(A.filter(oneSkipped.said, Str.startsWith("out: baseline"))).toEqual([
+          "out: baseline test/Shop.prove.test.ts and the stories pass, # s"
+        ])
+      })
+  )
+
+  it.effect(
+    "the baseline fails when vitest ends with a code other than 0, and a mutant's run that does is still read",
+    () =>
+      Effect.gen(function* () {
+        const unhandled: Answer = (one) => Effect.map(asVitestDoes(one), (given) => ({ ...given, exit: O.some(1) }))
+        const base = yield* run({ sample: true }, tree, unhandled)
+        expect(base.lines).toEqual([
+          "err: BASELINE FAILS for test/Shop.prove.test.ts (# s): error vitest ended with code 1\nevery mutant would look held; nothing more is run"
+        ])
+        const mutantsOnly = yield* run({ sample: true, baseline: false, jobs: 1 }, tree, unhandled)
+        expect(mutantsOnly.report.failed).toBe(false)
+        expect(A.filter(mutantsOnly.said, Str.startsWith("out: sell-"))).toEqual([
+          "out: sell-negative                        rule         #s  same        NeverNegative (Sell violated)",
+          "out: sell-label                           story        #s  same        Shop: a sale is labelled sold"
+        ])
+      })
   )
 })
 

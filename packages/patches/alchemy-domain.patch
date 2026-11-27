@@ -872,6 +872,352 @@ index 6f78f0b..50fbb3c 100644
 Package: @alchemy.run/domain
 Applies-to: vendor/alchemy/alchemy.run-domain-e1c3e6d.tgz
 Upstream: not yet reported
+Why: A lock keeps each rule as the text written at its place in the aggregate, the decision or the model. For a
+  rule listed by name (`transitions: { ARule }`, `ARule: Rules.ARule`) that text is the name. A transition moved to
+  a file of its own is then refused as changed, though it is the rule that was locked; and once a lock is written
+  again it holds the name, so a later change to the rule where it is declared is never seen. With this the text of a
+  rule written as a name is the text of what the name is declared as, through the imports that give it.
+Remove-when: The library's lock follows a rule's name to its declaration. `bun run beep patches prove` then says
+  this patch's test passes without it.
+Test: test/alchemy-domain/04-a-rule-by-its-name/RuleByItsName.test.ts
+
+diff --git a/lib/Prove/internal/Lock.js b/lib/Prove/internal/Lock.js
+index 4ec4152..b49d5ee 100644
+--- a/lib/Prove/internal/Lock.js
++++ b/lib/Prove/internal/Lock.js
+@@ -93,6 +93,45 @@ const compare = Effect.fn(function* (solver, loader, interpreter, aggregate, def
+     const made = unknown === undefined ? { _tag: "Kept" } : { _tag: "Unknown", reason: unknown };
+     return made;
+ });
++/**
++ * A rule's text. One written as a name (`{ Rule }`, `Rule: Rule`) or as a member of a file read as a namespace
++ * (`Rule: Rules.Rule`) is the text of what that name is declared as, in the file that declares it, through the
++ * imports that give it: a rule moved to a file of its own is the rule it was, and a change to it there is a change.
++ */
++const ruleText = (modules, definition, node) => {
++  let module = definition.module;
++  let name = node.type === "Identifier" ? node.name : undefined;
++  if (
++    node.type === "MemberExpression" &&
++    !node.computed &&
++    node.object.type === "Identifier" &&
++    node.property.type === "Identifier" &&
++    !module.declarations.has(node.object.name)
++  ) {
++    const held = module.imports.get(node.object.name);
++    const file = held?.imported === "*" ? module.resolved.get(held.specifier) : undefined;
++    const next = modules.find((m) => m.path === file);
++    if (next) {
++      module = next;
++      name = node.property.name;
++    }
++  }
++  for (let hops = 0; name !== undefined && hops < 16; hops++) {
++    const declaration = module.declarations.get(name);
++    if (declaration?._tag === "Const" && declaration.init)
++      return module.source.slice(declaration.init.start, declaration.init.end);
++    if (declaration) break;
++    const imported = module.imports.get(name);
++    if (!imported || imported.imported === "*") break;
++    const file = module.resolved.get(imported.specifier);
++    const next = modules.find((m) => m.path === file);
++    if (!next) break;
++    module = next;
++    name = imported.imported;
++  }
++  return Paths.textOf(definition, node);
++};
++
+ /**
+  * Read the rules of a model, or of one aggregate, from the files that declare
+  * them, and compare each invariant in `changed` with the text it was locked as.
+@@ -112,7 +151,7 @@ export const inspect = Effect.fn(function* (options) {
+         for (const key of ["invariants", "transitions"])
+             for (const [rule, node] of Paths.written(definition, key)) {
+                 const name = options.qualified ? `${aggregate.aggregateName}.${rule}` : rule;
+-                const source = Paths.textOf(definition, node);
++                const source = ruleText(modules, definition, node);
+                 sources.set(name, { kind: key === "invariants" ? "invariant" : "transition", source });
+                 const locked = options.locked.get(name);
+                 if (key === "invariants" && locked !== undefined && normal(locked) !== normal(source))
+@@ -127,7 +166,7 @@ export const inspect = Effect.fn(function* (options) {
+         for (const [rule, node] of Paths.written(definition, "transitions"))
+             sources.set(`${decision.decisionName}.${rule}`, {
+                 kind: "transition",
+-                source: Paths.textOf(definition, node),
++                source: ruleText(modules, definition, node),
+             });
+     }
+     if (options.model !== undefined) {
+@@ -143,14 +182,14 @@ export const inspect = Effect.fn(function* (options) {
+                 for (const [rule, node] of Paths.written(definition, key))
+                     sources.set(`${options.model}.${rule}`, {
+                         kind: key === "invariants" ? "model invariant" : key,
+-                        source: Paths.textOf(definition, node),
++                        source: ruleText(modules, definition, node),
+                     });
+             for (const rule of Paths.relationNames(definition)) {
+                 const node = Paths.relationNode(definition, rule);
+                 if (node)
+                     sources.set(`${options.model}.${rule}`, {
+                         kind: "relation",
+-                        source: Paths.textOf(definition, node),
++                        source: ruleText(modules, definition, node),
+                     });
+             }
+         }
+diff --git a/src/Prove/internal/Lock.ts b/src/Prove/internal/Lock.ts
+index 98d616c..8b8b20f 100644
+--- a/src/Prove/internal/Lock.ts
++++ b/src/Prove/internal/Lock.ts
+@@ -129,6 +129,45 @@ export interface Inspected {
+   readonly compared: ReadonlyMap<string, Comparison>;
+ }
+ 
++/**
++ * A rule's text. One written as a name (`{ Rule }`, `Rule: Rule`) or as a member of a file read as a namespace
++ * (`Rule: Rules.Rule`) is the text of what that name is declared as, in the file that declares it, through the
++ * imports that give it: a rule moved to a file of its own is the rule it was, and a change to it there is a change.
++ */
++const ruleText = (modules: ReadonlyArray<Value.Module>, definition: Paths.Definition, node: Value.Node): string => {
++  let module = definition.module;
++  let name: string | undefined = node.type === "Identifier" ? node.name : undefined;
++  if (
++    node.type === "MemberExpression" &&
++    !node.computed &&
++    node.object.type === "Identifier" &&
++    node.property.type === "Identifier" &&
++    !module.declarations.has(node.object.name)
++  ) {
++    const held = module.imports.get(node.object.name);
++    const file = held?.imported === "*" ? module.resolved.get(held.specifier) : undefined;
++    const next = modules.find((m) => m.path === file);
++    if (next) {
++      module = next;
++      name = node.property.name;
++    }
++  }
++  for (let hops = 0; name !== undefined && hops < 16; hops++) {
++    const declaration = module.declarations.get(name);
++    if (declaration?._tag === "Const" && declaration.init)
++      return module.source.slice(declaration.init.start, declaration.init.end);
++    if (declaration) break;
++    const imported = module.imports.get(name);
++    if (!imported || imported.imported === "*") break;
++    const file = module.resolved.get(imported.specifier);
++    const next = modules.find((m) => m.path === file);
++    if (!next) break;
++    module = next;
++    name = imported.imported;
++  }
++  return Paths.textOf(definition, node);
++};
++
+ /**
+  * Read the rules of a model, or of one aggregate, from the files that declare
+  * them, and compare each invariant in `changed` with the text it was locked as.
+@@ -167,7 +206,7 @@ export const inspect = Effect.fn(function* (options: {
+     for (const key of ["invariants", "transitions"])
+       for (const [rule, node] of Paths.written(definition, key)) {
+         const name = options.qualified ? `${aggregate.aggregateName}.${rule}` : rule;
+-        const source = Paths.textOf(definition, node);
++        const source = ruleText(modules, definition, node);
+         sources.set(name, { kind: key === "invariants" ? "invariant" : "transition", source });
+         const locked = options.locked.get(name);
+         if (key === "invariants" && locked !== undefined && normal(locked) !== normal(source))
+@@ -181,7 +220,7 @@ export const inspect = Effect.fn(function* (options: {
+     for (const [rule, node] of Paths.written(definition, "transitions"))
+       sources.set(`${decision.decisionName}.${rule}`, {
+         kind: "transition",
+-        source: Paths.textOf(definition, node),
++        source: ruleText(modules, definition, node),
+       });
+   }
+   if (options.model !== undefined) {
+@@ -199,14 +238,14 @@ export const inspect = Effect.fn(function* (options: {
+         for (const [rule, node] of Paths.written(definition, key))
+           sources.set(`${options.model}.${rule}`, {
+             kind: key === "invariants" ? "model invariant" : key,
+-            source: Paths.textOf(definition, node),
++            source: ruleText(modules, definition, node),
+           });
+       for (const rule of Paths.relationNames(definition)) {
+         const node = Paths.relationNode(definition, rule);
+         if (node)
+           sources.set(`${options.model}.${rule}`, {
+             kind: "relation",
+-            source: Paths.textOf(definition, node),
++            source: ruleText(modules, definition, node),
+           });
+       }
+     }
+Package: @alchemy.run/domain
+Applies-to: vendor/alchemy/alchemy.run-domain-e1c3e6d.tgz
+Upstream: not yet reported
+Why: The prover reads `State.make({...})` of a struct as the fields written and nothing more, where the library's
+  `make` adds each field left out that has a constructor default (`Schema.withConstructorDefault`, and the tag of
+  `Schema.tag`). A state built that way is "read wrongly" for every rule, so an `evolve` has to write every field,
+  the status and each count that starts at zero included, and the schema's defaults cannot be used. With this a
+  field left out takes its default when that is a number, a text, a truth or `null` already there
+  (`Effect.succeed(0)`), in a struct held inside one too. Of any other default the prover says the code is not read.
+Remove-when: The library's prover reads a struct's constructor defaults. `bun run beep patches prove` then says this
+  patch's test passes without it.
+Test: test/alchemy-domain/05-a-structs-defaults/StructDefaults.test.ts
+
+diff --git a/lib/Prove/internal/Interpreter.js b/lib/Prove/internal/Interpreter.js
+index 9403f20..215ad72 100644
+--- a/lib/Prove/internal/Interpreter.js
++++ b/lib/Prove/internal/Interpreter.js
+@@ -1,5 +1,6 @@
+ import * as Data from "effect/Data";
+ import * as Effect from "effect/Effect";
++import * as Exit from "effect/Exit";
+ import * as Option from "effect/Option";
+ import * as Brands from "./Brands.js";
+ import * as Compare from "./Compare.js";
+@@ -71,6 +72,40 @@ const fromHost = (value, name) => typeof value === "number"
+                     : value === undefined
+                         ? Value.undef
+                         : { _tag: "Host", value, name };
++/**
++ * What `Schema.make` adds to a struct written without some of its fields: each field left out that has a
++ * constructor default takes it, as the real `make` gives it, and so in a struct held inside one. A default is read
++ * only when it is a value already there (`Effect.succeed(0)`, `Schema.tag("Open")`) and a number, a text, a truth
++ * or `null`. For any other the answer names the field, and the caller says the code is not read.
++ */
++const withDefaults = (
++  made,
++  ast,
++) => {
++  if (ast._tag !== "Objects" || made._tag !== "Obj") return { made };
++  const fields = { ...made.fields };
++  for (const property of ast.propertySignatures) {
++    const key = String(property.name);
++    const held = fields[key];
++    const given = property.type.context?.constructorDefault;
++    if (held !== undefined && held._tag !== "Undef") {
++      const inner = withDefaults(held, property.type);
++      if ("unread" in inner) return inner;
++      fields[key] = inner.made;
++      continue;
++    }
++    if (given === undefined) continue;
++    if (held !== undefined || !Exit.isExit(given) || !Exit.isSuccess(given)) return { unread: key };
++    const value = given.value;
++    if (
++      !(typeof value === "number" || typeof value === "string" || typeof value === "boolean" || value === null)
++    )
++      return { unread: key };
++    fields[key] = fromHost(value, key);
++  }
++  return { made: made.brand ? Value.obj(fields, made.brand) : Value.obj(fields) };
++};
++
+ const child = (parent) => ({ variables: new Map(), parent });
+ /** A value the prover knows, as the text JavaScript makes of it in a string. */
+ const shown = (v) => v._tag === "Null"
+@@ -812,9 +847,17 @@ export const make = (loader, run) => {
+                     return {
+                         _tag: "Native",
+                         name: `${value.name}.make`,
+-                        call: ([made]) => made && Symbolic.assumeFits(made, ast, current.run)
+-                            ? Effect.succeed(made)
+-                            : Effect.fail(new Value.Infeasible()),
++                        // A field left to its constructor default is the default, as the real `make` gives it.
++                        call: ([made], at) => {
++                            if (!made)
++                                return Effect.fail(new Value.Infeasible());
++                            const filled = withDefaults(made, ast);
++                            if ("unread" in filled)
++                                return fail(at, `leaves ${filled.unread} of ${value.name}.make to a default the prover does not read`);
++                            return Symbolic.assumeFits(filled.made, ast, current.run)
++                                ? Effect.succeed(filled.made)
++                                : Effect.fail(new Value.Infeasible());
++                        },
+                     };
+                 }
+                 return (library.unionMember(value.value, key, value.name) ??
+diff --git a/src/Prove/internal/Interpreter.ts b/src/Prove/internal/Interpreter.ts
+index e4502fb..8e01f7d 100644
+--- a/src/Prove/internal/Interpreter.ts
++++ b/src/Prove/internal/Interpreter.ts
+@@ -1,6 +1,8 @@
+ import * as Data from "effect/Data";
+ import * as Effect from "effect/Effect";
++import * as Exit from "effect/Exit";
+ import * as Option from "effect/Option";
++import type * as SchemaAST from "effect/SchemaAST";
+ import * as Brands from "./Brands.ts";
+ import * as Compare from "./Compare.ts";
+ import { fromTruth, isQuotient, same, textual, truth } from "./Compare.ts";
+@@ -100,6 +102,40 @@ const fromHost = (value: unknown, name: string): V =>
+               ? Value.undef
+               : { _tag: "Host", value, name };
+ 
++/**
++ * What `Schema.make` adds to a struct written without some of its fields: each field left out that has a
++ * constructor default takes it, as the real `make` gives it, and so in a struct held inside one. A default is read
++ * only when it is a value already there (`Effect.succeed(0)`, `Schema.tag("Open")`) and a number, a text, a truth
++ * or `null`. For any other the answer names the field, and the caller says the code is not read.
++ */
++const withDefaults = (
++  made: V,
++  ast: SchemaAST.AST,
++): { readonly made: V } | { readonly unread: string } => {
++  if (ast._tag !== "Objects" || made._tag !== "Obj") return { made };
++  const fields: Record<string, V> = { ...made.fields };
++  for (const property of ast.propertySignatures) {
++    const key = String(property.name);
++    const held = fields[key];
++    const given = property.type.context?.constructorDefault;
++    if (held !== undefined && held._tag !== "Undef") {
++      const inner = withDefaults(held, property.type);
++      if ("unread" in inner) return inner;
++      fields[key] = inner.made;
++      continue;
++    }
++    if (given === undefined) continue;
++    if (held !== undefined || !Exit.isExit(given) || !Exit.isSuccess(given)) return { unread: key };
++    const value: unknown = given.value;
++    if (
++      !(typeof value === "number" || typeof value === "string" || typeof value === "boolean" || value === null)
++    )
++      return { unread: key };
++    fields[key] = fromHost(value, key);
++  }
++  return { made: made.brand ? Value.obj(fields, made.brand) : Value.obj(fields) };
++};
++
+ const child = (parent: Scope | undefined): Scope => ({ variables: new Map(), parent });
+ 
+ export interface Interpreter {
+@@ -1009,10 +1045,19 @@ export const make = (loader: Loader, run: Run): Interpreter => {
+           return {
+             _tag: "Native",
+             name: `${value.name}.make`,
+-            call: ([made]) =>
+-              made && Symbolic.assumeFits(made, ast, current.run)
+-                ? Effect.succeed(made)
+-                : Effect.fail(new Value.Infeasible()),
++            // A field left to its constructor default is the default, as the real `make` gives it.
++            call: ([made], at) => {
++              if (!made) return Effect.fail(new Value.Infeasible());
++              const filled = withDefaults(made, ast);
++              if ("unread" in filled)
++                return fail(
++                  at,
++                  `leaves ${filled.unread} of ${value.name}.make to a default the prover does not read`,
++                );
++              return Symbolic.assumeFits(filled.made, ast, current.run)
++                ? Effect.succeed(filled.made)
++                : Effect.fail(new Value.Infeasible());
++            },
+           };
+         }
+         return (
+Package: @alchemy.run/domain
+Applies-to: vendor/alchemy/alchemy.run-domain-e1c3e6d.tgz
+Upstream: not yet reported
 Why: Verify runs each sequence its search found as a `Story`, and a `Story` starts its clock at a time of its own
   (2026-01-01 at this pin). The search gives the commands of a short sequence one time, the solver's first (the
   epoch), and a sequence whose commands share one time is written with no clock step. A `decide` that reads `now`
@@ -880,7 +1226,7 @@ Why: Verify runs each sequence its search found as a `Story`, and a `Story` star
   the clock before its first command, so the story runs it when the search did, whatever time the story starts at.
 Remove-when: The library's found sequences set the clock the search used before their first command.
   `bun run beep patches prove` then says this patch's test passes without it.
-Test: test/alchemy-domain/04-a-found-sequence-keeps-its-time/FoundSequenceTime.test.ts
+Test: test/alchemy-domain/06-a-found-sequence-keeps-its-time/FoundSequenceTime.test.ts
 
 diff --git a/lib/Explore/internal/Script.js b/lib/Explore/internal/Script.js
 index 36af935..06b1c41 100644

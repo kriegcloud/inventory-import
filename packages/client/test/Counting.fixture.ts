@@ -27,6 +27,7 @@ export const CounterIds = {
   left: CounterId.make("c-left"),
   forgotten: CounterId.make("c-forgotten"),
   forgottenLooked: CounterId.make("c-forgotten-looked"),
+  forgottenShown: CounterId.make("c-forgotten-shown"),
   expired: CounterId.make("c-expired"),
   returned: CounterId.make("c-returned"),
   unsigned: CounterId.make("c-unsigned"),

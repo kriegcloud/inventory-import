@@ -339,13 +339,14 @@ describe("a watched key", () => {
         const sam = page(served(host).layer, memberOf("mem_sam", "org_prairie"), letGoAtOnce)
         const counter = CounterIds.shared
         dana.registry.mount(bump)
-        sam.registry.mount(total(counter))
+        const looking = sam.registry.mount(total(counter))
         yield* firstSnapshot(sam.registry, counter)
         dana.registry.set(bump, { counterId: counter, by: 4 })
         const four = yield* showsTotal(sam.registry, counter, 4)
         dana.registry.set(bump, { counterId: counter, by: 6 })
         const ten = yield* showsTotal(sam.registry, counter, 10)
         expect([four, ten]).toEqual([4, 10])
+        looking()
       })
     )
   )
@@ -357,7 +358,7 @@ describe("a watched key", () => {
         const { registry } = page(served(host).layer, memberOf("mem_dana", "org_prairie"), letGoAtOnce)
         const counter = CounterIds.refused
         registry.mount(bump)
-        registry.mount(total(counter))
+        const looking = registry.mount(total(counter))
         registry.set(bump, { counterId: counter, by: 60 })
         yield* showsTotal(registry, counter, 60)
         registry.set(bump, { counterId: counter, by: 50 })
@@ -366,6 +367,7 @@ describe("a watched key", () => {
           return AsyncResult.isFailure(now) ? O.some(now.cause.pipe(Cause.squash)) : O.none()
         })
         expect(refused).toBeInstanceOf(TooHigh)
+        looking()
       })
     )
   )
@@ -378,7 +380,7 @@ describe("a watched key", () => {
         const { registry, signedIn } = page(client.layer, memberOf("mem_lee", "org_prairie"), appIdle)
         const counter = CounterIds.switched
         registry.mount(bump)
-        registry.mount(total(counter))
+        const looking = registry.mount(total(counter))
         registry.set(bump, { counterId: counter, by: 9 })
         yield* showsTotal(registry, counter, 9)
         registry.set(signedIn, memberOf("mem_lee", "org_harbor"))
@@ -394,6 +396,7 @@ describe("a watched key", () => {
         expect(heldReadMembers()).not.toContain("mem_lee/org_prairie")
         const again = yield* showsTotal(registry, counter, 9)
         expect(again).toBe(9)
+        looking()
         forgetReads()
       })
     )
@@ -447,12 +450,66 @@ describe("a watched key", () => {
   it.live("let go by `forgetReads` while it is looked at, is not kept when the screen then leaves it", () =>
     Effect.scoped(
       Effect.gen(function* () {
+        const dana = "mem_dana/org_prairie"
         const { client, leave } = yield* lookingAt(CounterIds.forgottenLooked)
-        // `leavePage` lets go of every read, and then the page leaves: the screen leaves a watch already let go.
+        // `leavePage` lets go of every read, and then the screen leaves: the watch let go is closed, and none is opened
+        // again for the person the page is leaving, so nothing is kept.
         forgetReads()
         leave()
         yield* Effect.sleep("300 millis")
-        expect([client.closed.current, heldReadMembers()]).toEqual([["mem_dana/org_prairie"], []])
+        expect([client.opened.current, client.closed.current, heldReadMembers()]).toEqual([[dana], [dana], []])
+      })
+    )
+  )
+
+  it.live(
+    "let go by `forgetReads` while the screen shows it, is closed, and none is opened until it is refreshed",
+    () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const counter = CounterIds.forgottenShown
+          const dana = "mem_dana/org_prairie"
+          const { client, registry, leave } = yield* lookingAt(counter)
+          // The screen still shows it: the watch is closed all the same, and the screen waits, with nothing of its state.
+          forgetReads()
+          yield* Effect.sleep("100 millis")
+          const waiting = registry.get(total(counter))
+          expect([client.opened.current, client.closed.current, AsyncResult.isInitial(waiting)]).toEqual([
+            [dana],
+            [dana],
+            true
+          ])
+          // A change pushed meanwhile opens nothing for the member the page is leaving.
+          registry.set(bump, { counterId: counter, by: 2 })
+          yield* answered(registry, O.none(), bump)
+          yield* Effect.sleep("100 millis")
+          expect([client.opened.current, shown(registry, counter)]).toEqual([[dana], O.none()])
+          // A refresh opens one watch again, which shows the state as it is now.
+          registry.refresh(total(counter))
+          const again = yield* showsTotal(registry, counter, 3)
+          expect([again, client.opened.current, client.closed.current]).toEqual([3, [dana, dana], [dana]])
+          leave()
+          forgetReads()
+        })
+      )
+  )
+
+  it.live("let go by `forgetReads` while the screen shows it, opens a watch for the next member the page has", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const counter = CounterIds.forgottenShown
+        const { client, registry, signedIn, leave } = yield* lookingAt(counter)
+        forgetReads()
+        yield* Effect.sleep("100 millis")
+        registry.set(signedIn, memberOf("mem_sam", "org_prairie"))
+        const now = yield* showsTotal(registry, counter, 1)
+        expect([now, client.opened.current, client.closed.current]).toEqual([
+          1,
+          ["mem_dana/org_prairie", "mem_sam/org_prairie"],
+          ["mem_dana/org_prairie"]
+        ])
+        leave()
+        forgetReads()
       })
     )
   )
@@ -520,9 +577,10 @@ describe("a watched key", () => {
         registry.set(bump, { counterId: counter, by: 2 })
         yield* answered(registry, AsyncResult.value(before), bump)
         yield* Effect.sleep("100 millis")
-        registry.mount(total(counter))
+        const back = registry.mount(total(counter))
         // At once: the state the watch kept following while nobody looked, never a skeleton, from the same watch.
         expect([shown(registry, counter), judge.judged.current - judgedBefore]).toEqual([O.some(7), 0])
+        back()
         forgetReads()
       })
     )
@@ -559,7 +617,7 @@ describe("a watched key", () => {
           const counter = CounterIds.judged
           const seen: Array<AsyncResult.AsyncResult<unknown, unknown>> = []
           registry.mount(bump)
-          registry.subscribe(totalOverSockets(counter), (now) => seen.push(now), { immediate: true })
+          const looking = registry.subscribe(totalOverSockets(counter), (now) => seen.push(now), { immediate: true })
           yield* until(() => AsyncResult.value(registry.get(totalOverSockets(counter))))
           const judgedAtOpen = judge.judged.current
           // Two verdicts later: the server closed the read twice, and the client opened it again each time. Waited
@@ -582,6 +640,7 @@ describe("a watched key", () => {
             upgrades.current.length >= 3,
             A.filter(upgrades.current, (address) => !Str.startsWith("/mem_dana?")(address))
           ]).toEqual([true, []])
+          looking()
         })
       )
   )

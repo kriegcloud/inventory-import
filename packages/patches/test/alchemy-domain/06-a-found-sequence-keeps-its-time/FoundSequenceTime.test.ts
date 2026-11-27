@@ -1,4 +1,4 @@
-// The test of `alchemy-domain/04-a-found-sequence-keeps-its-time.patch`. Without the patch Verify runs the sequence
+// The test of `alchemy-domain/06-a-found-sequence-keeps-its-time.patch`. Without the patch Verify runs the sequence
 // the search found (`WriteEntry` at the solver's time, the epoch) as a story that writes no clock step, because every
 // command of it shares one time: the story runs it at 2026-01-01, its own start, records day 20454 where the search
 // read day 0, and the report says the sequence does something else when run as a story.

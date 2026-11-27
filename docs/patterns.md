@@ -443,13 +443,13 @@ step (`packages/catalog/web/src/ResultStep.screen.tsx`) says what it will do and
 A file with a row per item and a quantity column per month, or a row that lists two lots, holds several records in
 one row. The import does this end to end: one function says how a row becomes records, and the review, the screen,
 the confirm, the result and the take-back key each record on its own id. Files: `packages/catalog/model/src/Review/Review.rules.ts`
-(`ItemsOfRow`, `recordsOfRow`, `rowId`, `rowPlace`), `packages/catalog/model/src/Review/ItemsOfRow.context.ts`, `packages/catalog/host/src/ImportStore.adapter.ts`,
+(`ItemsOfRow`, `recordsOfRow`, `rowId`, `rowPlace`), `packages/catalog/model/src/Review/ItemsOfRow.reference.ts`, `packages/catalog/host/src/ImportStore.adapter.ts`,
 `migrations/0001_init.sql` (`part`, `sourcePart`), `packages/catalog/web/src/ImportReview.controller.ts`,
 `test/domain/RowParts.test.ts` and `test/server/RowParts.slow.test.ts`. The gallery's "One line, several records"
 (`/gallery/review?state=months`) shows the region with it.
 
 - **Say it once, in the domain.** `itemsOfRow` in `ItemImport.ts` says how a row becomes items; the review screen
-  uses it, and the server reviews with `ItemsOfRow` (`packages/catalog/model/src/Review/ItemsOfRow.context.ts`), which defaults to it. Never give the server another in the app: the
+  uses it, and the server reviews with `ItemsOfRow` (`packages/catalog/model/src/Review/ItemsOfRow.reference.ts`), which defaults to it. Never give the server another in the app: the
   confirm would then write records the screen never showed. A test provides its own (`Layer.succeed(ItemsOfRow,
   byMonth)`).
 - **A record has its own id; its row keeps its number.** Each record of a row has a `part` (1, 2, ...) and the

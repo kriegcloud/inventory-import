@@ -1,16 +1,19 @@
 // The blocks of @alchemy.run/domain one file declares, read from its syntax tree: a call of a block's maker, under
 // whichever name the file imported it by (`Domain.View(` through `import * as Domain from "@alchemy.run/domain"`, or
-// from `"@alchemy.run/domain/index"`, `View(` through `import { View } from "@alchemy.run/domain"`, `View.make(`
-// through `import * as View from "@alchemy.run/domain/View"`, `Domain["View"](` or `Domain[\`View\`](` with the
-// name written out), a call of `RpcMiddleware.Service` (`effect/rpc/RpcMiddleware`) and of `Context.Service`
-// (`effect/Context`, a hand-written port). A callee, and the object of a member, is read through what only wraps it:
-// parentheses, `!`, `as`, `satisfies`, `<T>x`, `x<T>` and the last expression of a sequence (`(0, Domain.View)(`).
+// from `"@alchemy.run/domain/index"`, or through `import Domain = require("@alchemy.run/domain")`, `View(` through
+// `import { View } from "@alchemy.run/domain"`, `View.make(` through `import * as View from
+// "@alchemy.run/domain/View"`, `Domain["View"](` or `Domain[\`View\`](` with the name written out), a call of
+// `RpcMiddleware.Service` (`effect/rpc/RpcMiddleware`) and of `Context.Service` (`effect/Context`, a hand-written port).
+// A callee, and the object of a member, is read through what only wraps it: parentheses, `!`, `as`, `satisfies`,
+// `<T>x`, `x<T>`, an optional chain (`(Domain?.View)(`) and the last expression of a sequence (`(0, Domain.View)(`).
 // Every maker the library's index exports a block by is read (`Model`, `Aggregate`, `Decision`, `Command`, `Event`,
 // `Rejection`, `RequestContext`, `Relation` and the eleven the block-files law places); `Sealed` makes a field, not a
 // block, and is not. A pattern over the text would also take the words out of a comment, a string or a test's fixture
-// text, so the tree is read. What it cannot see: a maker passed through a variable of the file's own
-// (`const V = Domain.View`), or reached through a module that re-exports it; a type-only import makes nothing and is
-// not read. The walk keeps its own list, so no file nests it past the stack.
+// text, so the tree is read. It also says whether the file holds anything besides its blocks: a statement at its top
+// that is not an import, a declaration of types only, or one that declares a block. What it cannot see: a maker
+// passed through a name of the file's own (`const V = Domain.View`, `import V = Domain.View`), reached through a module
+// that re-exports it, or called through `.call(...)` or `.apply(...)` (`Domain.View.call(undefined, "V", {})`); a
+// type-only import makes nothing and is not read. The walk keeps its own list, so no file nests it past the stack.
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
@@ -62,9 +65,18 @@ export interface BlockAt {
   readonly line: number
 }
 
-/** What reading one file gives: its blocks, or the parser's first complaint when it could not read the file. */
+/**
+ * What reading one file gives: its blocks, whether they are all it holds, or the parser's first complaint when it
+ * could not read the file.
+ */
 export interface BlocksRead {
   readonly found: ReadonlyArray<BlockAt>
+  /**
+   * Whether every statement at the file's top is an import, a declaration of types only (a type, an interface, a
+   * `declare namespace`), a list of names it exports, or one that declares a block: a file that holds nothing else
+   * may be renamed to its block's ending, and one with other code beside its blocks keeps its name.
+   */
+  readonly alone: boolean
   readonly unread: O.Option<string>
 }
 
@@ -116,7 +128,8 @@ const wrappers = [
   "TSAsExpression",
   "TSSatisfiesExpression",
   "TSTypeAssertion",
-  "TSInstantiationExpression"
+  "TSInstantiationExpression",
+  "ChainExpression"
 ]
 
 /** The expression a wrapper holds, or a sequence's last, which is its value. */
@@ -176,6 +189,36 @@ const membersOf = (written: string): Readonly<Record<string, BlockKind>> => {
           )
       })
 }
+
+/**
+ * What `import Domain = require("@alchemy.run/domain")` binds: its name, as a namespace of the module's makers. One
+ * that names another name (`import V = Domain.View`) binds nothing here.
+ */
+const requiredOf = (declaration: Node): Bindings => {
+  const members = typeOnly(declaration)
+    ? R.empty<string, BlockKind>()
+    : O.match(
+        O.flatMap(
+          O.filter(
+            child(declaration, "moduleReference"),
+            (reference) => reference.type === "TSExternalModuleReference"
+          ),
+          (reference) => stringOf(reference, "expression")
+        ),
+        { onNone: () => R.empty<string, BlockKind>(), onSome: membersOf }
+      )
+  const namespaces =
+    R.size(members) > 0 ? O.toArray(O.map(nameOf(declaration, "id"), (local) => [local, members] as const)) : []
+  return { namespaces: R.fromEntries(namespaces), names: R.empty<string, BlockKind>() }
+}
+
+/** The `import X = ...` declarations at a file's top, `export import X = ...` included. */
+const importEqualsOf = (statement: Node): ReadonlyArray<Node> =>
+  statement.type === "TSImportEqualsDeclaration"
+    ? A.of(statement)
+    : statement.type === "ExportNamedDeclaration"
+      ? O.toArray(O.filter(child(statement, "declaration"), (inner) => inner.type === "TSImportEqualsDeclaration"))
+      : []
 
 /** What one import declaration binds: the members a namespace of its module holds as makers, and each name it imports. */
 const bindingsOf = (declaration: Node): Bindings => {
@@ -245,6 +288,25 @@ const declaredName = (node: Node): O.Option<string> =>
     ? nameOf(node, "id")
     : O.none()
 
+/** Statements that bring names in or declare types only: they hold no code beside a file's blocks. */
+const typesOnly = [
+  "ImportDeclaration",
+  "TSImportEqualsDeclaration",
+  "TSTypeAliasDeclaration",
+  "TSInterfaceDeclaration",
+  "EmptyStatement"
+]
+
+/** Whether a statement at a file's top holds no code: an import, types only, or `export { names }`. */
+const holdsNoCode = (statement: Node): boolean =>
+  A.contains(typesOnly, statement.type) ||
+  (statement.type === "TSModuleDeclaration" && statement["declare"] === true) ||
+  (statement.type === "ExportNamedDeclaration" &&
+    O.match(child(statement, "declaration"), {
+      onNone: () => O.isNone(child(statement, "source")),
+      onSome: holdsNoCode
+    }))
+
 /**
  * Every block `source` declares, in the order written, or why it could not be read.
  *
@@ -254,14 +316,12 @@ export const readBlocks = (input: { readonly file: string; readonly source: stri
   const parsed = parseSync(input.file, input.source)
   const complaint = A.head(A.map(parsed.errors, (error) => error.message))
   if (O.isSome(complaint) || !isNode(parsed.program)) {
-    return { found: [], unread: O.orElse(complaint, () => O.some("it is not a module")) }
+    return { found: [], alone: false, unread: O.orElse(complaint, () => O.some("it is not a module")) }
   }
   const program = parsed.program
-  const declarations = A.filter(
-    A.filter(A.isArray(program["body"]) ? program["body"] : [], isNode),
-    (statement) => statement.type === "ImportDeclaration"
-  )
-  const bound = A.map(declarations, bindingsOf)
+  const body = A.filter(A.isArray(program["body"]) ? program["body"] : [], isNode)
+  const declarations = A.filter(body, (statement) => statement.type === "ImportDeclaration")
+  const bound = A.appendAll(A.map(declarations, bindingsOf), A.map(A.flatMap(body, importEqualsOf), requiredOf))
   const bindings: Bindings = {
     namespaces: A.reduce(bound, R.empty<string, Readonly<Record<string, BlockKind>>>(), (all, one) => ({
       ...all,
@@ -271,6 +331,8 @@ export const readBlocks = (input: { readonly file: string; readonly source: stri
   }
   const line = linesOf(input.source)
   const found: Array<BlockAt> = []
+  // Where each block's call starts, to tell a statement that declares a block from one that holds other code.
+  const starts: Array<number> = []
   // Which class or constant has given its name to a block: the first block under it takes its name, and a block
   // written inside another (a view inside a model's `views`) takes the name it gives itself.
   const named: Array<number> = []
@@ -290,6 +352,7 @@ export const readBlocks = (input: { readonly file: string; readonly source: stri
     if (node.type === "CallExpression") {
       const kind = kindOfCall(node, bindings)
       if (O.isSome(kind)) {
+        starts.push(node.start)
         const first = O.isSome(here) && !A.contains(named, scope)
         if (first) named.push(scope)
         found.push({
@@ -301,5 +364,10 @@ export const readBlocks = (input: { readonly file: string; readonly source: stri
     }
     for (const next of A.reverse(children(node))) left.push({ node: next, name: here, scope })
   }
-  return { found, unread: O.none() }
+  const alone = A.every(
+    body,
+    (statement) =>
+      holdsNoCode(statement) || A.some(starts, (start) => start >= statement.start && start < statement.end)
+  )
+  return { found, alone, unread: O.none() }
 }

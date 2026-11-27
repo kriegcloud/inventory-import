@@ -9,6 +9,7 @@ import {
   operatorsFor,
   CatalogColumn
 } from "@inventory/catalog-contract/TableView"
+import { dual } from "effect/Function"
 // WHAT THE TABLE ASSISTANT MAY ASK OF A TABLE, AND NOTHING MORE. A person types what they want to see; a model (or the
 // fixed rules) answers with a `ViewCommand`: sort, filter, search, show or hide a column, clear. The command changes
 // the person's own view of a table, never stored data. The one thing not to break: every column and operator in an
@@ -191,10 +192,13 @@ const ascending = /\s+(ascending|asc|low to high|smallest first|a to z|oldest fi
  */
 const groupOf =
   (pattern: RegExp) =>
-  (clause: string): O.Option<string> =>
-    O.flatMap(Str.match(pattern)(clause), (found) => O.fromUndefinedOr(found[1]))
+    (clause: string): O.Option<string> =>
+      O.flatMap(Str.match(pattern)(clause), (found) => O.fromUndefinedOr(found[1]))
 
-const readClause = (clause: string, columns: ColumnCatalog): O.Option<ViewChange> => {
+const readClause: {
+  (clause: string, columns: ColumnCatalog): O.Option<ViewChange>,
+  (columns: ColumnCatalog): (clause: string) => O.Option<ViewChange>
+} = dual(2, (clause: string, columns: ColumnCatalog): O.Option<ViewChange> => {
   if (/^(clear|reset)( all| everything| the view| it)?$/.test(clause) || /^show (all|everything)$/.test(clause)) {
     return O.some({ kind: "clear", what: "everything" })
   }
@@ -259,7 +263,7 @@ const readClause = (clause: string, columns: ColumnCatalog): O.Option<ViewChange
     operator: "inArray",
     values: A.filter(column.values, (value) => Str.toLowerCase(value) === wanted)
   }))
-}
+})
 
 /**
  * Reads a request with the fixed rules: each part joined by "and", a comma or "then" must be one they read, or the
@@ -277,8 +281,8 @@ export const readByRules = (input: {
     A.map(Str.split(/\s*(?:,|;|\band then\b|\bthen\b|\band\b)\s*/)(clean(input.prompt)), clean),
     (clause) => clause !== ""
   )
-  if (clauses.length === 0) return Result.fail(`Type what you want to see. ${rulesRead}`)
-  const changes: Array<ViewChange> = []
+  if (A.isReadonlyArrayEmpty(clauses)) return Result.fail(`Type what you want to see. ${rulesRead}`)
+  const changes = A.empty<ViewChange>()
   for (const clause of clauses) {
     const read = readClause(clause, input.columns)
     if (O.isNone(read)) return Result.fail(`The rules could not read ${quoted(clause)}.`)

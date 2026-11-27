@@ -15,6 +15,7 @@ import { DecidingGroup } from "./Review/DecidingGroup.decision.ts"
 import { Undoing } from "./Review/Undoing.decision.ts"
 import { UndoingGroup } from "./Review/UndoingGroup.decision.ts"
 import { RowState, Row, RowEvent } from "./Row/Row.aggregate.ts"
+import { dual } from "effect/Function"
 
 // What the invariants below are said in. An invariant of the model is searched, never proved: Verify runs it as it is
 // written and does not read its code, so it may call these. A relation is proved, so the two relations call nothing.
@@ -55,7 +56,18 @@ const everyDecidedGroup = (groups: ReadonlyArray<Held<GroupState>>, holds: (grou
  * `holds` of every decided act on a group, beside the import it was recorded on. A removed import is asked nothing:
  * what it numbered is gone. An import not yet staged has no act on a group, so one found there breaks the rule.
  */
-const everyGroupOfItsImport = (
+const everyGroupOfItsImport: {
+  (
+    all: { readonly Group: ReadonlyArray<Held<GroupState>>; readonly Import: ReadonlyArray<Held<ImportState>> },
+    holds: (group: DecidedGroup, life: StagedImport) => boolean
+  ): boolean,
+  (
+    holds: (group: DecidedGroup, life: StagedImport) => boolean
+  ): (all: {
+    readonly Group: ReadonlyArray<Held<GroupState>>;
+    readonly Import: ReadonlyArray<Held<ImportState>>
+  }) => boolean
+} = dual(2, (
   all: { readonly Group: ReadonlyArray<Held<GroupState>>; readonly Import: ReadonlyArray<Held<ImportState>> },
   holds: (group: DecidedGroup, life: StagedImport) => boolean
 ): boolean =>
@@ -67,16 +79,21 @@ const everyGroupOfItsImport = (
         ImportState.guards.Removed(life.state) ||
         (!ImportState.guards.Unstaged(life.state) && holds(group, life.state))
     )
-  )
-
-/** A row an act has reached: it names its import. */
-type ReachedRow = Exclude<RowState, typeof RowState.cases.Untouched.Type>
+  ))
 
 /**
  * `holds` of every row an act has reached, beside the import it belongs to. A removed import is asked nothing, as for
  * a group; an import not yet staged has no row, so one found there breaks the rule.
  */
-const everyRowOfItsImport = (
+const everyRowOfItsImport: {
+  (
+  all: { readonly Row: ReadonlyArray<Held<RowState>>; readonly Import: ReadonlyArray<Held<ImportState>> },
+  holds: (row: ReachedRow, life: StagedImport) => boolean
+): boolean,
+  (
+  holds: (row: ReachedRow, life: StagedImport) => boolean
+): (all: { readonly Row: ReadonlyArray<Held<RowState>>; readonly Import: ReadonlyArray<Held<ImportState>> }) => boolean
+} = dual(2, (
   all: { readonly Row: ReadonlyArray<Held<RowState>>; readonly Import: ReadonlyArray<Held<ImportState>> },
   holds: (row: ReachedRow, life: StagedImport) => boolean
 ): boolean => {
@@ -89,7 +106,10 @@ const everyRowOfItsImport = (
         (!ImportState.guards.Unstaged(life.state) && holds(row, life.state))
     )
   return A.every(all.Row, (row) => RowState.guards.Untouched(row.state) || besideItsImport(row.state))
-}
+})
+
+/** A row an act has reached: it names its import. */
+type ReachedRow = Exclude<RowState, typeof RowState.cases.Untouched.Type>
 
 /** The catalog's model: today, the review of an import. */
 export class Catalog extends Domain.Model(
@@ -185,4 +205,5 @@ export class Catalog extends Domain.Model(
     }
   },
   { description: "The catalog: the review of an import, its rows, the acts on groups of them, and the acts on each" }
-) {}
+) {
+}

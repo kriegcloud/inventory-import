@@ -19,11 +19,14 @@ export const ModelAllowanceViaAccess = Layer.effect(
   ModelAllowance,
   Effect.gen(function* () {
     const gateway = yield* ModelAllowanceGateway
+
+    const take = Effect.fnUntraced(function* (purpose: CatalogModelPurpose) {
+      const call = yield* gateway.take(purpose)
+      return AllowanceAnswer.guards.taken(call) ? taken : usedUp(usedUpWords)
+    })
+
     return ModelAllowance.of({
-      take: Effect.fnUntraced(function* (purpose: CatalogModelPurpose) {
-        const call = yield* gateway.take(purpose)
-        return AllowanceAnswer.guards.taken(call) ? taken : usedUp(usedUpWords)
-      })
+      take
     })
   })
 )

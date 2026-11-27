@@ -20,7 +20,7 @@ pull request is merged, or, for a step with none, when its record below is writt
 | 6 | One summary at the end of a failing check | 35 | done: 2026-11-26 |
 | 7 | `bun run check:changed` | 40 | done: 2026-11-26 |
 | 8 | A merge that finishes on its own | none, or one for the rule in `CLAUDE.md` | todo |
-| 9 | The worktrees and the main checkout | one for `CLAUDE.md` | doing |
+| 9 | The worktrees and the main checkout | one for `CLAUDE.md` | done: #36, 2026-11-26 |
 | 10 | Close: the closing note, `status: done`, `bun run check:full` on main | one | todo |
 
 Every question was answered on 2026-11-26 ("Decided", below). Step 5 is done. Steps 4, 6, 7 and 9 can start. Step 8 waits on Benjamin's change to the settings, and step 3 on a person he brings.

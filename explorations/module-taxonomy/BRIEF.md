@@ -56,8 +56,10 @@ Scope, not time. In:
   11 add (`.sealed.ts`, `.host.ts`, `.cron.ts`, `.singleton.ts`, and a surface's `.http.ts`, `.cli.ts`,
   `.toolkit.ts`, `.mcp.ts`), and the model's mutants that name a moved line written again (60 name
   `Import.aggregate.ts`).
-- An ending for each of the four files that have none and a kind or a rename for each of the three one-off endings,
-  once he has answered what they are (decisions 6 and 7).
+- The four files that had no ending and the three endings used once, as he answered (decisions 6 and 7): `Host.ts`
+  in both hosts, `Auth.config.ts` for access's `Config.ts`, `Adapters.ts` folded into `Host.ts`; `.state.ts` and
+  `.route.ts` kinds, `ItemsOfRow.reference.ts` renamed `ItemsOfRow.context.ts`.
+- A model's merged Live in `<Model>.model.ts` (decision 13).
 
 Out:
 
@@ -158,9 +160,9 @@ its home here (decision 9c). Its `NOTE.md` says what each needed and what Verify
 - **`block-files` allows a command in its decider's file, and has no `.event.ts`, `.state.ts`, `.transition.ts` or
   `.union.ts`.** The four kinds are added before the first file moves. Once the commands and events have moved, the
   allowance is taken out, or the two places drift apart again. The law was not run on the experiment's files.
-- **`.state.ts` is taken once already.** `ItemEditor.state.ts` in `catalog/web` is one of decision 7's three one-off
-  endings. A model's `.state.ts` is another thing under the same ending: decision 7 is answered for `.state` before
-  the kind is written, or the registry holds one ending with two meanings.
+- **`.state.ts` is taken once already.** `ItemEditor.state.ts` in `catalog/web` has the ending. Decision 7 makes it
+  the same kind as a model's: the tagged union of the states a subject is in, with the pure functions over it. The
+  registry's rule for the kind is written to hold for both, or the ending has two meanings.
 - **A named import of `Event` or `Command`.** Nine classes of `Import` are named `Event`. The editor will offer
   `import { Event }`. Decision 2 makes refusing it a law; that check lands before the first event moves.
 - **Inside its file `Event` hides the DOM's.** No file of the model uses that one; a diagnostic that minds was not
@@ -221,7 +223,7 @@ its home here (decision 9c). Its `NOTE.md` says what each needed and what Verify
 | The folder rule of decision 8 as a count in `block-files` | `module-kinds`, later, with the move of `Import` | `BlockFiles.rules.ts` |
 | The kinds of decisions 9 to 11 in the registry, and `.handler.ts` and `.live.ts` retired for a Live in its block's file | `module-kinds`, later, before `alchemy-domain-uptake` builds the first of them | `Kinds.registry.ts`; the placement table above |
 | Patches `04` and `05` removed | when the library keeps a named rule's text and reads a constructor default itself | `packages/patches/alchemy-domain`, `docs/patches.md` |
-| The four files with no ending and the three one-off endings | `module-kinds`, later, when decisions 6 and 7 are answered | `packages/*/host/src/Host.ts`, `packages/access/host/src/Adapters.ts` and `Config.ts`; `ItemsOfRow.reference.ts`, `ItemEditor.state.ts`, `SignIn.route.ts` |
+| The four files with no ending and the three one-off endings | `module-kinds`, later, as decisions 6 and 7 were answered | `packages/*/host/src/Host.ts`, `packages/access/host/src/Adapters.ts` and `Config.ts`; `ItemsOfRow.reference.ts`, `ItemEditor.state.ts`, `SignIn.route.ts` |
 | The registry for packages outside a context | not this goal | NET-NEW; needs the census first |
 
 The first slice is the registry, `block-files` reading it, and the nine renames: it changes no code a proof reads,

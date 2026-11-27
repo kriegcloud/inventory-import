@@ -1,7 +1,7 @@
 ---
 type: Decisions
 title: Decisions
-description: Module taxonomy decisions. The open questions, one decision each, with the option recommended and what it was tried on, and the answered ones with the options he rejected and how to reverse them. Decision 1 was answered twice; the later answer stands.
+description: Module taxonomy decisions. No question is open. The answered ones, one decision each, with the options he rejected and how to reverse them. Decision 1 was answered twice; the later answer stands.
 ---
 
 # Decisions
@@ -13,18 +13,60 @@ agent's, made from his answers beside it, and his to overturn.
 
 ## Open
 
-| # | Question | Recommended | Changes | Where it is argued |
-| --- | --- | --- | --- | --- |
-| 6 | What ending do the two files with none take? (`Adapters.ts` and `Config.ts` in access's host; decision 10a answered `Host.ts` in both hosts) | Asked when its part of the brief opens | | [BRIEF](BRIEF.md), Map |
-| 7 | Is each of the three endings used once a kind, or is its file renamed? (`.reference`, `.state`, `.route`) | Asked when its part of the brief opens | Decision 1 as replaced gives a model `.state.ts`; `.state` is asked first | [BRIEF](BRIEF.md), Map |
+None. Decisions 6 and 7 and the home of a model's merged Live were answered on 2026-11-27, after the review loop.
 
 Decisions 1, 3, 4 and 5 were answered on 2026-11-27 and are under "Answered"; he replaced his answer to 1 the same
 day and then answered 2. He raised 8 to 11 (kind folders, the blocks to come, hosts and surfaces, sealed values) and
 answered 8a, 8b, 8c, 9a, 9b, 9c, 10a, 10b and 11a; the agent placed 9d and 11b and named the flat modules' unions
 (under 8b). Decision 12 records, after the fact, the three calls of his that took the shape past decision 1. 10a
-answered 6 for `Host.ts`; the rest of 6, and 7, were not put to him, and neither blocks the brief's first slice.
+answered 6 for `Host.ts`. He answered the rest of 6, 7 and decision 13 (the merged Live) last, after the experiment's
+review loop closed.
 
 ## Answered
+
+### 2026-11-27: decisions 6, 7 and 13, the files with no ending, the endings used once and the merged Live
+
+Asked together once the experiment's review loop closed with no required finding. He chose the recommended option in
+each. Nothing in a package was renamed for them here; the uptake does that.
+
+**6. The two files with no ending in access's host.**
+
+- Question: what ending do `Config.ts` (the `StagePassword` schema and `authSettings`, an Effect Config that sign-in
+  reads) and `Adapters.ts` (one `Layer.mergeAll` of the four D1 adapters) take?
+- Answer: "`Auth.config.ts`, a new kind" and "Fold it into `Host.ts`". `.config.ts` is a typed settings contract read
+  through Effect Config, named for its subject. `AccessAdaptersD1` keeps its name as an export of `Host.ts`.
+- Rationale: a host's settings are a kind catalog's host will need too, so the ending is not used once. Both hosts
+  then read alike: `Host.ts` holds every merge of its host, as catalog's holds `CatalogLive`. Rejected for the
+  config: "`Access.config.ts`" (one file every later setting lands in) and "Keep `Config.ts`" (an exception the law
+  lists by name). Rejected for the adapters: "Keep it, give catalog one too" and "Keep `Adapters.ts` as it is".
+- Reverse: rename `Auth.config.ts` to `Config.ts` and drop the kind; move the merge back to its own file.
+
+**7. The three endings used once.**
+
+- Question: is each of `.state` (`ItemEditor.state.ts` in catalog's web), `.reference` (`ItemsOfRow.reference.ts`, a
+  `Context.Reference` with a default) and `.route` (`SignIn.route.ts` in access's host) a kind, or is its file
+  renamed?
+- Answer: "state, route kinds; reference → context". `.state.ts` and `.route.ts` are kinds;
+  `ItemsOfRow.reference.ts` becomes `ItemsOfRow.context.ts`.
+- Rationale: `.state.ts` is a model kind already (decision 12), and the web file is the same thing, the tagged union
+  of the states its subject is in with the pure functions over it, so the ending keeps one meaning. A host gains
+  routes. `.context.ts` already names what a block reads from context, and a Reference is that with a default.
+  Rejected: "All three are kinds" (two kinds for values read from context) and "Only state is a kind" (the route
+  folded into `Access.http.ts`, which grows by about 100 lines).
+- Reverse: rename `ItemsOfRow.context.ts` back and add `.reference` to the registry; fold or rename the route.
+
+**13. The Layer that merges every Live of a model.**
+
+- Question: decision 9b puts each block's Live in the block's file. Where does the one Layer that merges them live?
+- Answer: "In `<Model>.model.ts`". It sits beside the model class, which imports every block already, and still
+  needs the model's ports and external systems from the host.
+- Rationale: one import gives a host the model and its handlers, and no host or test repeats the list or forgets
+  one. Tried: `CatalogTrialHandlers` in the experiment's `Trial.model.ts`, provided to an in-memory host and to a
+  test Api. Rejected: "In the host's `Host.ts`" and "Its own `<Model>.handlers.ts`" (a kind used once a model).
+- Reverse: move the merge to the host and export each Live from the model package.
+
+The three module groups the brief marks "to name" were not asked: the brief leaves each to the uptake goal that
+builds its blocks.
 
 ### 2026-11-27: decision 11, sealed values and the Vault
 

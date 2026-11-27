@@ -4,7 +4,7 @@ title: Module taxonomy
 description: Whether the per-unit module shape tried on RPCs in beep-effect (one unit, role-named files, a contract door and a handler door) gives @alchemy.run/domain blocks, and the rest of this repository, one consistent structure. A reading from source and experiments run: the whole catalog model written to the shape verifies against the package's lock, with one trial block of each kind to come, and a registry of kinds refuses sixteen of the two contexts' 173 files.
 status: active
 stage: shape
-next: he reads `scratchpad/experiments/catalog-model` (the whole model in the shape, verified) and says whether it goes into `packages/catalog/model`; decisions 8 to 11 are answered, 9d and 11b placed by the agent; the rest of 6, and 7, are open
+next: he reads `scratchpad/experiments/catalog-model` (the whole model in the shape, verified) and says whether it goes into `packages/catalog/model`; every decision is answered (6, 7 and 13 last), 9d and 11b placed by the agent; three module groups are named by the uptake
 goals: []
 ---
 
@@ -372,3 +372,6 @@ rest of 6, and 7, are open.
   corrected after the third round and confirmed by its reviewer. The trial blocks gained from it: every read is
   guarded by organization, the row's view sits beside the row, and a decide reads a state's helper through its
   namespace. The lock is byte for byte the package's throughout.
+- 2026-11-27: he answered what was left. `Config.ts` becomes `Auth.config.ts` and `Adapters.ts` folds into `Host.ts`
+  (decision 6); `.state.ts` and `.route.ts` are kinds and `ItemsOfRow.reference.ts` becomes `.context.ts`
+  (decision 7); a model's merged Live sits in `<Model>.model.ts` (decision 13). No decision is open.

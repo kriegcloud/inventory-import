@@ -1,7 +1,7 @@
 ---
 type: Tooling Guide
 title: Looking at a deployed stage
-description: For one stage - how to read its plan, its drift, its logs and its state, each with the exact command; what the deploy workflow's plan step and its guard do; who may open a preview; and what none of these commands may be run by.
+description: For one stage - how to read its plan, its drift, its logs and its state, each with the exact command; which of the two Cloudflare accounts Alchemy, cf and the dashboard reach, and how to pick one; what the deploy workflow's plan step and its guard do; who may open a preview; and what none of these commands may be run by.
 tags: [tooling, deploy, operations]
 ---
 
@@ -31,6 +31,45 @@ All of them run from the repository's root and take the stage and the profile of
 Not verified: none of these was run against an account when this page was written (2026-11-26). The flags, the
 exit codes and what each prints are read from the CLI's source at the commit `vendor/alchemy` holds, and the plan's
 lines from a run of its own formatter.
+
+## Two accounts, and which one a command reaches
+
+The stages live in two Cloudflare accounts ([the infra plan](../goals/infra/PLAN.md), "Two accounts, each reached its
+own way"). Production's account holds the zone `beep-effect.com` and is reached by Benjamin's own login. The previews'
+account holds every preview, test stage and staging, and that login does not reach it: an account-owned token he made
+there does (his choice of 2026-11-22, "Use my own token", over adding his login as a member). Each tool picks its
+account its own way, so the same command can reach either:
+
+| Tool | What decides the account, first match wins | For the previews' account | For production's |
+| --- | --- | --- | --- |
+| Alchemy (`bunx alchemy …`) | `--profile <name>`, else `ALCHEMY_PROFILE`, else the profile `default`. In a workflow, `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` instead (the log says "using environment variables") | `--profile inventory-preview` | `--profile inventory-production` |
+| Cloudflare's CLI (`cf …`) | `CLOUDFLARE_API_TOKEN` in the environment or in a `.env` file it reads, else `--profile <name>`, else the profile bound to the folder (`cf auth activate`), else `default` | `cf --profile preview …`, once the profile exists | `cf …` (the `default` login) |
+| The dashboard | The browser's login | A login of that account's owner, in a browser profile of its own | Benjamin's login |
+
+One `cf` is enough; a second account is a second profile, made once and signed in as the previews' account's owner:
+
+```bash
+cf auth create preview
+```
+
+Then check which account a command will reach before running it:
+
+```bash
+cf --profile preview auth whoami
+```
+
+`cf auth list` names the profiles. A `CLOUDFLARE_API_TOKEN` exported in the shell, or written in a `.env` file `cf`
+reads, wins over every profile: unset it before using one. An error that the account "does not belong to the
+authenticated user" means a login of the other account.
+
+What is done by hand in the previews' account (Access for previews, below; a token rotated, [Releasing and
+deploying](releasing.md)) is done in the dashboard signed in as its owner. Done under Benjamin's login it lands in
+production's account, and the previews' deploys still fail.
+
+Seen on 2026-11-26: `cf` 1.0.0-rc.4 held one profile, `default`; Alchemy held `default`, `inventory-preview` and
+`inventory-production`; the dashboard under Benjamin's login answered for the previews' account that it "does not
+belong to the authenticated user". `cf`'s order is from its documentation ("Credential order"), Alchemy's from its
+source at the commit `vendor/alchemy` holds; neither was run against an account.
 
 ## The plan
 
@@ -107,6 +146,12 @@ A run without either reference stops before its first step and names the line to
 list at its next deploy (a push to its pull request, or a re-run of its Preview job). A list with a piece that is no
 email stops the deploy with `MissingPreviewAccess`, which says so without repeating the list. In a preview's plan
 the gate is the line `[Website/Access]`.
+
+The gate also needs Access turned on in the previews' account, once: in its dashboard, signed in as its owner (above),
+open Zero Trust and finish its first setup (a team name; the free plan is enough), then check that "One-time PIN" is
+a login method. The previews' token needs the account permission "Access: Apps and Policies, Edit". Until Access is
+on, every preview's deploy stops at `[Website/Access] create` with `access.api.error.not_enabled: Access is not
+enabled` (seen on pull request 32, 2026-11-26).
 
 ## Where a stage's telemetry goes
 

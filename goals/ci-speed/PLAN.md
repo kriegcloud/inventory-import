@@ -22,7 +22,7 @@ the exploration's [DECISIONS.md](../../explorations/ideal-architecture/DECISIONS
 | 6 | `envMode` strict: each task's `env`, the pass-through list found by running `check:full` until it passes, locally and on a branch's CI | nothing; a condition of step 9 | nothing | built; CI's run waits on a push ("Step 6" below) |
 | 7 | `.dev.vars` out of `build`'s outputs and a check that fails when a build artifact holds one; Node pinned exactly and among the global inputs | nothing; a condition of step 9 | nothing | done ("Step 7" below) |
 | 8 | Move `Pwned.slow.test.ts` to a task of its own, never cached; give `test:slow` inputs so the rest can replay | 3 to 5 min where the app's closure is unchanged (22 of the last 40 commits) | step 6 | built ("Step 8" below) |
-| 9 | The Worker: the team's settings declared in `GitHub.stack.ts`; `TURBO_API`, `TURBO_TEAM`, `TURBO_TOKEN` and `TURBO_CACHE` in both jobs (read on a pull request, write on a push to main through the main-only environment, nothing for a fork); `--force` on the check job's tasks on a push to main; the `actions/cache` steps and the key step out of the proofs job; the workstation's lines in `.env.example` | a pull request whose commit passed `bun run check` locally replays those tasks and the proofs; otherwise 2 to 5 min where `bun.lock` is untouched | steps 5 to 8; "By hand" below | todo |
+| 9 | The Worker: the team's settings declared in `GitHub.stack.ts`; `TURBO_API`, `TURBO_TEAM`, `TURBO_TOKEN` and `TURBO_CACHE` in both jobs (read on a pull request, write on a push to main through the main-only environment, nothing for a fork); `--force` on the check job's tasks on a push to main; the `actions/cache` steps and the key step out of the proofs job; the workstation's lines in `.env.example` | a pull request whose commit passed `bun run check` locally replays those tasks and the proofs; otherwise 2 to 5 min where `bun.lock` is untouched | steps 5 to 8; "By hand" below | built on `ci/remote-cache`; what it shows on CI waits on "By hand" ("Step 9" below) |
 | 10 | One variable for property run counts in `vitest.shared.ts`, in each task's `env`; 500 for `WaitedRows.property` on a pull request, today's counts in the nightly | about 30 s | step 6 | done, seen on CI ("Step 10" below) |
 | 11 | Drop `tsc -b` from the app's build if `check` covers it; the CLI's at-scale tests to its slow project; `docs/standards/engineering.md` and CLAUDE.md say what CI now carries; ten runs after, beside the baseline | under a minute together | the rest | done; median 361 s over ten runs ("Ten runs after") |
 
@@ -31,21 +31,27 @@ figures together, not apart.
 
 ## Blocker
 
-None until step 9, which needs the team to exist on the Worker and the stack deployed.
+Step 9 is built and cannot be seen working until the team exists on the Worker, its tokens are in 1Password and the
+GitHub stack is deployed: "By hand" below, each step Benjamin's.
 
 ## By hand, Benjamin's
 
 No agent deploys either stack. In order:
 
 1. In beep-effect, `packages/tooling/infra/turbo-cache/src/Worker.ts`: a team `inventory` in `cachePolicy` with three
-   principals, main's CI (write), pull requests (read) and the workstation (write). An agent may write that change
-   as a pull request there; the merge and the deploy through `deploy-turbo-cache.yml` are his.
-2. The three tokens, from beep-effect's token command with `--team inventory`, into 1Password. Never in a chat, a
-   log or a file in either repository.
+   principals, main's CI (write), pull requests (read) and the workstation (write). Written as
+   [beep-effect#3611](https://github.com/beep-effect/beep-effect/pull/3611); the merge and the deploy through
+   `deploy-turbo-cache.yml` are his.
+2. The three tokens, from beep-effect's token command with `--team inventory` (`ci-pr`, `ci-main`, `dankstation`),
+   into 1Password. Never in a chat, a log or a file in either repository. Their references go in
+   `packages/infra/env/op.env.local` as `TURBO_CACHE_READ_TOKEN` and `TURBO_CACHE_WRITE_TOKEN` (the lines in
+   `op.env` show the form), and the Worker's address, which the command prints, in the root's `.env` as
+   `TURBO_CACHE_API`.
 3. Here, after step 9's change to `GitHub.stack.ts` is merged: deploy the GitHub stack, which makes the variables,
    the secrets and the environment limited to main.
-4. On the workstation: `TURBO_API`, `TURBO_TEAM` and `TURBO_TOKEN` as a 1Password reference in the untracked `.env`,
-   as `.env.example` will show.
+4. On the workstation: `TURBO_API`, `TURBO_TEAM` and `TURBO_TOKEN` (the `dankstation` token, as a reference) in the
+   untracked `.env`, as `.env.example` shows; then `op run --env-file=.env -- bun run check` reads and writes the
+   Worker.
 
 ## What the workstation's write token rests on
 
@@ -146,6 +152,38 @@ What they settle:
 - The baseline was measured before step 1's upload existed, so its numbers are GitHub's; turbo's own times start
   with these ten.
 - What would come next, were it wanted: the fold (172 to 398 s) and the slow job set the longest runs.
+
+## Step 9, the shared cache
+
+Built on the branch `ci/remote-cache`, stacked on `ci/speed`, so `ci/speed` can merge first: the proofs' `actions/cache`
+replay is gone here, and until the stack is deployed a pull request on this branch runs the proofs with nothing
+replayed, as the ten runs above did (361 s median).
+
+- `packages/infra/src/TurboCache.rules.ts`: the team, the variable names and `cacheSettingsOf`, which takes the
+  Worker's address and the two tokens all three or none; a part stops the stack and names what is missing
+  (`packages/infra/test/TurboCache.test.ts`).
+- `GitHub.stack.ts`, once given the three: `TURBO_CACHE_API` and `TURBO_CACHE_TEAM` as repository variables,
+  `TURBO_CACHE_READ_TOKEN` as a repository secret (GitHub gives a fork's run none), and the environment
+  `turbo-cache-write`, limited to main, holding `TURBO_CACHE_WRITE_TOKEN`. Given none, it writes none, and the stack
+  still deploys the rest.
+- `ci.yml`: the four jobs that run turbo (`rest`, `web`, `slow`, `model`) start with "The shared cache", which sets
+  `TURBO_API`, `TURBO_TEAM`, `TURBO_TOKEN` and `TURBO_CACHE` for the job only when the variables and a token are
+  there: `local:rw,remote:rw` with the write token on a push to main, `local:rw,remote:r` with the read token
+  otherwise. A push to main takes the `turbo-cache-write` environment, and only once `TURBO_CACHE_API` is set, so no
+  run makes that environment before the stack does. `rest`, `web` and `slow` run with `--force` on a push to main.
+  The proofs' key step and its two `actions/cache` steps are gone; the reasoner's, which keep its jar, stay.
+- `.env.example` at the root: the workstation's three lines and the stack's address line.
+- Checked here: the infra package's type-check, lint and the new test; `bun run check`; the workflow parses and
+  each of the four jobs has the step. Not checked: any of it on CI with the cache, which needs "By hand" 1 to 3.
+
+What the acceptance needs once the cache exists, each read from a run:
+
+1. A token of `inventory` asking for team `beep` is refused: `curl -H "Authorization: Bearer $TOKEN"
+   "$TURBO_CACHE_API/v8/artifacts/status?slug=beep"` answers 403 (run by Benjamin, with the token from `op read`).
+2. A pull request that touches only documents: "N cached" in the log of each of the check's jobs.
+3. A pull request whose commit passed `bun run check` with the workstation's token: its tasks and the proofs replay.
+4. The push to main that merges it: "0 cached" in the check's three jobs, and the next pull request replays what it
+   wrote.
 
 ## Step 4, the seeds' orderings
 

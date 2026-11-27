@@ -26,6 +26,10 @@ jobs:
     name: Check, test and build (all but the two longest)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # A push to main writes the shared cache, through the environment that alone holds the write token and that only
+    # main may use; every other run only reads it. Named only once the repository's stack wrote the cache's settings,
+    # so no run makes the environment before the stack does (packages/infra/src/TurboCache.rules.ts).
+    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.TURBO_CACHE_API != '' && 'turbo-cache-write' || null }}
     # A job's permissions replace the workflow's: the bans' ledgers are compared, on a push, with the last commit of the
     # branch whose run passed, so this job alone reads the runs.
     permissions:
@@ -90,6 +94,22 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
+      # The shared turbo cache (goals/ci-speed, step 9): beep-effect's Worker, team `inventory`. A push to main reads
+      # and writes; a pull request and a release branch only read; a fork's run is given no token and keeps turbo's
+      # local cache, as every run does until the repository's stack has written the settings.
+      - name: The shared cache
+        env:
+          API: ${{ vars.TURBO_CACHE_API }}
+          TEAM: ${{ vars.TURBO_CACHE_TEAM }}
+          TOKEN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.TURBO_CACHE_WRITE_TOKEN || secrets.TURBO_CACHE_READ_TOKEN }}
+          MODE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'local:rw,remote:rw' || 'local:rw,remote:r' }}
+        run: |
+          if [ -z "$API" ] || [ -z "$TEAM" ] || [ -z "$TOKEN" ]; then
+            echo "No shared cache for this run: turbo keeps its local cache"
+            exit 0
+          fi
+          { echo "TURBO_API=$API"; echo "TURBO_TEAM=$TEAM"; echo "TURBO_TOKEN=$TOKEN"; echo "TURBO_CACHE=$MODE"; } >> "$GITHUB_ENV"
+          echo "The shared cache, team $TEAM: $MODE"
       # Through turbo: type-check, lint, the fast tests, the production build, format and docs checks and every law:
       # `check:ci`, without the package the `web` job checks. The slow tests are the `slow` job's, and the review
       # model's proofs, its search and its other long tests the `proofs` jobs'.
@@ -97,6 +117,9 @@ jobs:
       # made tests several times slower than they are and failed them on their limits; two tasks at a time with one
       # test worker each is what four cores carry (measured: docs/standards/engineering.md, "The check on CI").
       # `--continue` runs every task even after one fails, so a red run lists everything that is wrong.
+      # A push to main runs every task again with `--force`, whatever the shared cache holds, and writes its results
+      # over what was there: a result a pull request replayed from a workstation is made again on CI at the merge, so
+      # a difference between the two turns main red (decision "what a shared cache asks", 1).
       # The longest properties run fewer times on a pull request (vitest.shared.ts; Benjamin's decision of
       # 2026-11-26). A push leaves the variable unset, as a workstation does: turbo hashes unset apart from any value,
       # so only unset lets a push and a workstation share a result made at today's counts.
@@ -104,7 +127,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         run: echo "PROPERTY_RUNS=short" >> "$GITHUB_ENV"
       - name: Check, test and build
-        run: bun run check:ci -- --filter='!@inventory/catalog-web' --summarize --continue --concurrency=2
+        run: bun run check:ci -- --filter='!@inventory/catalog-web' --summarize --continue --concurrency=2 ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '--force' || '' }}
         env:
           VITEST_MAX_WORKERS: 1
       # The seven laws with a ledger, again, against the base the step above named: in the check above they compared
@@ -133,6 +156,10 @@ jobs:
     name: Check and test the catalog's screens
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # A push to main writes the shared cache, through the environment that alone holds the write token and that only
+    # main may use; every other run only reads it. Named only once the repository's stack wrote the cache's settings,
+    # so no run makes the environment before the stack does (packages/infra/src/TurboCache.rules.ts).
+    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.TURBO_CACHE_API != '' && 'turbo-cache-write' || null }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -142,6 +169,22 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
+      # The shared turbo cache (goals/ci-speed, step 9): beep-effect's Worker, team `inventory`. A push to main reads
+      # and writes; a pull request and a release branch only read; a fork's run is given no token and keeps turbo's
+      # local cache, as every run does until the repository's stack has written the settings.
+      - name: The shared cache
+        env:
+          API: ${{ vars.TURBO_CACHE_API }}
+          TEAM: ${{ vars.TURBO_CACHE_TEAM }}
+          TOKEN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.TURBO_CACHE_WRITE_TOKEN || secrets.TURBO_CACHE_READ_TOKEN }}
+          MODE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'local:rw,remote:rw' || 'local:rw,remote:r' }}
+        run: |
+          if [ -z "$API" ] || [ -z "$TEAM" ] || [ -z "$TOKEN" ]; then
+            echo "No shared cache for this run: turbo keeps its local cache"
+            exit 0
+          fi
+          { echo "TURBO_API=$API"; echo "TURBO_TEAM=$TEAM"; echo "TURBO_TOKEN=$TOKEN"; echo "TURBO_CACHE=$MODE"; } >> "$GITHUB_ENV"
+          echo "The shared cache, team $TEAM: $MODE"
       # The longest properties run fewer times on a pull request (vitest.shared.ts; Benjamin's decision of
       # 2026-11-26). A push leaves the variable unset, as a workstation does: turbo hashes unset apart from any value,
       # so only unset lets a push and a workstation share a result made at today's counts.
@@ -149,7 +192,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         run: echo "PROPERTY_RUNS=short" >> "$GITHUB_ENV"
       - name: Check, lint and test
-        run: bunx turbo run check lint test --filter=@inventory/catalog-web --summarize --continue --concurrency=2
+        run: bunx turbo run check lint test --filter=@inventory/catalog-web --summarize --continue --concurrency=2 ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '--force' || '' }}
         env:
           VITEST_MAX_WORKERS: 1
       # Turbo's own time for each task of this job (`--summarize` writes it), kept with the run: what a change to
@@ -170,6 +213,10 @@ jobs:
     name: Slow tests and the data grid
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # A push to main writes the shared cache, through the environment that alone holds the write token and that only
+    # main may use; every other run only reads it. Named only once the repository's stack wrote the cache's settings,
+    # so no run makes the environment before the stack does (packages/infra/src/TurboCache.rules.ts).
+    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.TURBO_CACHE_API != '' && 'turbo-cache-write' || null }}
     steps:
       # The whole history, as these tests had it when they ran in the one check job.
       - uses: actions/checkout@v4
@@ -182,8 +229,24 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
+      # The shared turbo cache (goals/ci-speed, step 9): beep-effect's Worker, team `inventory`. A push to main reads
+      # and writes; a pull request and a release branch only read; a fork's run is given no token and keeps turbo's
+      # local cache, as every run does until the repository's stack has written the settings.
+      - name: The shared cache
+        env:
+          API: ${{ vars.TURBO_CACHE_API }}
+          TEAM: ${{ vars.TURBO_CACHE_TEAM }}
+          TOKEN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.TURBO_CACHE_WRITE_TOKEN || secrets.TURBO_CACHE_READ_TOKEN }}
+          MODE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'local:rw,remote:rw' || 'local:rw,remote:r' }}
+        run: |
+          if [ -z "$API" ] || [ -z "$TEAM" ] || [ -z "$TOKEN" ]; then
+            echo "No shared cache for this run: turbo keeps its local cache"
+            exit 0
+          fi
+          { echo "TURBO_API=$API"; echo "TURBO_TEAM=$TEAM"; echo "TURBO_TOKEN=$TOKEN"; echo "TURBO_CACHE=$MODE"; } >> "$GITHUB_ENV"
+          echo "The shared cache, team $TEAM: $MODE"
       - name: The slow tests and the live one
-        run: bunx turbo run test:slow test:live --summarize --continue --concurrency=2
+        run: bunx turbo run test:slow test:live --summarize --continue --concurrency=2 ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '--force' || '' }}
         env:
           VITEST_MAX_WORKERS: 1
       # The data grid's typing, in a real browser: what is typed on a cell is what is stored. The runner image has
@@ -232,13 +295,18 @@ jobs:
   # proofs, the search and the mutants rerun when the model's files, its stories or proofs, the mutants, the kernel,
   # the pinned library or a version the lockfile resolves for the package change; the fold reruns on any change to
   # the web package or what it imports. The three long ones start at once, a runner each: the proofs, the search,
-  # and the fold beside the mutants. Turbo's results come back from the last run on main through GitHub's cache
-  # and are saved only on main, each part under its own key, so a pull request that leaves those alone replays them
-  # in seconds. Every night they run again with every mutant (proofs-nightly.yml).
+  # and the fold beside the mutants. Their results are in the shared cache with everything else, written by main's
+  # pushes and the workstation, so a pull request that leaves those files alone, or whose commit passed them
+  # locally, replays them in seconds. Main does not force them: every night they run again with nothing replayed
+  # and every mutant (proofs-nightly.yml).
   model:
     name: ${{ matrix.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # A push to main writes the shared cache, through the environment that alone holds the write token and that only
+    # main may use; every other run only reads it. Named only once the repository's stack wrote the cache's settings,
+    # so no run makes the environment before the stack does (packages/infra/src/TurboCache.rules.ts).
+    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.TURBO_CACHE_API != '' && 'turbo-cache-write' || null }}
     strategy:
       # One part failing does not stop the others: a red run says everything that is wrong.
       fail-fast: false
@@ -262,40 +330,25 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
-      # The key is made of turbo's own hashes of the tasks, asked for without running them. So an exact hit means
-      # turbo will replay every one, and there is nothing new to keep; any other run starts from the newest results
-      # kept on main and proves what changed.
-      - name: Ask turbo what the results are filed under
-        id: filed
+      # The shared turbo cache (goals/ci-speed, step 9): beep-effect's Worker, team `inventory`. A push to main reads
+      # and writes; a pull request and a release branch only read; a fork's run is given no token and keeps turbo's
+      # local cache, as every run does until the repository's stack has written the settings.
+      - name: The shared cache
         env:
-          PART: ${{ matrix.part }}
+          API: ${{ vars.TURBO_CACHE_API }}
+          TEAM: ${{ vars.TURBO_CACHE_TEAM }}
+          TOKEN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.TURBO_CACHE_WRITE_TOKEN || secrets.TURBO_CACHE_READ_TOKEN }}
+          MODE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'local:rw,remote:rw' || 'local:rw,remote:r' }}
         run: |
-          bunx turbo run ${{ matrix.tasks }} --dry=json > "$RUNNER_TEMP/proofs.json"
-          node -e '
-            const { tasks } = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))
-            const real = tasks.filter((task) => task.command !== "<NONEXISTENT>")
-            if (real.length === 0) throw new Error("no package has any of these tasks")
-            console.log("key=proofs-" + process.env.PART + "-" + real.map((task) => task.hash).join("-"))
-          ' "$RUNNER_TEMP/proofs.json" >> "$GITHUB_OUTPUT"
-      - name: Bring back the results kept on main
-        id: results
-        uses: actions/cache/restore@v6
-        with:
-          path: .turbo/cache
-          key: ${{ steps.filed.outputs.key }}
-          restore-keys: |
-            proofs-${{ matrix.part }}-
+          if [ -z "$API" ] || [ -z "$TEAM" ] || [ -z "$TOKEN" ]; then
+            echo "No shared cache for this run: turbo keeps its local cache"
+            exit 0
+          fi
+          { echo "TURBO_API=$API"; echo "TURBO_TEAM=$TEAM"; echo "TURBO_TOKEN=$TOKEN"; echo "TURBO_CACHE=$MODE"; } >> "$GITHUB_ENV"
+          echo "The shared cache, team $TEAM: $MODE"
       # Two tasks at a time and no more: the runner has four cores and each proof file starts its own solver.
       - name: Run this part
-        run: bunx turbo run ${{ matrix.tasks }} --cache-dir=.turbo/cache --concurrency=2 --summarize
-      # Only what passed is kept (a failed step ends the job before this one), only from main, and only when the
-      # results are new.
-      - name: Keep the results for later runs
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.results.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v6
-        with:
-          path: .turbo/cache
-          key: ${{ steps.filed.outputs.key }}
+        run: bunx turbo run ${{ matrix.tasks }} --concurrency=2 --summarize
       # Turbo's own time for each task of this job (`--summarize` writes it), kept with the run: what a change to
       # the jobs is measured against (goals/ci-speed). The folder's name starts with a dot, which the action leaves
       # out unless told.

@@ -1015,7 +1015,7 @@ The hooks left, each with its reason:
 - The libraries' own hooks stay: TanStack's `useTable` (`use-data-table.ts`), dnd-kit's `useSensor`, `useSensors`
   and `useSortable` (`sortable.tsx`), Radix's `useDirection` (`direction.tsx` and its readers).
 
-**Five `useContext` calls stay** (2026-11-22; kept under the rule's own words, "no hooks where an atom can do the job", since here one cannot. Benjamin was told and has not chosen: it is his to overrule), neither a DOM ref, `useId` nor a library's own hook, each read
+**Five `useContext` calls stay** (2026-11-22; kept under the rule's own words, "no hooks where an atom can do the job", since here one cannot. Benjamin's ruling of 2026-11-26: "Yes, keep them", the exploration's DECISIONS), neither a DOM ref, `useId` nor a library's own hook, each read
 past the lint by one `oxlint-disable-next-line` on its import with the reason:
 
 - `faceted.tsx`, 1 (`useFacetedState`, read by `FacetedValue`, `FacetedItem` and `FacetedClear`): what `Faceted` was
@@ -1093,7 +1093,7 @@ readonly ledger fell by 7 places, and `use-data-grid.ts` left the assertion ban'
 
 **`useContext` stays once** (`DataGridRowContext` in `data-grid-row.tsx`, read past the lint by one
 `oxlint-disable-next-line`): it carries what the grid was drawn with down to its rows, the case of batch 1's five.
-Benjamin was told; his to overrule with those.
+Benjamin kept it with those on 2026-11-26 ("Yes, keep them").
 
 **Seen on `/gallery/grid`** (headless Chromium, a dev server of this branch): the grid drawn, 6 rows of 8 columns, no
 console error or warning; a click on r1 Number and a shift-click on r3 Long text selected 9 cells with the focus kept

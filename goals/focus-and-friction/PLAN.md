@@ -19,9 +19,9 @@ pull request is merged, or, for a step with none, when its record below is writt
 | 5 | Measure `bun run check`: how long, and what a failure prints | the record below | done: 2026-11-26 |
 | 6 | One summary at the end of a failing check | 35 | done: 2026-11-26 |
 | 7 | `bun run check:changed` | 40 | done: 2026-11-26 |
-| 8 | A merge that finishes on its own | CLOSE_PR, the rule in `CLAUDE.md` | done: 2026-11-27 |
+| 8 | A merge that finishes on its own | 47, the rule in `CLAUDE.md` | done: 2026-11-27 |
 | 9 | The worktrees and the main checkout | 36 | done: 2026-11-26 |
-| 10 | Close: the closing note, `status: done`, `bun run check:full` on main | CLOSE_PR | done: 2026-11-27 |
+| 10 | Close: the closing note, `status: done`, `bun run check:full` on main | 47 | done: 2026-11-27 |
 
 Every question was answered on 2026-11-26 ("Decided", below), and the last one on 2026-11-27. The goal is done. Step 3, prepared, moved to its own goal, [person-session](../person-session/SPEC.md), on Benjamin's answer; the hold of step 2 now ends there. The closing note is at the end.
 
@@ -278,7 +278,7 @@ repository's settings. It is his setting, so no agent changes it. Then "merge it
 **Done, 2026-11-27.** Benjamin asked the agent to make the change itself ("do this yourself", in his message of that
 morning), so it was made by `gh api -X PATCH repos/kriegcloud/inventory-import -F allow_auto_merge=true -F
 delete_branch_on_merge=true` at 04:06 UTC, which read back `{"allow_auto_merge":true,"delete_branch_on_merge":true}`.
-`CLAUDE.md`, "How we work", now says what a merge he asks for is. The first pull request merged that way is CLOSE_PR,
+`CLAUDE.md`, "How we work", now says what a merge he asks for is. The first pull request merged that way is pull request 47,
 this goal's close.
 
 ## 9. Worktrees and the main checkout

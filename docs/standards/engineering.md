@@ -78,7 +78,11 @@ My engineering rules are in `CLAUDE.md` and [patterns](../patterns.md). This pag
   main requires waits for the three, and each job keeps turbo's own time for every task with the run
   (`goals/ci-speed`). On a pull request the longest properties run fewer times (`PROPERTY_RUNS=short`, read in
   `vitest.shared.ts` and hashed by the `test` task); a push to main and the nightly leave it unset and run today's
-  counts. A job given more than that is timed over several runs first. The runner has four cores; turbo's own ten tasks at once, each test run with a worker per core, made tests
+  counts. Every job reads turbo's results from beep-effect's cache Worker, team `inventory`, once the repository's
+  stack has written its settings (`packages/infra/src/TurboCache.rules.ts`): a pull request only reads; a push to
+  main runs the check's tasks again with `--force` and writes, through an environment only main may use; the proofs
+  replay there too, and the nightly forces them. Until then each run keeps turbo's local cache. A job given more
+  than that is timed over several runs first. The runner has four cores; turbo's own ten tasks at once, each test run with a worker per core, made tests
   several times slower than they are (ten at once on four pinned cores: 117 s, and red on three tests' limits).
   To see what the runner sees:
   `VITEST_MAX_WORKERS=1 taskset -c 0-3 bun run check:full -- --force --continue --concurrency=2` (green three times

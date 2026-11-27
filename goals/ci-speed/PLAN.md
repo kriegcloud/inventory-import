@@ -89,10 +89,13 @@ Every job started within a second of 00:41:40 UTC. Times from GitHub's start and
 | Check and test the catalog's screens (`web`) | passed | 182 s, against 190 to 449 s for `catalog-web:test` alone before |
 | The model against the review region, and a sample of its mutants | passed | 192 s |
 | Check, test and build, all but the two longest (`rest`) | passed | 194 s |
-| Slow tests and the data grid (`slow`) | running | |
-| The model's proofs | running; nothing to restore, since the cache keys are new | |
+| Slow tests and the data grid (`slow`) | passed | 381 s: the longest job, against 191 to 311 s for `app:test:slow` alone before; nothing replayed, as no cache is shared yet |
+| The model's proofs | passed, with nothing restored: the cache keys are new | 346 s, against 489 to 703 s for the whole proofs job before with nothing replayed |
 
-One run is not the ten SPEC asks for; the ten after, and the median against 673 s, wait on more runs.
+The two required gates passed: "Proofs and search of the model" at 00:47:32, "Check, test and build" at 00:48:07.
+The whole run took 390 s from its start to the last gate, against a median of 673 s on pull requests before.
+The slow job now sets the run's length. One run is not the ten SPEC asks for; the ten after, and their median
+against 673 s, wait on more runs.
 
 ## Step 4, the seeds' orderings
 

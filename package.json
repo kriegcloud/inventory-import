@@ -94,6 +94,7 @@
   "overrides": {
     "@alchemy.run/1password": "file:vendor/alchemy/alchemy.run-1password-e1c3e6d.tgz",
     "@alchemy.run/acme": "file:vendor/alchemy/alchemy.run-acme-e1c3e6d.tgz",
+    "@alchemy.run/better-auth": "file:vendor/alchemy/alchemy.run-better-auth-e1c3e6d.tgz",
     "@alchemy.run/cloudflare": "file:vendor/alchemy/alchemy.run-cloudflare-e1c3e6d.tgz",
     "@alchemy.run/cloudflare-runtime": "file:vendor/alchemy/alchemy.run-cloudflare-runtime-e1c3e6d.tgz",
     "@alchemy.run/docker": "file:vendor/alchemy/alchemy.run-docker-e1c3e6d.tgz",

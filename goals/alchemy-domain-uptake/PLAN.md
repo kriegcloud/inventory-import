@@ -49,7 +49,7 @@ Three more need nothing at all, being tooling of the scratchpad: **tests-40**, *
 
 ## Current blocker
 
-None for move 1. He signed the brief on 2026-11-26 ("I've approved", the exploration's DECISIONS). Move 2 waits on his re-pin widened to `@alchemy.run/better-auth` and `@alchemy.run/test`, and on its open decisions.
+None for move 1. He signed the brief on 2026-11-26 ("I've approved", the exploration's DECISIONS). Move 2 is open. The pin holds `@alchemy.run/better-auth` since his re-pin of 2026-11-26 (`@alchemy.run/test` is npm's build, which the registry never makes). Four of the move's decisions are answered (the exploration's DECISIONS, "Move 2 opens"); the rest are put to him in rounds, and what none of them blocks is built meanwhile.
 
 ## What Benjamin does by hand
 

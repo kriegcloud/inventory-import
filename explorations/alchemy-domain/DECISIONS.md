@@ -942,3 +942,13 @@ added then and I apply the stack. Under `dev:alchemy` the model's Worker answers
 prefix too; deployed it has no address of its own (`workersDev: false`). Rejected: a wider permission the reference
 does not ask for; moving a declared database; a harness that can reach the model's Worker only through the site's.
 Reverse: a new decision by him.
+
+### 2026-11-27 — Move 2: how long the model's Worker keeps receipts (host-07)
+
+**Asked:** the library keeps a command's receipt 30 days by default, and delivery marks and cancelled schedules 7
+days. I was told a receipt is kept for ever, and the kept queue of presses rests on it. How long are receipts kept?
+**Options:** receipts for ever, the other two at the library's 7 days; the library's defaults; one year. Answer:
+"Receipts forever". I chose; the agent recommended the same. One `retention` value, `receipts: "forever"`, is passed
+by every model in the model's Worker, so a kept press is never applied twice however old it is; each record's object
+grows by one row an act and is not trimmed. Rejected: a window after which a press is decided again, which would
+need a second decision on what an older press does. Reverse: a new decision by him.

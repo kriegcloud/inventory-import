@@ -72,12 +72,15 @@ export class ModelAllowance extends Context.Service<
       ModelAllowance,
       Effect.gen(function* () {
         const calls = yield* Ref.make(left)
+
+        const take = Effect.fnUntraced(function* () {
+          yield* CurrentActor
+          const had = yield* Ref.getAndUpdate(calls, (n) => Math.max(0, n - 1))
+          return had > 0 ? taken : usedUp(memoryUsedUpWords)
+        })
+
         return ModelAllowance.of({
-          take: Effect.fnUntraced(function* () {
-            yield* CurrentActor
-            const had = yield* Ref.getAndUpdate(calls, (n) => Math.max(0, n - 1))
-            return had > 0 ? taken : usedUp(memoryUsedUpWords)
-          })
+          take
         })
       })
     )

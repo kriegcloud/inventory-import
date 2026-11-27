@@ -10,7 +10,8 @@ import {
   SuggestionKind,
   SuggestionByKind,
   suggestionFromStored,
-  suggestionToStored
+  suggestionToStored,
+  Suggestion
 } from "@inventory/catalog-contract/Suggestion"
 import { Field } from "@inventory/catalog-contract/Staged"
 import * as A from "effect/Array"
@@ -58,9 +59,22 @@ export const SuggestionStoreD1 = Layer.effect(
     const findAll = SqlSchema.findAll({
       Request: S.Struct({ org: OrganizationId, id: S.String }),
       Result: Stored,
-      execute: (r) => sql`SELECT id, kind, rowId, rowNumber, field, fromValue AS "from", toValue AS "to",
-        columnIndex AS "column", madeBy AS "by", model, confidence, basis
-      FROM importSuggestion WHERE organizationId = ${r.org} AND importId = ${r.id} ORDER BY createdAt, id`
+      execute: (r) => sql`SELECT id,
+                                 kind,
+                                 rowId,
+                                 rowNumber,
+                                 field,
+                                 fromValue   AS "from",
+                                 toValue     AS "to",
+                                 columnIndex AS "column",
+                                 madeBy      AS "by",
+                                 model,
+                                 confidence,
+                                 basis
+                          FROM importSuggestion
+                          WHERE organizationId = ${r.org}
+                            AND importId = ${r.id}
+                          ORDER BY createdAt, id`
     })
 
     // Written only while the import is open, and only where the row and field have no suggestion yet.
@@ -74,16 +88,29 @@ export const SuggestionStoreD1 = Layer.effect(
       }),
       Result: S.Array(S.Struct({ id: S.String })),
       execute: (r) => sql`INSERT INTO importSuggestion (id, organizationId, importId, kind, rowId, rowNumber, field,
-        fromValue, toValue, columnIndex, madeBy, model, confidence, basis, askedById, createdAt)
-      SELECT ${r.row.id}, ${r.org}, ${r.importId}, ${r.row.kind}, ${r.row.rowId}, ${r.row.rowNumber},
-        ${r.row.field}, ${r.row.from}, ${r.row.to}, ${r.row.column}, ${r.row.by}, ${r.row.model},
-        ${r.row.confidence}, ${r.row.basis}, ${r.actor}, ${r.at}
-      WHERE EXISTS (SELECT 1 FROM importDraft WHERE organizationId = ${r.org} AND id = ${r.importId}
-        AND status = 'open')
-      ON CONFLICT (organizationId, importId, rowId, field) DO NOTHING RETURNING id`
+                                                        fromValue, toValue, columnIndex, madeBy, model, confidence,
+                                                        basis, askedById, createdAt)
+                          SELECT ${r.row.id},
+                                 ${r.org},
+                                 ${r.importId},
+                                 ${r.row.kind},
+                                 ${r.row.rowId},
+                                 ${r.row.rowNumber},
+                                 ${r.row.field},
+                                 ${r.row.from},
+                                 ${r.row.to},
+                                 ${r.row.column},
+                                 ${r.row.by},
+                                 ${r.row.model},
+                                 ${r.row.confidence},
+                                 ${r.row.basis},
+                                 ${r.actor},
+                                 ${r.at} WHERE EXISTS (SELECT 1 FROM importDraft WHERE organizationId = ${r.org} AND id = ${r.importId}
+                              AND status = 'open')
+                          ON CONFLICT (organizationId, importId, rowId, field) DO NOTHING RETURNING id`
     })
 
-    const list = Effect.fn("Suggestions.list")(function* (organizationId: OrganizationId, importId: ImportId) {
+    const listHandler = Effect.fn("Suggestions.list")(function* (organizationId: OrganizationId, importId: ImportId) {
       const rows = yield* findAll({ org: organizationId, id: importId })
       return A.getSomes(A.map(rows, suggestionFromStored))
     }, Effect.orDie)
@@ -108,8 +135,13 @@ export const SuggestionStoreD1 = Layer.effect(
       return A.filter(write.suggestions, (suggestion) => A.contains(written, suggestion.id))
     }, Effect.orDie)
 
+    const list: {
+      (organizationId: OrganizationId): (self: ImportId) => Effect.Effect<ReadonlyArray<Suggestion>>
+      (self: ImportId, organizationId: OrganizationId): Effect.Effect<ReadonlyArray<Suggestion>>
+    } = dual(2, (self: ImportId, organizationId: OrganizationId) => listHandler(organizationId, self))
+
     return SuggestionStore.of({
-      list: dual(2, (self: ImportId, organizationId: OrganizationId) => list(organizationId, self)),
+      list,
       store
     })
   })

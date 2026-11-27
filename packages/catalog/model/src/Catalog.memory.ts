@@ -608,7 +608,10 @@ const withSaved = (
 
 // -- The take-back, as one step -----------------------------------------------------------------------------------
 
-const takeBackStep = (state: CatalogState, write: TakeBackWrite): readonly [TookBack, CatalogState] => {
+const takeBackStep: {
+  (state: CatalogState, write: TakeBackWrite): readonly [TookBack, CatalogState]
+  (write: TakeBackWrite): (state: CatalogState) => readonly [TookBack, CatalogState]
+} = dual(2, (state: CatalogState, write: TakeBackWrite): readonly [TookBack, CatalogState] => {
   const audit = write.audit
   const org = audit.organizationId
   const at = audit.createdAt
@@ -754,11 +757,14 @@ const takeBackStep = (state: CatalogState, write: TakeBackWrite): readonly [Took
     })
   )
   return [tookBack, next]
-}
+})
 
 // -- Items: the page's questions, answered over a list --------------------------------------------------------
 
-const textOf = (item: StoredItem, column: ItemFilter["id"]): O.Option<string> =>
+const textOf: {
+  (item: StoredItem, column: ItemFilter["id"]): O.Option<string>
+  (column: ItemFilter["id"]): (item: StoredItem) => O.Option<string>
+} = dual(2, (item: StoredItem, column: ItemFilter["id"]): O.Option<string> =>
   ItemFilterColumn.match(column, {
     name: () => O.some(item.name),
     sku: () => O.some(item.sku),
@@ -770,13 +776,18 @@ const textOf = (item: StoredItem, column: ItemFilter["id"]): O.Option<string> =>
     quantityOnHand: () => O.some(`${item.quantityOnHand}`),
     unitCost: () => item.unitCost.pipe(costDigits, O.some)
   })
+)
 
-const numberOf = (item: StoredItem, column: ItemFilter["id"]): O.Option<number> =>
+const numberOf: {
+  (item: StoredItem, column: ItemFilter["id"]): O.Option<number>
+  (column: ItemFilter["id"]): (item: StoredItem) => O.Option<number>
+} = dual(2, (item: StoredItem, column: ItemFilter["id"]): O.Option<number> =>
   column === "quantityOnHand"
     ? O.some(item.quantityOnHand)
     : column === "unitCost"
       ? O.some(Number(costDigits(item.unitCost)))
       : O.none()
+)
 
 const listOf = (value: ItemFilter["value"]): ReadonlyArray<string> => (P.isString(value) ? [value] : value)
 
@@ -790,7 +801,10 @@ const asNumber = (text: string): O.Option<number> =>
 const leftOutText = ""
 
 // None: the filter is half-typed or does not suit its column, and is left out, as the adapter leaves it out.
-const passes = (item: StoredItem, filter: ItemFilter): O.Option<boolean> => {
+const passes: {
+  (item: StoredItem, filter: ItemFilter): O.Option<boolean>
+  (filter: ItemFilter): (item: StoredItem) => O.Option<boolean>
+} = dual(2, (item: StoredItem, filter: ItemFilter): O.Option<boolean> => {
   const has = O.filter(textOf(item, filter.id), Str.isNonEmpty)
   const values = listOf(filter.value)
   const typed = O.filter(A.head(values), Str.isNonEmpty)
@@ -837,12 +851,15 @@ const passes = (item: StoredItem, filter: ItemFilter): O.Option<boolean> => {
       )
     }
   )
-}
+})
 
 /** Where an item that leaves a sorted value out goes: before every value, as SQLite orders an empty column first. */
 const sortsFirst = { count: -1, day: "" } as const
 
-const sortKey = (item: StoredItem, column: ItemSort["id"]): string | number =>
+const sortKey: {
+  (item: StoredItem, column: ItemSort["id"]): string | number
+  (column: ItemSort["id"]): (item: StoredItem) => string | number
+} = dual(2, (item: StoredItem, column: ItemSort["id"]): string | number =>
   ItemSortColumn.match(column, {
     name: () => Str.toLowerCase(item.name),
     sku: () => item.sku,
@@ -854,6 +871,7 @@ const sortKey = (item: StoredItem, column: ItemSort["id"]): string | number =>
     firstReceivedOn: () => O.match(item.firstReceivedOn, { onNone: () => sortsFirst.day, onSome: identity }),
     createdAt: () => DateTime.toEpochMillis(item.createdAt)
   })
+)
 
 const compareBy =
   (sorting: ReadonlyArray<ItemSort>) =>
@@ -869,7 +887,10 @@ const compareBy =
     return a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0
   }
 
-const pageOf = (items: ReadonlyArray<StoredItem>, query: ItemQuery): ItemPage => {
+const pageOf: {
+  (items: ReadonlyArray<StoredItem>, query: ItemQuery): ItemPage
+  (query: ItemQuery): (items: ReadonlyArray<StoredItem>) => ItemPage
+} = dual(2, (items: ReadonlyArray<StoredItem>, query: ItemQuery): ItemPage => {
   const words = A.map(searchWords(query.search), Str.toLowerCase)
   const haystack = (item: StoredItem): string =>
     Str.toLowerCase(
@@ -888,7 +909,7 @@ const pageOf = (items: ReadonlyArray<StoredItem>, query: ItemQuery): ItemPage =>
     pageCount: Math.ceil(sorted.length / query.perPage),
     total: sorted.length
   }
-}
+})
 
 const facetsOf = (items: ReadonlyArray<StoredItem>): ItemFacets => {
   const counts = (read: (item: StoredItem) => string) =>
@@ -916,18 +937,24 @@ const facetsOf = (items: ReadonlyArray<StoredItem>): ItemFacets => {
   }
 }
 
-const sameAsEdit = (item: StoredItem, edit: ItemEdit): boolean =>
-  item.name === edit.name &&
-  Eq.equals(item.description, edit.description) &&
-  item.category === edit.category &&
-  item.uom === edit.uom &&
-  BigDecimal.equals(item.unitCost, edit.unitCost) &&
-  item.quantityOnHand === edit.quantityOnHand &&
-  Eq.equals(item.reorderPoint, edit.reorderPoint) &&
-  sameStocking(item.stocking, edit.stocking) &&
-  Eq.equals(discontinuedOn(item.stocking), discontinuedOn(edit.stocking)) &&
-  item.lotTracked === edit.lotTracked &&
-  Eq.equals(item.firstReceivedOn, edit.firstReceivedOn)
+const sameAsEdit: {
+  (item: StoredItem, edit: ItemEdit): boolean
+  (edit: ItemEdit): (item: StoredItem) => boolean
+} = dual(
+  2,
+  (item: StoredItem, edit: ItemEdit): boolean =>
+    item.name === edit.name &&
+    Eq.equals(item.description, edit.description) &&
+    item.category === edit.category &&
+    item.uom === edit.uom &&
+    BigDecimal.equals(item.unitCost, edit.unitCost) &&
+    item.quantityOnHand === edit.quantityOnHand &&
+    Eq.equals(item.reorderPoint, edit.reorderPoint) &&
+    sameStocking(item.stocking, edit.stocking) &&
+    Eq.equals(discontinuedOn(item.stocking), discontinuedOn(edit.stocking)) &&
+    item.lotTracked === edit.lotTracked &&
+    Eq.equals(item.firstReceivedOn, edit.firstReceivedOn)
+)
 
 // -- The twins ------------------------------------------------------------------------------------------------------
 
@@ -1022,7 +1049,11 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       return answer
     })
 
-    const finishUpload = Effect.fnUntraced(function* (actor: Member, upload: Upload, needsAtStart: number) {
+    const finishUpload = Effect.fnUntraced(function* (
+      actor: Member,
+      upload: Upload,
+      needsAtStart: number
+    ): Effect.fn.Return<boolean> {
       const id = yield* random.uuidV4()
       const at = yield* DateTime.now
       return yield* Ref.modify(ref, (state): readonly [boolean, CatalogState] => {

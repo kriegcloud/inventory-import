@@ -132,7 +132,7 @@ export const view = Effect.fn("TableAssistant.view")(function* (request: ViewReq
   if (Result.isFailure(checked)) {
     return Result.fail({ reason: checked.failure, answeredBy, note: cannot })
   }
-  if (checked.success.length === 0) {
+  if (A.isReadonlyArrayEmpty(checked.success)) {
     return Result.fail({
       // The model's own words for what it could not do, when it gave any.
       reason: O.match(cannot, { onNone: () => nothingToChange, onSome: identity }),

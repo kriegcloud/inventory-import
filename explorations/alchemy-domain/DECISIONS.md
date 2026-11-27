@@ -809,3 +809,56 @@ branch could not merge before move 5) or removed (nothing would say they are owe
 The context's new ending, asked next: `.reference.ts` (`Review/ItemsOfRow.reference.ts`: it is a `Context.Reference`
 with a default, the only one in the repository), against `.port.ts` (it has a default and no adapter) and folding it
 into `Review.rules.ts` (a rules file would import `effect/Context`). I chose; the agent recommended the same.
+
+### 2026-11-26 — Move 2 opens: the pin, and where its code lives
+
+The pin first. Said by him when move 2 opened: "do the re-pin". `@alchemy.run/better-auth` is a root of the pin from
+that day, at the same commit, `e1c3e6d` (19 packages). `@alchemy.run/test` is not: the registry builds no such
+package, and it stays npm's build in `apps/inventory`, as he chose for the harness.
+
+Then four questions, put to him before any code of the move.
+
+| Question | Options, the recommended one first | Answer |
+| --- | --- | --- |
+| Which package holds the `Usage` model? | A context of its own, `packages/usage` (`model` now, `host` when it is hosted); a second model inside `packages/access/model` | "packages/usage" |
+| Where does the model's Worker live? | A second app, `apps/model`, with one new row in the boundaries law so `packages/infra` may declare it; a second entry inside `apps/inventory`; a host package under `packages/` | "A second app, apps/model" |
+| What does `bun run dev` run once there are two Workers? | Vite as today, the models in memory inside the site's Worker, with `bun run dev:alchemy` beside it for the Durable Objects host; `alchemy dev` with state in memory (decision 30 as first answered); `alchemy dev` with a local state file | "Keep Vite; dev:alchemy beside it" |
+| How is the mutants runner shared by a second model? | One shared Python script given the package folder; a rewrite as `bun run beep mutants <package>` in the repository's Effect CLI; a copy of `run.py` in each package | "Rewrite in the Effect CLI" |
+
+I chose; the agent recommended the same for the first three. On the mutants runner I chose against the
+recommendation: it is rewritten in the CLI, beside the laws, not kept as Python. The rewrite keeps the catalog's 192
+mutant keys under its listing, and the nightly calls the new command. Decision 30's answer for `bun run dev` is
+replaced by the third row. Rejected: `Usage` inside the access model's package (move 7 hosts it apart); the Worker as
+a second entry of the site's app or as a library package; a local database and secret lost on every start of
+`bun run dev`; two copies of one runner. Reverse: a new decision by him.
+
+### 2026-11-26 — Move 2, second round: who asks, staging, what a call keeps, the count
+
+| Question | Options, the recommended one first | Answer |
+| --- | --- | --- |
+| The site's Worker sends `TakeCall` over the service binding. How does the model's Worker know who is asking? | The site's Worker forwards the person's cookie and page-member header, and the model's Worker reads the session itself; the site's Worker sends the member it resolved, trusted because only the binding reaches that Api | "Forward the cookie" |
+| Is the staging deploy one I keep from move 2? | Wiped like a preview until I say otherwise; kept from move 2 | "Wiped like a preview" |
+| What does `CallTaken` keep? | The organization, the day, the member's id and the purpose (view, check or suggest); the organization and the day only | "Org, day, who, purpose" |
+| Is the day's count (`AllowanceToday`) shown at move 2, and who may read it? | No screen yet, and the read admits every member of the organization, viewers included; a line beside the table assistant for every member; admins only, first shown at move 7 | "No screen yet; any member may read" |
+
+I chose; the agent recommended the same, all four. So: one session read more for each model call, and Better Auth on
+the model's Worker; the names `Usage`, `Allowance` and `CallTaken` stay proposals until a deploy I keep; nothing a
+`modelCall` row records today is lost in the event; and nothing a person sees changes at move 2. A count on a screen
+is a new number and sentence, asked when a screen needs it. Rejected: an actor taken on the caller's word; names
+fixed by the first staging deploy; a call recorded without who took it; a new line on screen in this move. Reverse:
+a new decision by him.
+
+### 2026-11-26 — Move 2, third round: the old table, pushed reads, the session's port
+
+| Question | Options, the recommended one first | Answer |
+| --- | --- | --- |
+| What happens to the `modelCall` table once the model counts the calls? | Kept, unread and unwritten, until move 7, and dropped then by a numbered migration; dropped now by a migration, which deletes its rows on production and staging; removed from `0001` only | "Keep it, unused, until move 7" |
+| How does "this page is one member's" hold for a pushed read, which cannot carry the page-member header? | The page's member id in the socket's address, checked against the cookie by the site's Worker before it forwards; the page closes its reads when another tab says who is signed in changed, and nothing more; the member in every view's key | "Member id in the socket's address" |
+| How long may an open pushed read go before it is judged again? | The earlier of the session's end and one minute; of the session's end and five minutes; the session's own end only | "One minute at most" |
+| Where do the one session lookup and the member check live, so every model can use them? | A port in the kernel, implemented once in `access/host`; `apps/model` builds every model's Session Layer from `access/host`; an exception in the boundaries law | "A port in the kernel" |
+
+I chose; the agent recommended the same, all four. So no stored row is deleted at move 2; a pushed read that
+reconnects under another person's cookie is refused and the page asks to load again; a revoked session stops
+receiving within a minute; and the boundaries law stays as it is. Rejected: deleting the record of who used a call
+before I have said whether it matters; a push for one account reaching another account's page; a revoked session
+that keeps receiving for days; contexts coupled through one host. Reverse: a new decision by him.

@@ -22,7 +22,7 @@ the exploration's [DECISIONS.md](../../explorations/ideal-architecture/DECISIONS
 | 6 | `envMode` strict: each task's `env`, the pass-through list found by running `check:full` until it passes, locally and on a branch's CI | nothing; a condition of step 9 | nothing | built; CI's run waits on a push ("Step 6" below) |
 | 7 | `.dev.vars` out of `build`'s outputs and a check that fails when a build artifact holds one; Node pinned exactly and among the global inputs | nothing; a condition of step 9 | nothing | done ("Step 7" below) |
 | 8 | Move `Pwned.slow.test.ts` to a task of its own, never cached; give `test:slow` inputs so the rest can replay | 3 to 5 min where the app's closure is unchanged (22 of the last 40 commits) | step 6 | built ("Step 8" below) |
-| 9 | The Worker: the team's settings declared in `GitHub.stack.ts`; `TURBO_API`, `TURBO_TEAM`, `TURBO_TOKEN` and `TURBO_CACHE` in both jobs (read on a pull request, write on a push to main through the main-only environment, nothing for a fork); `--force` on the check job's tasks on a push to main; the `actions/cache` steps and the key step out of the proofs job; the workstation's lines in `.env.example` | a pull request whose commit passed `bun run check` locally replays those tasks and the proofs; otherwise 2 to 5 min where `bun.lock` is untouched | steps 5 to 8; "By hand" below | built on `ci/remote-cache`; what it shows on CI waits on "By hand" ("Step 9" below) |
+| 9 | The Worker: the team's settings declared in `GitHub.stack.ts`; `TURBO_API`, `TURBO_TEAM`, `TURBO_TOKEN` and `TURBO_CACHE` in both jobs (read on a pull request, write on a push to main through the main-only environment, nothing for a fork); `--force` on the check job's tasks on a push to main; the `actions/cache` steps and the key step out of the proofs job; the workstation's lines in `.env.example` | a pull request whose commit passed `bun run check` locally replays those tasks and the proofs; otherwise 2 to 5 min where `bun.lock` is untouched | steps 5 to 8; "By hand" below | built and in main (#33, #34), the Worker deployed with the team; what it shows on CI waits on "By hand" 2 and 3 ("Step 9" below) |
 | 10 | One variable for property run counts in `vitest.shared.ts`, in each task's `env`; 500 for `WaitedRows.property` on a pull request, today's counts in the nightly | about 30 s | step 6 | done, seen on CI ("Step 10" below) |
 | 11 | Drop `tsc -b` from the app's build if `check` covers it; the CLI's at-scale tests to its slow project; `docs/standards/engineering.md` and CLAUDE.md say what CI now carries; ten runs after, beside the baseline | under a minute together | the rest | done; median 361 s over ten runs ("Ten runs after") |
 
@@ -31,8 +31,10 @@ figures together, not apart.
 
 ## Blocker
 
-Step 9 is built and cannot be seen working until the team exists on the Worker, its tokens are in 1Password and the
-GitHub stack is deployed: "By hand" below, each step Benjamin's.
+Step 9 is built and cannot be seen working until its tokens are in 1Password and the GitHub stack is deployed: "By
+hand" 2 and 3 below, each Benjamin's. As of 2026-11-27, 03:34 UTC: the team exists on the Worker (step 1 done), and
+the repository has no `TURBO_CACHE_API` variable, no read-token secret and no `turbo-cache-write` environment, so
+every run still uses turbo's local cache only.
 
 ## By hand, Benjamin's
 
@@ -40,8 +42,9 @@ No agent deploys either stack. In order:
 
 1. In beep-effect, `packages/tooling/infra/turbo-cache/src/Worker.ts`: a team `inventory` in `cachePolicy` with three
    principals, main's CI (write), pull requests (read) and the workstation (write). Written as
-   [beep-effect#3611](https://github.com/beep-effect/beep-effect/pull/3611); the merge and the deploy through
-   `deploy-turbo-cache.yml` are his.
+   [beep-effect#3611](https://github.com/beep-effect/beep-effect/pull/3611). Done on 2026-11-27: merged at his
+   word (it needed the `ready-for-heavy` label before its last three required checks would start), and the merge
+   started `deploy-turbo-cache.yml` itself, which passed on fd09f45.
 2. The three tokens, from beep-effect's token command with `--team inventory` (`ci-pr`, `ci-main`, `dankstation`),
    into 1Password. Never in a chat, a log or a file in either repository. Their references go in
    `packages/infra/env/op.env.local` as `TURBO_CACHE_READ_TOKEN` and `TURBO_CACHE_WRITE_TOKEN` (the lines in
@@ -155,9 +158,9 @@ What they settle:
 
 ## Step 9, the shared cache
 
-Built on the branch `ci/remote-cache`, stacked on `ci/speed`, so `ci/speed` can merge first: the proofs' `actions/cache`
-replay is gone here, and until the stack is deployed a pull request on this branch runs the proofs with nothing
-replayed, as the ten runs above did (361 s median).
+In main since 2026-11-27 (#33, with the two fixes a review of it found in #34: the run counts above, and what is
+said of the search below). The proofs' `actions/cache` replay is gone, and until the stack is deployed every pull
+request runs the proofs with nothing replayed, as the ten runs above did (361 s median).
 
 - `packages/infra/src/TurboCache.rules.ts`: the team, the variable names and `cacheSettingsOf`, which takes the
   Worker's address and the two tokens all three or none; a part stops the stack and names what is missing

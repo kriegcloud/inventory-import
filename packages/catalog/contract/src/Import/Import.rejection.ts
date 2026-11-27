@@ -1,7 +1,7 @@
 // Why a request about an import or an upload is refused, each with a sentence for the person.
 import * as S from "effect/Schema"
 import { reasonForPerson } from "../internal/Described.ts"
-import { StaleAccept } from "./Decision.command.ts"
+import { StaleAccept } from "./Decision.payload.ts"
 import { OrganizationId } from "@inventory/kernel/Ids"
 
 /**

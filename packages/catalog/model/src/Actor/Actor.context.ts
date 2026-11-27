@@ -1,11 +1,10 @@
 // Who is asking, as the catalog's model reads it: the organization, the member and the role, carried with every
 // command to wherever its aggregate runs. The model declares its own (the prover reads a request context only through
-// a relative path); the kernel's `CurrentActor` stays for `/api/v1`, and one session lookup will fill both. The one
-// thing not to break: a decide reads who acts from here and never from a command, so no sender can say who they are.
+// a relative path); the kernel's `CurrentActor` stays for `/api/v1`, and one session lookup will fill both. The
+// middleware that provides it is `Session` (`Session.middleware.ts`). The one thing not to break: a decide reads who
+// acts from here and never from a command, so no sender can say who they are.
 import * as Domain from "@alchemy.run/domain"
-import { NotSignedIn } from "@inventory/kernel/AccessError"
 import { Role } from "@inventory/kernel/Role"
-import * as RpcMiddleware from "effect/rpc/RpcMiddleware"
 import * as S from "effect/Schema"
 
 /** The text of a kernel id: at most 64 characters, as the kernel bounds it. */
@@ -27,13 +26,4 @@ export type Actor = typeof Actor.Type
 export class CurrentActor extends Domain.RequestContext<CurrentActor>()(
   "@inventory/catalog-model/Actor/CurrentActor",
   Actor
-) {}
-
-/**
- * The middleware every command of the model names: it provides `CurrentActor`, or fails with the kernel's
- * `NotSignedIn` when nobody is signed in, so no command of the model is taken.
- */
-export class Session extends RpcMiddleware.Service<Session, { readonly provides: CurrentActor }>()(
-  "@inventory/catalog-model/Actor/Session",
-  { error: NotSignedIn }
 ) {}

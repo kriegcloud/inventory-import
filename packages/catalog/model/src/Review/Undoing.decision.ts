@@ -10,7 +10,8 @@ import * as Domain from "@alchemy.run/domain"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
-import { CurrentActor, Session } from "../Actor/Actor.context.ts"
+import { CurrentActor } from "../Actor/Actor.context.ts"
+import { Session } from "../Actor/Session.middleware.ts"
 import {
   ActCounted,
   ConfirmedSince,

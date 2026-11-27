@@ -67,7 +67,7 @@ export class Answerer extends Context.Service<
       ): Effect.Effect<ModelAnswered<Sc["Type"]>, AiUnavailable>
     }
   }
->()("@inventory/catalog-model/Answer/Answerer.external/Answerer") {
+>()("@inventory/catalog-model/Answer/Answerer.port/Answerer") {
   /** A twin with no model: `status` is off, and asking it anyway is the trouble "no key". */
   static readonly off: Layer.Layer<Answerer> = Layer.succeed(
     Answerer,

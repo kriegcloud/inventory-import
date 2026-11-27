@@ -11,7 +11,7 @@
     "./Access": "./src/Access.contract.ts",
     "./SessionState": "./src/Session/SessionState.read.ts",
     "./Person": "./src/People/Person.read.ts",
-    "./PeopleCommand": "./src/People/People.command.ts",
+    "./PeoplePayload": "./src/People/People.payload.ts",
     "./PeopleRejection": "./src/People/People.rejection.ts",
     "./AuditTrail": "./src/Activity/AuditTrail.read.ts",
     "./ModelAllowance": "./src/Allowance/ModelAllowance.gateway.ts"

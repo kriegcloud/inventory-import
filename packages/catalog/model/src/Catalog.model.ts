@@ -69,6 +69,28 @@ const everyGroupOfItsImport = (
     )
   )
 
+/** A row an act has reached: it names its import. */
+type ReachedRow = Exclude<RowState, typeof RowState.cases.Untouched.Type>
+
+/**
+ * `holds` of every row an act has reached, beside the import it belongs to. A removed import is asked nothing, as for
+ * a group; an import not yet staged has no row, so one found there breaks the rule.
+ */
+const everyRowOfItsImport = (
+  all: { readonly Row: ReadonlyArray<Held<RowState>>; readonly Import: ReadonlyArray<Held<ImportState>> },
+  holds: (row: ReachedRow, life: StagedImport) => boolean
+): boolean => {
+  const besideItsImport = (row: ReachedRow): boolean =>
+    A.every(
+      all.Import,
+      (life) =>
+        row.importId !== life.id ||
+        ImportState.guards.Removed(life.state) ||
+        (!ImportState.guards.Unstaged(life.state) && holds(row, life.state))
+    )
+  return A.every(all.Row, (row) => RowState.guards.Untouched(row.state) || besideItsImport(row.state))
+}
+
 /** The catalog's model: today, the review of an import. */
 export class Catalog extends Domain.Model(
   "Catalog",
@@ -115,6 +137,17 @@ export class Catalog extends Domain.Model(
           all,
           (group, life) => group.change >= 1 && group.change <= life.changes && group.undoneAt <= life.changes
         ),
+      // A row's decision, and the change its last undo took back, are changes its import gave. A row that took no
+      // undo holds 0 there, so that half is bounded below by 0, not 1: a negative one is refused all the same
+      // (Benjamin, 2026-11-26, from CodeRabbit's finding on pull request 32).
+      ARowsChangeIsOneItsImportGave: (all) =>
+        everyRowOfItsImport(
+          all,
+          (row, life) =>
+            row.undone.change >= 0 &&
+            row.undone.change <= life.changes &&
+            (!RowState.guards.Decided(row) || (row.change >= 1 && row.change <= life.changes))
+        ),
       // A group is taken back by a later change than the one that decided it.
       AGroupsUndoComesAfterIt: (all) =>
         everyDecidedGroup(all.Group, (group) => inForce(group) || group.undoneAt > group.change),
@@ -152,14 +185,4 @@ export class Catalog extends Domain.Model(
     }
   },
   { description: "The catalog: the review of an import, its rows, the acts on groups of them, and the acts on each" }
-) {}
-
-/**
- * Every command of the model, for its stories and for Verify's search. What a browser and what the server may send
- * are separate Apis, declared when the model is hosted.
- */
-export class CatalogApi extends Domain.Api(
-  "CatalogApi",
-  { model: Catalog },
-  { description: "Every command of the catalog's model, for its stories and its search" }
 ) {}

@@ -65,7 +65,7 @@ export class ModelAllowance extends Context.Service<
   {
     readonly take: (purpose: CatalogModelPurpose) => Effect.Effect<AllowanceAnswer, never, CurrentActor>
   }
->()("@inventory/catalog-model/Answer/ModelAllowance.external/ModelAllowance") {
+>()("@inventory/catalog-model/Answer/ModelAllowance.port/ModelAllowance") {
   /** A twin holding `left` calls for everyone: each take uses one, and after the last every take is `usedUp`. */
   static readonly memory = (left: number): Layer.Layer<ModelAllowance> =>
     Layer.effect(

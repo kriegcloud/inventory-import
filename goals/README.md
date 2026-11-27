@@ -21,4 +21,18 @@ A goal is created only when its exploration graduates (see [explorations](../exp
 the exploration's research and decisions and never copies them. `rg '^status:' goals` lists where every goal stands;
 git history is the archive.
 
+## Running a goal with `/goal`
+
+A goal run with Claude Code's `/goal` ends its condition with a hand-off clause:
+
+```text
+/goal follow the instructions in goals/<slug>/, or stop when the only work left is a step the plan names as Benjamin's
+```
+
+The `/goal` judge checks the condition at the end of every turn and cannot tell on its own that a step is Benjamin's
+(a deploy, a secret, a repository setting, a product decision). Without the clause it keeps blocking the turn until
+Claude Code's cap of nine ends it ("A hook blocked the turn from ending 9 consecutive times"). The `ci-speed` run did
+this on step 9 while it waited on the cache variable and the GitHub stack's deploy. So a plan names every step that is
+Benjamin's as his, and when only those are left the agent says which step, what it unblocks, and stops.
+
 `bun run docs:check` validates every file here as an Open Knowledge Format document.

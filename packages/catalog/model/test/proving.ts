@@ -122,3 +122,29 @@ export const missingRules = (proof: {
     })
   )
 ]
+
+/**
+ * What an aggregate's report says is wrong, one line each: a rule not proved for a command or a decision, a starting
+ * state its schema or an invariant refuses, a command that can leave a state its schema refuses, a command that never
+ * records anything, and a path where the code did not do what the prover read. Empty when nothing is. Ours, because
+ * `Prove` takes no lock and no `require`: which rules there are, and that each stays proved, is the library's, in the
+ * search of the whole model.
+ */
+export const aggregateFailures = (report: Prove.Report): ReadonlyArray<string> => [
+  ...notProved(
+    A.flatMap([...report.invariants, ...report.transitions], (rule) =>
+      A.map(rule.commands, (proof) => `${standingOf(proof.verdict)}  ${rule.name}  ${proof.command}`)
+    )
+  ),
+  ...(report.initial ? [] : ["the starting state is not one its schema allows"]),
+  ...A.map(
+    A.filter(report.invariants, (rule) => !rule.initial),
+    (rule) => `the starting state breaks ${rule.name}`
+  ),
+  ...notProved(A.map(report.commands, (command) => `${standingOf(command.schema)}  ${command.command}`)),
+  ...A.map(
+    A.filter(report.commands, (command) => command.accepted !== true),
+    (command) => `never accepted  ${command.command}`
+  ),
+  ...A.map(report.agreement.differs, (path) => `the code differs from what was read: ${path}`)
+]

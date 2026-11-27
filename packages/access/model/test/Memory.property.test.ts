@@ -3,7 +3,7 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
-import { EmailToFind } from "@inventory/access-contract/PeopleCommand"
+import { EmailToFind } from "@inventory/access-contract/PeoplePayload"
 import { MemoryAccount, MemoryMembership, MemoryCall, AccessMemoryState } from "../src/internal/memory.ts"
 import { seed } from "./support.ts"
 

@@ -2204,11 +2204,33 @@ Asked by dialog in two rounds, once the goal `focus-and-friction` was written (p
    and the main checkout is left alone; those are listed for me. Rejected: a list first, with nothing removed until I
    name each.
 
+**Own tests only, decided by dialog 2026-11-26.** check:changed runs a changed package's own tests; its dependents' tests wait for `bun run check` before the push. I chose; the agent recommended the same.
+
 Next: steps 4 to 7 and 9 of `goals/focus-and-friction` start; 6 waits on me; 3 waits on a person.
 
 Reverse: 1, the pause ends early by a dated line here; 2, the session moves to a stage; 3 and 4, the text moves back
 or to the other place; 5, `CLAUDE.md` asks for `bun run check` before every commit again; 6, both settings off; 7,
 removal asks first.
+
+### 2026-11-26 — focus and friction: the commit check's tests, and the worktrees left
+
+Asked by dialog once steps 3, 4 and 9 of `goals/focus-and-friction` were open (pull requests 36, 37 and 39).
+
+1. **After a change in one package, does `bun run check:changed` run only that package's own tests?** I chose; the
+   agent recommended the same. Yes: the tests of the packages that depend on it (`catalog-web`'s 163 s after a model
+   change, step 5) are left to `bun run check` before the push, which still runs every test. Rejected: the
+   dependents' tests too, which keeps a model change near three minutes before each commit.
+2. **The changed `.claude/worktrees/wf_*` worktrees left by Workflow runs?** I chose; the agent recommended the same.
+   An agent compares each one's changes with main and removes those whose every change main already holds; any with a
+   difference is listed for me with its files. Rejected: leaving them all.
+3. **`.claude/worktrees/integration` and `sean-demo/rebuild`, clean and in main?** I chose; the agent recommended the
+   same. Both stay: the first holds an ignored `.alchemy/` folder and `packages/infra/env/op.env.local`, the second
+   sits in another project's folder. Rejected: removing both; removing `integration` only.
+
+Next: step 7 is built on answer 1; step 9 compares and removes on answer 2.
+
+Reverse: 1, `check:changed` adds the dependents' tests; 2, removal of a changed worktree asks first again; 3, either
+is removed by a dated line here.
 
 ### 2026-11-26 — Alchemy uptake: the goal's edges
 
@@ -2339,6 +2361,20 @@ The third round: the conditions under which a result made on my machine may coun
 
 Reverse: 1, `--force` comes off main's run; 2, `envMode` is loose again and the lists stay as documentation; 3, the
 cache steps return to the proofs job and its turbo call names a local cache folder.
+
+### 2026-11-26 — The review's model: a row's undo change is bounded below
+
+From CodeRabbit's finding on pull request 32: the invariant `ARowsChangeIsOneItsImportGave` bounded a row's last
+undo change only from above, so an undo change of -1 passed for any import, though only 0 (no undo) or a change the
+import gave is meant to be there.
+
+1. **Fix it in the rule, in the schema, or not at all?** I chose; the agent recommended the same. In the rule:
+   `row.undone.change >= 0` beside its upper bound, and the lock rewritten once with `UPDATE_VERIFY_LOCK=1` for that
+   rule alone. The invariant is only searched, so the comparison it adds costs the proofs nothing. Rejected: `Change`
+   as a non-negative Int in its schema, which reaches every change number of the model; leaving the gap with a
+   reply.
+
+Reverse: the comparison comes out of the rule and the lock is rewritten once more.
 
 ### 2026-11-26 — atoms, the kit's data grid: moved, not deleted
 

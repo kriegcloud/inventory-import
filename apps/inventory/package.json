@@ -28,6 +28,7 @@
     "auth:schema": "node scripts/auth-schema.mjs",
     "check": "tsrs -b --fast && beep-cli quality strict strict-ceiling.json",
     "test:slow": "vitest run --project slow",
+    "test:live": "vitest run --project live",
     "test:all": "vitest run",
     "test:watch": "vitest"
   },

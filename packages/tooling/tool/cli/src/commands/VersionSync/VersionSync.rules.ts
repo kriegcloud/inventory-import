@@ -5,7 +5,7 @@
  * | What | Its one source | The places that follow it |
  * | --- | --- | --- |
  * | bun | `.bun-version` | `packageManager`; a `bun-version:` in a workflow; "Bun 1.2.3" in the standing documents |
- * | Node | `engines.node` of the root's package.json (its major) | `node-version:` in every workflow; "Node 22 or newer" in the documents; the major of every `@types/node` (a problem, since only the registry knows the newest of a major) |
+ * | Node | `engines.node` of the root's package.json (its major) | the major of the exact version `.tool-versions` pins, which the workflows and a version manager run; a `node-version:` in a workflow; "Node 22 or newer" in the documents; the major of every `@types/node` (a problem, since only the registry knows the newest of a major) |
  * | Effect | the `effect` every package.json states (the root's `catalog` when there is one) | every `@effect/*` package that is released with it; "Effect 4.1" and "effect 4.1.4" in the documents; the versions `vendor sync` writes into a vendored package |
  * | `@effect/tsgo`, TypeScript, Better Auth | the one version the package.json files state | their name followed by a version in the documents |
  * | Alchemy | `alchemy` in the package.json files; `vendor/alchemy/sources.json` when the packages are kept as files | every `@alchemy.run/*` dependency; with kept files, each dependency's `<version>-<commit>` and each override's file |
@@ -417,12 +417,29 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
     )
   })
 
-  // Node: the oldest the root's package.json allows.
-  const nodePlan = (): Plan => {
+  // Node: the oldest the root's package.json allows. The one version CI and a version manager run is pinned in
+  // `.tool-versions` (turbo hashes that file into every task, so a result is never replayed under another Node);
+  // its major is the major `engines.node` names.
+  const nodePlan = Effect.fn("VersionSync.node")(function* () {
     const major = O.flatMap(O.fromUndefinedOr(rootPackage.decoded.engines?.node), (range) =>
       O.fromNullishOr(/\d+/.exec(range)?.[0])
     )
     if (O.isNone(major)) return nothing
+    const pinned = yield* readIfThere(repo.join(repo.root, ".tool-versions"))
+    // Which version of another major to pin is a person's to say, so a wrong major is a problem, not a repair.
+    const pins = A.flatMap(O.toArray(pinned), (at) =>
+      A.map(A.fromIterable(Str.matchAll(/^node(?:js)?[ \t]+v?((\d+)[\w.-]*)/gm)(at.text)), (match) => ({ at, match }))
+    )
+    const pinProblems = A.flatMap(pins, ({ at, match }) =>
+      match[2] === major.value
+        ? []
+        : [
+            Problem.make({
+              file: at.file,
+              message: `line ${lineAt(at.text)(match.index ?? 0)}: Node ${match[1] ?? ""} is pinned, and \`engines.node\` names Node ${major.value}: pin an exact ${major.value}.x.y, or change \`engines.node\` with it`
+            })
+          ]
+    )
     const same = () => major.value
     const what = "Node's version, from `engines.node` of the root's package.json"
     // Node's types are for the Node that runs the code: their major is the major `engines.node` names. Which version
@@ -441,6 +458,7 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
     })
     return mergePlans(
       A.flatten([
+        [Plan.make({ checked: pins.length, drifts: [], problems: pinProblems })],
         A.map(workflows, (at) =>
           places({ at: at, what: what, expected: same })(/\bnode-version:\s*["']?(\d+(?:\.[\dx]+)*)(?![\w/*])/g)
         ),
@@ -450,7 +468,7 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
         [Plan.make({ checked: types.length, drifts: [], problems: typesProblems })]
       ])
     )
-  }
+  })
 
   // A dependency whose version is also written in sentences.
   const written = (label: string, name: string, names: ReadonlyArray<string>): Plan => {
@@ -679,9 +697,10 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
   const date = yield* datePlan()
   const cli = yield* cliPlan()
   const schema = yield* schemaPlan()
+  const node = yield* nodePlan()
   return mergePlans([
     bun,
-    nodePlan(),
+    node,
     cataloguedPlan(),
     effect,
     written("@effect/tsgo", "@effect/tsgo", ["@effect/tsgo"]),

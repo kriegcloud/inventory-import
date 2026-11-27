@@ -6,10 +6,31 @@
     // The files bun applies to dependencies at an install are among them (docs/patches.md): bun.lock holds a patch's
     // path and never its content, so without them a changed patch would replay a result made with the old one, a
     // proof of the review's model included.
-    "inputs": [".bun-version", "bunfig.toml", "packages/patches/*.patch"],
-    // Tasks see the whole environment (the slow tests start workerd and wrangler, which read many variables); none
-    // of it changes a cached result, so none of it is hashed.
-    "envMode": "loose"
+    // And the one Node that runs every task (`.tool-versions`: the workflows set it up from this file, and a version
+    // manager runs it on a workstation), so a result made under one Node is never replayed under another.
+    "inputs": [".bun-version", ".tool-versions", "bunfig.toml", "packages/patches/*.patch"],
+    // A task sees only the variables named for it: its own `env`, which are in its hash, and the ones below, which
+    // are not, beside the few turbo always lets through (PATH, HOME, the terminal's). So a variable set in a shell
+    // and named nowhere (a key, `AI_ENABLED`) reaches no task and changes no result, on the workstation or on CI:
+    // a result stored on one may be replayed on the other (goals/ci-speed).
+    "envMode": "strict",
+    // Let through and not hashed, because none of them changes whether a task passes:
+    // - `CI` and `GITHUB_ACTIONS`: Vitest refuses to write a new snapshot under CI, and a retried test is reported as
+    //   an annotation on GitHub's runner (vitest.retries.ts). The one task whose answer depends on `CI` is the
+    //   model's `verify`, which names it in its own `env`.
+    // - `VITEST_MAX_WORKERS`: how many workers a test run may start; CI gives one (docs/standards/engineering.md).
+    // - `LEDGER_BASE`: the commit CI names for the laws with a ledger, which are never replayed.
+    // - `JAVA_HOME` and `XDG_CACHE_HOME`: where the reasoner finds Java and keeps its jar; `reason` is never replayed.
+    // - `MISE_*`: the version manager's own, so its shims find the Node `.tool-versions` pins.
+    "passThroughEnv": [
+      "CI",
+      "GITHUB_ACTIONS",
+      "VITEST_MAX_WORKERS",
+      "LEDGER_BASE",
+      "JAVA_HOME",
+      "XDG_CACHE_HOME",
+      "MISE_*"
+    ]
   },
   "tasks": {
     // A task with no script anywhere: depending on `^transit` folds every workspace dependency's source into a
@@ -22,10 +43,11 @@
       "inputs": ["$TURBO_DEFAULT$", "!**/*.md", "!test/**"]
     },
     // Type-check with the Effect diagnostics.
-    // A package's check may run the repository's own commands (quality strict, laws exports): their source is an input.
+    // A package's check may run the repository's own commands (quality strict, laws exports). Their source, and the
+    // kit it is built on, reach the hash through the CLI's own `transit`, and nothing else does it: the root has no
+    // dependency on the CLI, which would put its source into every task's hash, a proof's included (goals/ci-speed).
     "check": {
-      "dependsOn": ["transit"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/tooling/tool/cli/src/**"],
+      "dependsOn": ["transit", "@beep/repo-cli#transit"],
       "outputs": []
     },
     // oxlint, and the design-system lint in packages with screens. A package's own lint profile is in its files; the
@@ -36,9 +58,11 @@
       "outputs": []
     },
     // The fast tests. Their limits and retries are the root's (vitest.shared.ts, vitest.retries.ts), which every
-    // package's vitest.config.ts imports.
+    // package's vitest.config.ts imports. `PROPERTY_RUNS` gives the longest properties fewer runs on a pull request
+    // (vitest.shared.ts), so it is in the hash: a result made at one count is never replayed at the other.
     "test": {
       "dependsOn": ["transit"],
+      "env": ["PROPERTY_RUNS"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/vitest.shared.ts", "$TURBO_ROOT$/vitest.retries.ts"],
       "outputs": []
     },
@@ -67,10 +91,26 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/vitest.shared.ts", "$TURBO_ROOT$/vitest.retries.ts"],
       "outputs": []
     },
-    // The slow tests: workerd, a real D1 database and sign-in. One suite calls a live service, so never cached.
-    "test:slow": { "dependsOn": ["transit"], "cache": false },
-    // The production build and its identity check.
-    "build": { "dependsOn": ["transit"], "outputs": ["dist/**"] },
+    // The slow tests: workerd, a real D1 database and sign-in. Everything they read is in their package or one it
+    // imports, so like the fast tests they are replayed until one of those changes.
+    "test:slow": {
+      "dependsOn": ["transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/vitest.shared.ts", "$TURBO_ROOT$/vitest.retries.ts"],
+      "outputs": []
+    },
+    // A test that calls a real service on the network (`*.live.test.ts`: the breach check against Have I Been
+    // Pwned). The service's answer is in no file, so a result is never replayed.
+    "test:live": { "dependsOn": ["transit"], "cache": false },
+    // The production build and its identity check. Cloudflare's Vite plugin copies a `.dev.vars` (and a `.env`) it
+    // finds beside the app into `dist`, for `vite preview`; that file holds the workstation's secrets, so it is
+    // never part of the result turbo stores and may share. `test/TurboCache.test.ts` of the CLI holds these lines.
+    // What the build reads from the environment is in its hash: which of wrangler's environments it builds for, the
+    // bundle report's switch, and the mark Alchemy sets when it runs the build itself.
+    "build": {
+      "dependsOn": ["transit"],
+      "env": ["CLOUDFLARE_ENV", "BUNDLE_REPORT", "ALCHEMY_CLOUDFLARE_VITE_INJECTED"],
+      "outputs": ["dist/**", "!dist/**/.dev.vars", "!dist/**/.dev.vars.*", "!dist/**/.env", "!dist/**/.env.*"]
+    },
     "dev": { "dependsOn": ["//#patches:installed"], "cache": false, "persistent": true },
     // Repository checks: root scripts that do not call turbo.
     // Every file but the scratchpad's: the formatter leaves it alone (.oxfmtrc.json), and an experiment that is not
@@ -93,6 +133,8 @@
     "//#alchemy:check": { "cache": false },
     // The stage C ceilings of the packages with screens add up to at most 678 (`beep quality ceilings`).
     "//#ceilings:check": {
+      // The CLI's source is named below; the kit it imports comes with its `transit`, as for a package's `check`.
+      "dependsOn": ["@beep/repo-cli#transit"],
       "inputs": ["apps/*/strict-ceiling.json", "packages/**/strict-ceiling.json", "packages/tooling/tool/cli/src/**"],
       "outputs": []
     },
@@ -117,6 +159,7 @@
     },
     // Every package with screens is in both lists Tailwind reads class names from (`beep laws screens`).
     "//#screens:check": {
+      "dependsOn": ["@beep/repo-cli#transit"],
       "inputs": [
         "apps/inventory/package.json",
         "apps/inventory/src/web/index.css",
@@ -156,6 +199,7 @@
     // scratchpad left out; and
     // every package.json, whose exports name the modules of hooks.
     "//#refs:check": {
+      "dependsOn": ["@beep/repo-cli#transit"],
       "inputs": [
         "**/*.tsx",
         "!**/node_modules/**",
@@ -253,6 +297,7 @@
     // (a vitest.config.ts, a vendor.json, a ceiling file). An installed file a `$schema` names is hashed through
     // bun.lock.
     "//#config-sync:check": {
+      "dependsOn": ["@beep/repo-cli#transit"],
       "inputs": [
         "packages/foundation/modeling/identity/src/**",
         "packages/foundation/modeling/schema/src/**",
@@ -462,11 +507,15 @@
     // Its tests run that law with the root's own profile and the installed packages, whose deprecation notes they
     // expect word for word: the same installed manifests are inputs here. One of its tests reads the workflows GitHub
     // runs (test/DeployWorkflow.test.ts), so a change to a workflow alone runs the tests again and is never replayed.
+    // Another reads every turbo.json (test/TurboCache.test.ts), and the Node pinned in `.tool-versions`, a global input.
     "@beep/repo-cli#test": {
       "dependsOn": ["transit"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/.github/workflows/**",
+        "$TURBO_ROOT$/turbo.json",
+        "$TURBO_ROOT$/apps/*/turbo.json",
+        "$TURBO_ROOT$/packages/**/turbo.json",
         "$TURBO_ROOT$/vitest.shared.ts",
         "$TURBO_ROOT$/vitest.retries.ts",
         "$TURBO_ROOT$/.oxlintrc.deprecated-apis.json",
@@ -511,6 +560,7 @@
     // Each patch's test fails beside the package with that one patch left out and the others applied (`beep patches
     // prove`): the patches and their tests, the kept files they are applied to, and what the tests are run with.
     "//#patches:prove": {
+      "dependsOn": ["@beep/repo-cli#transit"],
       "inputs": [
         "packages/patches/**",
         "!packages/patches/node_modules/**",
@@ -523,6 +573,7 @@
     },
     // No home path or private folder is named in the scratchpad (`beep laws private-paths`): every file in it.
     "//#private-paths:check": {
+      "dependsOn": ["@beep/repo-cli#transit"],
       "inputs": ["scratchpad/**", "!scratchpad/**/node_modules/**", "packages/tooling/tool/cli/src/**"],
       "outputs": []
     },
@@ -530,6 +581,7 @@
     // key in an experiment is refused like any other, and this is the one root task an edit there re-runs.
     "//#keys:check": { "outputs": [] },
     "//#docs:check": {
+      "dependsOn": ["@beep/repo-cli#transit"],
       "inputs": [
         "docs/**",
         "explorations/**",

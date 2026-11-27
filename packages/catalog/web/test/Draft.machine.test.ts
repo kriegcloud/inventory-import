@@ -74,6 +74,8 @@ const limit = runs * 120
 
 // Each run draws 30 to 60 picks, each one enabled when it is drawn (`enabled`). A run ends early when nothing is enabled
 // any more. The seed is new on every run: a failure is printed under its shortest ordering, which plays it again.
+// That ordering is what is kept, pinned by name below ("orderings the properties met, pinned"), never the seed: a
+// seed replays a thousand runs to reach one ordering, and draws another once the world's commands change.
 describe("the review's draft, whatever order things happen in", () => {
   it.prop(
     "sends only the person's own rows, never writes over what somebody else decided unasked, and every decision of hers is on the server, waiting, on a line or named",
@@ -1366,6 +1368,44 @@ describe("orderings the properties met, pinned", () => {
       ])
     ).toEqual(O.none())
   })
+
+  it("a confirm pressed while she decided, or after a save that failed and somebody else's answer, leaves no row of hers waiting once everything has landed", () => {
+    // Found by seeds 369148268449177 and -2416120108841983 on the machine before its rewrite (518babdb), where each
+    // failed with "after everything landed, a row of the person's still waits". That world kept one save out at a
+    // time: its saves are the one the draft waits for here (`which: "last"`).
+    const C = Command.cases
+    const orderings: ReadonlyArray<ReadonlyArray<Command>> = [
+      [
+        C.PressConfirm.make({}),
+        C.Decide.make({ row: "a", to: "kept" }),
+        C.SomeoneElse.make({ row: "c", to: "kept" }),
+        C.OtherAnswerSent.make({}),
+        C.ServerTakesConfirm.make({}),
+        C.OtherAnswerArrives.make({}),
+        C.Decide.make({ row: "b", to: "out" }),
+        C.ConfirmAnswers.make({}),
+        C.SomeoneElse.make({ row: "a", to: "out" }),
+        C.Decide.make({ row: "c", to: "nothing" }),
+        C.PressConfirm.make({}),
+        C.ServerTakesSave.make({ which: "last" }),
+        C.Leave.make({}),
+        C.ServerTakesRead.make({}),
+        C.ReadArrives.make({})
+      ],
+      [
+        C.Decide.make({ row: "a", to: "out" }),
+        C.Decide.make({ row: "b", to: "out" }),
+        C.SaveFails.make({ which: "last" }),
+        C.SomeoneElse.make({ row: "a", to: "out" }),
+        C.SomeoneElse.make({ row: "b", to: "kept" }),
+        C.OtherAnswerSent.make({}),
+        C.OtherAnswerArrives.make({}),
+        C.PressConfirm.make({}),
+        C.Decide.make({ row: "a", to: "kept" })
+      ]
+    ]
+    expect(A.map(orderings, broken)).toEqual([O.none(), O.none()])
+  })
 })
 
 describe("a save's answer that comes after its draft closed", () => {
@@ -1746,67 +1786,4 @@ describe("what this tab sent whose answer never came back, as the properties' wo
     const confirming = [...lostOnItsWay, D.PressConfirm.make({}), D.ServerTakesConfirm.make({})]
     expect([after(confirming), after([...confirming, D.ConfirmAnswers.make({})])]).toEqual([["a"], []])
   })
-})
-
-describe("seeds the properties were falsified by, played again", () => {
-  const seeds = [
-    {
-      name: "with reloads, sign-outs and closed tabs taken up",
-      seed: -876652368938065,
-      may: { confirms: false, elsewhere: false, tabs: true }
-    },
-    {
-      name: "with somebody else confirming, reopening or removing the import",
-      seed: -5255366521312007,
-      may: { confirms: true, elsewhere: true, tabs: true }
-    },
-    {
-      name: "with the person confirming",
-      seed: 369148268449177,
-      may: { confirms: true, elsewhere: false, tabs: false }
-    },
-    {
-      name: "with the person confirming",
-      seed: -2416120108841983,
-      may: { confirms: true, elsewhere: false, tabs: false }
-    },
-    {
-      name: "with somebody else confirming, reopening or removing the import",
-      seed: 5903557278919753,
-      may: { confirms: true, elsewhere: true, tabs: true }
-    },
-    {
-      name: "with somebody else confirming, reopening or removing the import",
-      seed: -7675454253259129,
-      may: { confirms: true, elsewhere: true, tabs: true }
-    },
-    {
-      name: "with reloads, sign-outs and closed tabs taken up",
-      seed: 7065129212828743,
-      may: { confirms: false, elsewhere: false, tabs: true }
-    },
-    {
-      name: "with reloads, sign-outs and closed tabs taken up",
-      seed: -5469710740912195,
-      may: { confirms: false, elsewhere: false, tabs: true }
-    },
-    {
-      name: "with reloads, sign-outs and closed tabs taken up",
-      seed: 1376949052012291,
-      may: { confirms: false, elsewhere: false, tabs: true }
-    },
-    {
-      name: "with somebody else confirming, reopening or removing the import",
-      seed: 22,
-      may: { confirms: true, elsewhere: true, tabs: true }
-    }
-  ] as const
-  for (const { may, name, seed } of seeds) {
-    // The same limit as the four above: a seeded one took 12.8 s at its slowest in three runs of 1,000, measured with
-    // other test runs busy on the same machine.
-    it.prop(`${name}, seed ${seed}`, { choices: Choices }, ({ choices }) => play(choices, may), {
-      timeout: limit,
-      arbitrary: { runs, size: 60, seed }
-    })
-  }
 })

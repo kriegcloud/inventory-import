@@ -125,10 +125,12 @@ export class Workstation extends Context.Service<
 
       const say = (line: string) => Console.log(line)
       const ask = (command: string, args: ReadonlyArray<string>) => repo.run(command, args, { stdin: "" })
+      // A question left with Ctrl-C or Escape is a no. The prompt then ends without its line, so one is written:
+      // what the run says next starts on a line of its own, not after "(y/N)".
       const confirm = (question: string) =>
         Prompt.run(Prompt.Confirm({ message: question, initial: false })).pipe(
           Effect.provideContext(prompting),
-          Effect.orElseSucceed(() => false)
+          Effect.catch(() => Console.log("").pipe(Effect.as(false)))
         )
       const choose = (question: string, choices: A.NonEmptyReadonlyArray<Choice>) =>
         Prompt.run(Prompt.Select({ message: question, choices: A.map(choices, (one) => ({ ...one })) })).pipe(

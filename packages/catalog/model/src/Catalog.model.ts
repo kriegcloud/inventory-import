@@ -138,11 +138,13 @@ export class Catalog extends Domain.Model(
           (group, life) => group.change >= 1 && group.change <= life.changes && group.undoneAt <= life.changes
         ),
       // A row's decision, and the change its last undo took back, are changes its import gave. A row that took no
-      // undo holds 0 there, so that half has only its upper bound.
+      // undo holds 0 there, so that half is bounded below by 0, not 1: a negative one is refused all the same
+      // (Benjamin, 2026-11-26, from CodeRabbit's finding on pull request 32).
       ARowsChangeIsOneItsImportGave: (all) =>
         everyRowOfItsImport(
           all,
           (row, life) =>
+            row.undone.change >= 0 &&
             row.undone.change <= life.changes &&
             (!RowState.guards.Decided(row) || (row.change >= 1 && row.change <= life.changes))
         ),

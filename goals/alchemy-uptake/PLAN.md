@@ -70,13 +70,22 @@ Once this is on `main`, **every preview's deploy stops until `PREVIEW_ACCESS` is
 2. Give the token previews deploy with (`PREVIEW_CLOUDFLARE_API_TOKEN`, the one you made in that account) the
    account permission "Access: Apps and Policies, Edit". Not verified which permission the provider's calls need
    beyond that: a missing one shows as a refused call that names it.
-3. Set the emails, typed at the prompt as one line separated by commas, never on the command line:
+3. In 1Password, make an item whose field holds the emails, on one line separated by commas. Make another item
+   for production's sign-up list (emails, or `closed`) if you don't already have one. Write both references into
+   `packages/infra/env/op.env.local` (git ignores it):
 
-   ```bash
-   gh secret set PREVIEW_ACCESS --env preview --repo kriegcloud/inventory-import
+   ```
+   PREVIEW_ACCESS="op://<vault>/<item>/<field>"
+   SIGN_UP="op://<vault>/<item>/<field>"
    ```
 
-4. Open or push to a pull request. Its plan should read `[Website/Access] create`. Open the preview's address in
+   Then deploy the repository's stack, which writes both to GitHub as secrets. It stops before step 1 without them:
+
+   ```bash
+   bun run beep infra setup --staging
+   ```
+
+4. Open or push to a pull request (or re-run its Preview job). Its plan should read `[Website/Access] create`. Open the preview's address in
    a private window: Cloudflare asks for an email and sends a code; one of the named emails then reaches the
    app's sign-in page, and any other is refused by Cloudflare. That is the first time the gate is seen at all.
 
@@ -374,9 +383,18 @@ secret in the clear. It is worth another look when Alchemy seals a Worker's bind
 - **`orphaned` is a loss too** (step 1). A database dropped from the state is still in the account, but the next
   deploy makes a new empty one and binds the Worker to it.
 - **Never `--detailed` in a workflow** (step 1): its log is public, and the plain plan names resources only.
-- **`PREVIEW_ACCESS` is set by hand, like `SIGN_UP`, and the repository's stack does not write it** (step 7): his
-  answer was "read as `SIGN_UP` is". So there is no reference line for it in `env/op.env`, and a preview deployed
-  from a workstation needs the variable in that shell.
+- **The repository's stack writes `PREVIEW_ACCESS` and production's `SIGN_UP`, from 1Password** (step 7; Benjamin,
+  2026-11-26: "Repository stack" and "Yes, both together"; the agent recommended both). This replaces the first
+  reading of his answer "read as `SIGN_UP` is", which had both lists set by hand with `gh secret set`. Each list is
+  a field of a 1Password item, and its reference is a line of `env/op.env.local` (`PREVIEW_ACCESS=op://…`,
+  `SIGN_UP=op://…`; the line named `SIGN_UP` is production's list). `GitHub.stack.ts` asks 1Password for both and
+  writes them as secrets of the `preview` and `production` environments. A list that is no list of emails stops
+  that stack, and a missing one stops it too, so a run again never closes production. Production's public variable
+  `SIGN_UP` and the setup command's `--sign-up` flag are gone, so no email is in GitHub in the clear. A preview
+  or production deployed from a workstation asks 1Password for its list itself. To change who may open a preview
+  or sign up: change the item's field, then run `bun run beep infra setup --staging`. Not moved: staging's own
+  `SIGN_UP` secret, which stays as he sets it by hand, and `TELEMETRY_COLLECTOR_AUTHORIZATION`, which is no
+  email list.
 - **A list with one bad piece is no list** (step 7): the deploy stops. Dropping the bad piece would gate a preview
   on fewer people than were meant, and nobody would be told.
 - **The Worker's own Access application, not one shared by every preview** (step 7): it is made and removed with

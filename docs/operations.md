@@ -93,14 +93,18 @@ A preview (`pr-<number>`) is behind Cloudflare Access: its address asks for an e
 the app's own sign-in page, and only the emails in the `preview` environment's secret `PREVIEW_ACCESS` pass. No
 other stage has a gate. The emails are in no file of the repository, which is public.
 
-To change who may open one, set the secret again with the whole list, typed at the prompt as one line separated
-by commas:
+The list is a field of a 1Password item: the emails on one line, separated by commas. Its reference is the line
+`PREVIEW_ACCESS="op://<vault>/<item>/<field>"` in `packages/infra/env/op.env.local`, and the repository's stack
+writes it to the `preview` environment as a secret. Production's sign-up list is handled the same way, through the
+line `SIGN_UP` there, written to the `production` environment. To change either list, edit the item's field, then
+deploy the repository's stack again:
 
 ```bash
-gh secret set PREVIEW_ACCESS --env preview --repo kriegcloud/inventory-import
+bun run beep infra setup --staging
 ```
 
-Each preview takes the new list at its next deploy (a push to its pull request). A list with a piece that is no
+A run without either reference stops before its first step and names the line to write. Each preview takes the new
+list at its next deploy (a push to its pull request, or a re-run of its Preview job). A list with a piece that is no
 email stops the deploy with `MissingPreviewAccess`, which says so without repeating the list. In a preview's plan
 the gate is the line `[Website/Access]`.
 

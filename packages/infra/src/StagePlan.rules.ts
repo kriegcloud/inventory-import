@@ -12,6 +12,7 @@
  */
 import * as A from "effect/Array"
 import * as O from "effect/Option"
+import * as Redacted from "effect/Redacted"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import {
@@ -198,12 +199,62 @@ export const givenTestPassword = <Password>(input: {
   })
 
 /**
- * The variable a preview's deploy reads the emails that may open it from: the `preview` environment's secret, set by
- * hand as `SIGN_UP` is, because the repository and its logs are public.
+ * The variable a preview's deploy reads the emails that may open it from: the `preview` environment's secret, which
+ * the repository's stack writes from a 1Password item (Benjamin, 2026-11-26: "Repository stack"). A secret, never a
+ * variable, because the repository and its logs are public.
  *
  * @category rules
  */
 export const previewAccessVariable = "PREVIEW_ACCESS"
+
+/**
+ * The variable production's sign-up list is read from: emails separated by commas, `closed` or `open`. In a
+ * workflow it is the `production` environment's secret, which the repository's stack writes from a 1Password item
+ * (Benjamin, 2026-11-26: "Yes, both together"); on a workstation the line of this name in `env/op.env.local` is
+ * production's list, and only production's plan asks 1Password for it, so staging never takes it.
+ *
+ * @category rules
+ */
+export const signUpVariable = "SIGN_UP"
+
+/**
+ * The repository's stack deployed with no sign-up list for production. Stopped: writing none, or `closed` in its
+ * place, would close production to everyone on a run again that only lost the line.
+ *
+ * @category errors
+ */
+export class MissingSignUpList extends S.TaggedError<MissingSignUpList, { readonly brand: unique symbol }>(
+  $I`MissingSignUpList`
+)(
+  "MissingSignUpList",
+  { variable: S.String.pipe(S.annotateKey({ description: "The variable that should hold the list" })) },
+  $I.annoteError<MissingSignUpList>("MissingSignUpList", {
+    description: "The repository's stack deployed without production's sign-up list"
+  })
+) {
+  /** What is missing and where its reference is written. */
+  override get message(): string {
+    return (
+      `Production has no sign-up list: ${this.variable} is not set. Make a 1Password item whose field holds the ` +
+      `emails that may open an account, separated by commas (or closed), write ` +
+      `${this.variable}="op://<vault>/<item>/<field>" in packages/infra/env/op.env.local, and deploy the ` +
+      `repository's stack again (bun run beep infra setup --staging).`
+    )
+  }
+}
+
+/**
+ * Production's sign-up list as the repository's stack writes it: the one it was given, or the deploy stops.
+ *
+ * @example givenSignUpList(O.none()) // Result.fail(MissingSignUpList)
+ *
+ * @category rules
+ */
+export const givenSignUpList = <List>(given: O.Option<List>): Result.Result<List, MissingSignUpList> =>
+  O.match(given, {
+    onNone: () => Result.fail(MissingSignUpList.make({ variable: signUpVariable })),
+    onSome: Result.succeed
+  })
 
 /**
  * A preview deployed with no list of who may open it, or with one that is no list of emails. Stopped: a preview
@@ -229,9 +280,10 @@ export class MissingPreviewAccess extends S.TaggedError<MissingPreviewAccess, { 
       ? `${this.variable} is not a list of emails separated by commas`
       : `${this.variable} is not set`
     return (
-      `Stage "${this.stage}" has no list of who may open it: ${what}, so the preview would answer anyone. Set it in ` +
-      `the preview environment, with the emails typed at the prompt and never on the command line: ` +
-      `gh secret set ${this.variable} --env preview`
+      `Stage "${this.stage}" has no list of who may open it: ${what}, so the preview would answer anyone. Make a ` +
+      `1Password item whose field holds the emails, separated by commas, write ` +
+      `${this.variable}="op://<vault>/<item>/<field>" in packages/infra/env/op.env.local, and deploy the ` +
+      `repository's stack (bun run beep infra setup --staging), which writes it to the preview environment as a secret`
     )
   }
 }
@@ -263,6 +315,27 @@ export const accessEmailsFor = (input: {
       })
   })
 }
+
+/**
+ * The emails that may open a preview, as the repository's stack writes them to the `preview` environment: what it
+ * was given, once it reads as a list of emails, or the reason it stops. Checked as a preview's deploy checks it
+ * (`accessEmailsFor`), so a list that would stop every preview stops this one run instead.
+ *
+ * @example givenPreviewAccess(O.some(Redacted.make("ben@example.test"))) // Result.succeed(that same value)
+ *
+ * @category rules
+ */
+export const givenPreviewAccess = (
+  given: O.Option<Redacted.Redacted<string>>
+): Result.Result<Redacted.Redacted<string>, MissingPreviewAccess> =>
+  O.match(given, {
+    onNone: () =>
+      Result.fail(MissingPreviewAccess.make({ stage: "pr-<number>", variable: previewAccessVariable, given: false })),
+    onSome: (value) =>
+      value.pipe(Redacted.value, S.decodeOption(AccessEmails), O.isSome)
+        ? Result.succeed(value)
+        : Result.fail(MissingPreviewAccess.make({ stage: "pr-<number>", variable: previewAccessVariable, given: true }))
+  })
 
 /**
  * A stage's collector address that is not an `https` address. Stopped: Cloudflare would refuse it at the deploy, or

@@ -21,11 +21,13 @@
     // read too, since `Review/ItemsOfRow.context.ts` reaches the review's rules (`Review/Review.rules.ts` and the rule
     // files it imports, `Words.rules.ts` among them). A proof also reads the kernel those blocks import from, how the
     // code is compiled, and the pinned library; turbo adds the versions the lockfile resolves for this package (Effect,
-    // the solver, the parser) and the vendored kit the kernel is built on, which the root depends on. It is replayed
-    // until one of them changes, or the limits and retries its vitest config takes from the root: an edit to a handler
-    // or a store of this package does not run the proofs again, unless its file has one of those endings; an edit to
-    // any rule (`.rules.ts`) does.
+    // the solver, the parser). The vendored kit the kernel is built on comes with the kernel's `transit`, which folds
+    // the source of every package the kernel depends on into this task's hash: nothing else brings it, and without
+    // that edge an edit to `@beep/schema` would replay an old proof. It is replayed until one of them changes, or the
+    // limits and retries its vitest config takes from the root: an edit to a handler or a store of this package does
+    // not run the proofs again, unless its file has one of those endings; an edit to any rule (`.rules.ts`) does.
     "prove": {
+      "dependsOn": ["//#patches:installed", "@inventory/kernel#transit"],
       "inputs": [
         "package.json",
         "turbo.json",
@@ -63,6 +65,7 @@
       // UPDATE_VERIFY_LOCK=1 it locks every rule as written and passes. Both are in the hash, so a run under one is
       // never replayed as a run under another.
       "env": ["CI", "UPDATE_VERIFY_LOCK"],
+      "dependsOn": ["//#patches:installed", "@inventory/kernel#transit"],
       "inputs": [
         "package.json",
         "turbo.json",
@@ -90,7 +93,9 @@
     // stories, which must notice it. The sample is fast and in `bun run check:full`; all of them run every night.
     // Both read what the proofs read, every block ending Verify reads, the stories and the mutants themselves, and are
     // replayed until one changes. `bun run beep laws model-inputs` holds each list as it holds Verify's.
+    // The contract's `transit` brings what the contract is built on, as the kernel's does for the kit.
     "mutants:sample": {
+      "dependsOn": ["//#patches:installed", "@inventory/kernel#transit", "@inventory/catalog-contract#transit"],
       "inputs": [
         "package.json",
         "turbo.json",
@@ -119,6 +124,7 @@
       "outputs": []
     },
     "mutants": {
+      "dependsOn": ["//#patches:installed", "@inventory/kernel#transit", "@inventory/catalog-contract#transit"],
       "inputs": [
         "package.json",
         "turbo.json",

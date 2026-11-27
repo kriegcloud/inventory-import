@@ -5,7 +5,6 @@
     "": {
       "name": "inventory-import",
       "devDependencies": {
-        "@beep/repo-cli": "workspace:*",
         "@effect/tsgo": "catalog:",
         "oxfmt": "^0.80.0",
         "oxlint": "catalog:",

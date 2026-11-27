@@ -192,11 +192,11 @@ const ascending = /\s+(ascending|asc|low to high|smallest first|a to z|oldest fi
  */
 const groupOf =
   (pattern: RegExp) =>
-    (clause: string): O.Option<string> =>
-      O.flatMap(Str.match(pattern)(clause), (found) => O.fromUndefinedOr(found[1]))
+  (clause: string): O.Option<string> =>
+    O.flatMap(Str.match(pattern)(clause), (found) => O.fromUndefinedOr(found[1]))
 
 const readClause: {
-  (clause: string, columns: ColumnCatalog): O.Option<ViewChange>,
+  (clause: string, columns: ColumnCatalog): O.Option<ViewChange>
   (columns: ColumnCatalog): (clause: string) => O.Option<ViewChange>
 } = dual(2, (clause: string, columns: ColumnCatalog): O.Option<ViewChange> => {
   if (/^(clear|reset)( all| everything| the view| it)?$/.test(clause) || /^show (all|everything)$/.test(clause)) {

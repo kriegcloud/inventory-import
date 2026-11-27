@@ -378,15 +378,15 @@ const commitStep = (
     A.some(items, (entry) => entry.organizationId === org && ownedKey(entry) === skuKey(row.item))
       ? items
       : A.append(items, {
-        organizationId: org,
-        item: { id, ...row.item, createdAt: at, createdBy: audit.actorName, revision: 1 },
-        importId: write.draft,
-        confirm: write.confirm,
-        rowNumber: row.rowNumber,
-        part: row.part,
-        updatedBy: O.none(),
-        updatedAt: O.none()
-      })
+          organizationId: org,
+          item: { id, ...row.item, createdAt: at, createdBy: audit.actorName, revision: 1 },
+          importId: write.draft,
+          confirm: write.confirm,
+          rowNumber: row.rowNumber,
+          part: row.part,
+          updatedBy: O.none(),
+          updatedAt: O.none()
+        })
   )
   // The copies first, one per item, then the replaces.
   const copies = A.reduce(replacing, state.replaced, (replaced, row) =>
@@ -401,16 +401,16 @@ const commitStep = (
           )
             ? replaced
             : A.append(replaced, {
-              organizationId: org,
-              importId: write.draft,
-              confirm: write.confirm,
-              itemId: stored.item.id,
-              rowNumber: row.rowNumber,
-              part: row.part,
-              before: stored,
-              revisionAfter: stored.item.revision + 1,
-              restored: false
-            })
+                organizationId: org,
+                importId: write.draft,
+                confirm: write.confirm,
+                itemId: stored.item.id,
+                rowNumber: row.rowNumber,
+                part: row.part,
+                before: stored,
+                revisionAfter: stored.item.revision + 1,
+                restored: false
+              })
       }
     )
   )
@@ -418,11 +418,11 @@ const commitStep = (
     A.map(list, (entry) =>
       entry.organizationId === org && ownedKey(entry) === skuKey(row.item)
         ? {
-          ...entry,
-          item: { ...withFields(entry.item, row.item), revision: entry.item.revision + 1 },
-          updatedBy: O.some<string>(audit.actorName),
-          updatedAt: O.some(at)
-        }
+            ...entry,
+            item: { ...withFields(entry.item, row.item), revision: entry.item.revision + 1 },
+            updatedBy: O.some<string>(audit.actorName),
+            updatedAt: O.some(at)
+          }
         : entry
     )
   )
@@ -496,16 +496,16 @@ const commitStep = (
       )
         ? all
         : A.append(all, {
-          organizationId: org,
-          importId: write.draft,
-          confirm: write.confirm,
-          rowNumber: row.rowNumber,
-          part: row.part,
-          sku: row.sku,
-          change: entry.change,
-          decidedByName: entry.decidedByName,
-          createdAt: at
-        })
+            organizationId: org,
+            importId: write.draft,
+            confirm: write.confirm,
+            rowNumber: row.rowNumber,
+            part: row.part,
+            sku: row.sku,
+            change: entry.change,
+            decidedByName: entry.decidedByName,
+            createdAt: at
+          })
     )
   })
   const count = (outcome: OutcomeKind): number =>
@@ -609,7 +609,7 @@ const withSaved = (
 // -- The take-back, as one step -----------------------------------------------------------------------------------
 
 const takeBackStep: {
-  (state: CatalogState, write: TakeBackWrite): readonly [TookBack, CatalogState],
+  (state: CatalogState, write: TakeBackWrite): readonly [TookBack, CatalogState]
   (write: TakeBackWrite): (state: CatalogState) => readonly [TookBack, CatalogState]
 } = dual(2, (state: CatalogState, write: TakeBackWrite): readonly [TookBack, CatalogState] => {
   const audit = write.audit
@@ -676,14 +676,14 @@ const takeBackStep: {
   const confirms = A.map(state.confirms, (confirm) =>
     isMarked(confirm.id) && confirm.organizationId === org
       ? {
-        ...confirm,
-        takeBack: O.some({ id: write.takeBack, byName: takenBackBy, at }),
-        removed: A.filter(put.items, (entry) => ofConfirm(confirm.id)(entry) && entry.item.revision === 1).length,
-        restored: A.filter(put.replaced, (copy) => copiesOf(confirm.id)(copy) && copy.restored).length,
-        kept:
-          A.filter(put.items, (entry) => ofConfirm(confirm.id)(entry) && entry.item.revision > 1).length +
-          A.filter(put.replaced, (copy) => copiesOf(confirm.id)(copy) && !copy.restored).length
-      }
+          ...confirm,
+          takeBack: O.some({ id: write.takeBack, byName: takenBackBy, at }),
+          removed: A.filter(put.items, (entry) => ofConfirm(confirm.id)(entry) && entry.item.revision === 1).length,
+          restored: A.filter(put.replaced, (copy) => copiesOf(confirm.id)(copy) && copy.restored).length,
+          kept:
+            A.filter(put.items, (entry) => ofConfirm(confirm.id)(entry) && entry.item.revision > 1).length +
+            A.filter(put.replaced, (copy) => copiesOf(confirm.id)(copy) && !copy.restored).length
+        }
       : confirm
   )
   const sum = (read: (confirm: MemConfirm) => number): number =>
@@ -762,7 +762,7 @@ const takeBackStep: {
 // -- Items: the page's questions, answered over a list --------------------------------------------------------
 
 const textOf: {
-  (item: StoredItem, column: ItemFilter["id"]): O.Option<string>,
+  (item: StoredItem, column: ItemFilter["id"]): O.Option<string>
   (column: ItemFilter["id"]): (item: StoredItem) => O.Option<string>
 } = dual(2, (item: StoredItem, column: ItemFilter["id"]): O.Option<string> =>
   ItemFilterColumn.match(column, {
@@ -775,17 +775,19 @@ const textOf: {
     lotTracked: () => O.some(`${item.lotTracked}`),
     quantityOnHand: () => O.some(`${item.quantityOnHand}`),
     unitCost: () => item.unitCost.pipe(costDigits, O.some)
-  }))
+  })
+)
 
 const numberOf: {
-  (item: StoredItem, column: ItemFilter["id"]): O.Option<number>,
+  (item: StoredItem, column: ItemFilter["id"]): O.Option<number>
   (column: ItemFilter["id"]): (item: StoredItem) => O.Option<number>
 } = dual(2, (item: StoredItem, column: ItemFilter["id"]): O.Option<number> =>
   column === "quantityOnHand"
     ? O.some(item.quantityOnHand)
     : column === "unitCost"
       ? O.some(Number(costDigits(item.unitCost)))
-      : O.none())
+      : O.none()
+)
 
 const listOf = (value: ItemFilter["value"]): ReadonlyArray<string> => (P.isString(value) ? [value] : value)
 
@@ -800,7 +802,7 @@ const leftOutText = ""
 
 // None: the filter is half-typed or does not suit its column, and is left out, as the adapter leaves it out.
 const passes: {
-  (item: StoredItem, filter: ItemFilter): O.Option<boolean>,
+  (item: StoredItem, filter: ItemFilter): O.Option<boolean>
   (filter: ItemFilter): (item: StoredItem) => O.Option<boolean>
 } = dual(2, (item: StoredItem, filter: ItemFilter): O.Option<boolean> => {
   const has = O.filter(textOf(item, filter.id), Str.isNonEmpty)
@@ -855,7 +857,7 @@ const passes: {
 const sortsFirst = { count: -1, day: "" } as const
 
 const sortKey: {
-  (item: StoredItem, column: ItemSort["id"]): string | number,
+  (item: StoredItem, column: ItemSort["id"]): string | number
   (column: ItemSort["id"]): (item: StoredItem) => string | number
 } = dual(2, (item: StoredItem, column: ItemSort["id"]): string | number =>
   ItemSortColumn.match(column, {
@@ -868,24 +870,25 @@ const sortKey: {
     reorderPoint: () => O.match(item.reorderPoint, { onNone: () => sortsFirst.count, onSome: identity }),
     firstReceivedOn: () => O.match(item.firstReceivedOn, { onNone: () => sortsFirst.day, onSome: identity }),
     createdAt: () => DateTime.toEpochMillis(item.createdAt)
-  }))
+  })
+)
 
 const compareBy =
   (sorting: ReadonlyArray<ItemSort>) =>
-    (a: StoredItem, b: StoredItem): -1 | 0 | 1 => {
-      for (const sort of sorting) {
-        const left = sortKey(a, sort.id)
-        const right = sortKey(b, sort.id)
-        if (left !== right) {
-          const up = left < right ? -1 : 1
-          return sort.desc ? (up === -1 ? 1 : -1) : up
-        }
+  (a: StoredItem, b: StoredItem): -1 | 0 | 1 => {
+    for (const sort of sorting) {
+      const left = sortKey(a, sort.id)
+      const right = sortKey(b, sort.id)
+      if (left !== right) {
+        const up = left < right ? -1 : 1
+        return sort.desc ? (up === -1 ? 1 : -1) : up
       }
-      return a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0
     }
+    return a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0
+  }
 
 const pageOf: {
-  (items: ReadonlyArray<StoredItem>, query: ItemQuery): ItemPage,
+  (items: ReadonlyArray<StoredItem>, query: ItemQuery): ItemPage
   (query: ItemQuery): (items: ReadonlyArray<StoredItem>) => ItemPage
 } = dual(2, (items: ReadonlyArray<StoredItem>, query: ItemQuery): ItemPage => {
   const words = A.map(searchWords(query.search), Str.toLowerCase)
@@ -935,20 +938,23 @@ const facetsOf = (items: ReadonlyArray<StoredItem>): ItemFacets => {
 }
 
 const sameAsEdit: {
-  (item: StoredItem, edit: ItemEdit): boolean,
+  (item: StoredItem, edit: ItemEdit): boolean
   (edit: ItemEdit): (item: StoredItem) => boolean
-} = dual(2, (item: StoredItem, edit: ItemEdit): boolean =>
-  item.name === edit.name &&
-  Eq.equals(item.description, edit.description) &&
-  item.category === edit.category &&
-  item.uom === edit.uom &&
-  BigDecimal.equals(item.unitCost, edit.unitCost) &&
-  item.quantityOnHand === edit.quantityOnHand &&
-  Eq.equals(item.reorderPoint, edit.reorderPoint) &&
-  sameStocking(item.stocking, edit.stocking) &&
-  Eq.equals(discontinuedOn(item.stocking), discontinuedOn(edit.stocking)) &&
-  item.lotTracked === edit.lotTracked &&
-  Eq.equals(item.firstReceivedOn, edit.firstReceivedOn))
+} = dual(
+  2,
+  (item: StoredItem, edit: ItemEdit): boolean =>
+    item.name === edit.name &&
+    Eq.equals(item.description, edit.description) &&
+    item.category === edit.category &&
+    item.uom === edit.uom &&
+    BigDecimal.equals(item.unitCost, edit.unitCost) &&
+    item.quantityOnHand === edit.quantityOnHand &&
+    Eq.equals(item.reorderPoint, edit.reorderPoint) &&
+    sameStocking(item.stocking, edit.stocking) &&
+    Eq.equals(discontinuedOn(item.stocking), discontinuedOn(edit.stocking)) &&
+    item.lotTracked === edit.lotTracked &&
+    Eq.equals(item.firstReceivedOn, edit.firstReceivedOn)
+)
 
 // -- The twins ------------------------------------------------------------------------------------------------------
 
@@ -1043,7 +1049,11 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       return answer
     })
 
-    const finishUpload = Effect.fnUntraced(function* (actor: Member, upload: Upload, needsAtStart: number): Effect.fn.Return<boolean> {
+    const finishUpload = Effect.fnUntraced(function* (
+      actor: Member,
+      upload: Upload,
+      needsAtStart: number
+    ): Effect.fn.Return<boolean> {
       const id = yield* random.uuidV4()
       const at = yield* DateTime.now
       return yield* Ref.modify(ref, (state): readonly [boolean, CatalogState] => {
@@ -1357,15 +1367,15 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
           onSome: (taken): ReadonlyArray<ImportEvent> =>
             O.exists(A.head(sameTakeBack(row)), (first) => first.id === row.id)
               ? [
-                ImportEvent.cases.TakenBack.make({
-                  batchId: row.id,
-                  by: taken.byName,
-                  at: taken.at,
-                  removed: A.reduce(sameTakeBack(row), 0, (total, other) => total + other.removed),
-                  restored: A.reduce(sameTakeBack(row), 0, (total, other) => total + other.restored),
-                  kept: A.reduce(sameTakeBack(row), 0, (total, other) => total + other.kept)
-                })
-              ]
+                  ImportEvent.cases.TakenBack.make({
+                    batchId: row.id,
+                    by: taken.byName,
+                    at: taken.at,
+                    removed: A.reduce(sameTakeBack(row), 0, (total, other) => total + other.removed),
+                    restored: A.reduce(sameTakeBack(row), 0, (total, other) => total + other.restored),
+                    kept: A.reduce(sameTakeBack(row), 0, (total, other) => total + other.kept)
+                  })
+                ]
               : []
         })
       ])

@@ -76,17 +76,17 @@ export const sameColumn: {
 // kept): the column the field read before that revision is not known. None when it is.
 const matchedUnkept =
   (input: { readonly choices: ReadonlyArray<MappingChoice>; readonly moves: ReadonlyArray<ColumnMove> }) =>
-    (field: Field): O.Option<number> =>
-      O.map(
-        A.findFirst(
-          input.choices,
-          (choice) =>
-            choice.field === field &&
-            choice.at > 0 &&
-            !A.some(input.moves, (move) => move.field === field && move.at >= choice.at)
-        ),
-        (choice) => choice.at
-      )
+  (field: Field): O.Option<number> =>
+    O.map(
+      A.findFirst(
+        input.choices,
+        (choice) =>
+          choice.field === field &&
+          choice.at > 0 &&
+          !A.some(input.moves, (move) => move.field === field && move.at >= choice.at)
+      ),
+      (choice) => choice.at
+    )
 
 /**
  * What one match writes into the draft's moves: every field that reads another column after it than before, each
@@ -152,10 +152,10 @@ export const savedAtOf: {
  */
 export const matchedAfter =
   (input: { readonly choices: ReadonlyArray<MappingChoice>; readonly moves: ReadonlyArray<ColumnMove> }) =>
-    (made: number) =>
-      (field: string): boolean =>
-        A.some(input.choices, (choice) => choice.field === field && choice.at > made) ||
-        A.some(input.moves, (move) => move.field === field && move.at > made)
+  (made: number) =>
+  (field: string): boolean =>
+    A.some(input.choices, (choice) => choice.field === field && choice.at > made) ||
+    A.some(input.moves, (move) => move.field === field && move.at > made)
 
 /**
  * The column a field read at revision `made`: the `was` of the field's first move after it, or the column it reads
@@ -173,18 +173,18 @@ export const columnAt =
     readonly moves: ReadonlyArray<ColumnMove>
     readonly now: (field: Field) => O.Option<number>
   }) =>
-    (field: Field, made: number): O.Option<O.Option<number>> => {
-      const later = A.filter(input.moves, (move) => move.field === field && move.at > made)
-      const first = A.reduce(later, O.none<ColumnMove>(), (found, move) =>
-        O.isSome(found) && found.value.at <= move.at ? found : O.some(move)
-      )
-      if (O.isSome(first)) {
-        return O.exists(first.value.knownFrom, (from) => made < from) ? O.none() : O.some(first.value.was)
-      }
-      return A.some(input.choices, (choice) => choice.field === field && choice.at > made)
-        ? O.none()
-        : O.some(input.now(field))
+  (field: Field, made: number): O.Option<O.Option<number>> => {
+    const later = A.filter(input.moves, (move) => move.field === field && move.at > made)
+    const first = A.reduce(later, O.none<ColumnMove>(), (found, move) =>
+      O.isSome(found) && found.value.at <= move.at ? found : O.some(move)
+    )
+    if (O.isSome(first)) {
+      return O.exists(first.value.knownFrom, (from) => made < from) ? O.none() : O.some(first.value.was)
     }
+    return A.some(input.choices, (choice) => choice.field === field && choice.at > made)
+      ? O.none()
+      : O.some(input.now(field))
+  }
 
 /**
  * A Replace or a Keep-stored on a row whose comparison with its stored item may have changed because other fields than
@@ -313,16 +313,19 @@ export const withoutStaleDecisions = (input: {
 type RowComparison = { readonly reads: boolean; readonly stored: ReadonlyArray<StoredDifference> }
 
 const sameDifferences: {
-  (a: ReadonlyArray<StoredDifference>, b: ReadonlyArray<StoredDifference>): boolean,
+  (a: ReadonlyArray<StoredDifference>, b: ReadonlyArray<StoredDifference>): boolean
   (b: ReadonlyArray<StoredDifference>): (a: ReadonlyArray<StoredDifference>) => boolean
-} = dual(2, (a: ReadonlyArray<StoredDifference>, b: ReadonlyArray<StoredDifference>): boolean =>
-  a.length === b.length &&
-  A.every(a, (one) =>
-    A.some(b, (other) => other.field === one.field && other.stored === one.stored && other.file === one.file)
-  ))
+} = dual(
+  2,
+  (a: ReadonlyArray<StoredDifference>, b: ReadonlyArray<StoredDifference>): boolean =>
+    a.length === b.length &&
+    A.every(a, (one) =>
+      A.some(b, (other) => other.field === one.field && other.stored === one.stored && other.file === one.file)
+    )
+)
 
 const sameComparison: {
-  (a: O.Option<RowComparison>, b: O.Option<RowComparison>): boolean,
+  (a: O.Option<RowComparison>, b: O.Option<RowComparison>): boolean
   (b: O.Option<RowComparison>): (a: O.Option<RowComparison>) => boolean
 } = dual(2, (a: O.Option<RowComparison>, b: O.Option<RowComparison>): boolean =>
   O.isNone(a)
@@ -333,7 +336,7 @@ const sameComparison: {
 // The decision as the row read before `field` was matched again, for that field only: what the re-match of another
 // field takes back in any case is left out on both sides, so a change is told against this field alone.
 const beforeOnly: {
-  (question: ComparisonQuestion, field: Field): RowDecision,
+  (question: ComparisonQuestion, field: Field): RowDecision
   (field: Field): (question: ComparisonQuestion) => RowDecision
 } = dual(2, (question: ComparisonQuestion, field: Field): RowDecision => ({
   ...question.now,
@@ -525,8 +528,7 @@ export class ItemsAsRead extends S.Opaque<ItemsAsRead, { readonly brand: unique 
     description:
       "The stored items, created rows and suggestions a judgement of the decisions across a re-match was worked out from"
   })
-) {
-}
+) {}
 
 /** A judgement that did not ask the file's review: it read nothing, so nothing can overtake it. */
 export const noItemsRead: ItemsAsRead = ItemsAsRead.make({
@@ -547,27 +549,27 @@ export const noItemsRead: ItemsAsRead = ItemsAsRead.make({
  */
 export const stillAsRead =
   (read: ItemsAsRead) =>
-    (now: {
-      readonly items: ReadonlyArray<{ readonly id: string; readonly sku: string; readonly revision: number }>
-      readonly created: ReadonlyArray<{ readonly rowNumber: number; readonly part: number }>
-      readonly suggestions: ReadonlyArray<string>
-    }): boolean => {
-      if (!read.asked) return true
-      const keys = HashSet.fromIterable(read.keys)
-      const under = A.filter(now.items, (item) => HashSet.has(keys, skuKey(item)))
-      const sameItems =
-        under.length === read.items.length &&
-        A.every(read.items, (seen) => A.some(under, (item) => item.id === seen.id && item.revision === seen.revision))
-      const sameCreated =
-        now.created.length === read.created.length &&
-        A.every(read.created, (seen) =>
-          A.some(now.created, (row) => row.rowNumber === seen.rowNumber && row.part === seen.part)
-        )
-      const sameSuggestions =
-        now.suggestions.length === read.suggestions.length &&
-        A.every(read.suggestions, (seen) => A.contains(now.suggestions, seen))
-      return sameItems && sameCreated && sameSuggestions
-    }
+  (now: {
+    readonly items: ReadonlyArray<{ readonly id: string; readonly sku: string; readonly revision: number }>
+    readonly created: ReadonlyArray<{ readonly rowNumber: number; readonly part: number }>
+    readonly suggestions: ReadonlyArray<string>
+  }): boolean => {
+    if (!read.asked) return true
+    const keys = HashSet.fromIterable(read.keys)
+    const under = A.filter(now.items, (item) => HashSet.has(keys, skuKey(item)))
+    const sameItems =
+      under.length === read.items.length &&
+      A.every(read.items, (seen) => A.some(under, (item) => item.id === seen.id && item.revision === seen.revision))
+    const sameCreated =
+      now.created.length === read.created.length &&
+      A.every(read.created, (seen) =>
+        A.some(now.created, (row) => row.rowNumber === seen.rowNumber && row.part === seen.part)
+      )
+    const sameSuggestions =
+      now.suggestions.length === read.suggestions.length &&
+      A.every(read.suggestions, (seen) => A.contains(now.suggestions, seen))
+    return sameItems && sameCreated && sameSuggestions
+  }
 
 /** One question to the file's review, and whether one try of a request found the row's comparison changed. */
 export type Answered = { readonly question: ComparisonQuestion; readonly changed: boolean }
@@ -583,14 +585,17 @@ export const sameDecision: {
 // tries. A decision made again in between, even to the same choice, was made on what the row compares with by then: it
 // is another question (`decided`).
 const sameQuestion: {
-  (a: ComparisonQuestion, b: ComparisonQuestion): boolean,
+  (a: ComparisonQuestion, b: ComparisonQuestion): boolean
   (b: ComparisonQuestion): (a: ComparisonQuestion) => boolean
-} = dual(2, (a: ComparisonQuestion, b: ComparisonQuestion): boolean =>
-  a.rowId === b.rowId &&
-  a.decided === b.decided &&
-  a.fields.length === b.fields.length &&
-  A.every(a.fields, ({ field }, index) => field === b.fields[index]?.field) &&
-  sameDecision(a.then, b.then))
+} = dual(
+  2,
+  (a: ComparisonQuestion, b: ComparisonQuestion): boolean =>
+    a.rowId === b.rowId &&
+    a.decided === b.decided &&
+    a.fields.length === b.fields.length &&
+    A.every(a.fields, ({ field }, index) => field === b.fields[index]?.field) &&
+    sameDecision(a.then, b.then)
+)
 
 /**
  * The review's answer to one try of a request (a match, a save or a confirm worked out again because something it read
@@ -744,24 +749,24 @@ export const takenBackOfMatch = (input: {
         return A.isReadonlyArrayEmpty(rows)
           ? []
           : [
-            {
-              revision: input.revision,
-              by: input.by,
-              field,
-              matched: O.some(input.matched),
-              reads: O.some(input.reads(field)),
-              kind,
-              count: rows.length,
-              rows: named,
-              saved: O.some(
-                R.fromEntries(
-                  A.getSomes(
-                    A.map(named, (rowId) => O.map(R.get(input.savedAt, rowId), (at) => [rowId, at] as const))
+              {
+                revision: input.revision,
+                by: input.by,
+                field,
+                matched: O.some(input.matched),
+                reads: O.some(input.reads(field)),
+                kind,
+                count: rows.length,
+                rows: named,
+                saved: O.some(
+                  R.fromEntries(
+                    A.getSomes(
+                      A.map(named, (rowId) => O.map(R.get(input.savedAt, rowId), (at) => [rowId, at] as const))
+                    )
                   )
                 )
-              )
-            }
-          ]
+              }
+            ]
       })
     )
   )
@@ -846,9 +851,9 @@ export const planMatch = Effect.fnUntraced(function* (input: {
   const stamp = A.some(added, (move) => move.field === field)
     ? at
     : O.match(
-      A.findFirst(input.choices, (old) => old.field === field),
-      { onNone: () => stagedRevision, onSome: (old) => old.at }
-    )
+        A.findFirst(input.choices, (old) => old.field === field),
+        { onNone: () => stagedRevision, onSome: (old) => old.at }
+      )
   const choices = leaving(stamp)
   const moves = [...input.moves, ...added]
   const madeOn = R.map(input.decisions, () => input.revision)

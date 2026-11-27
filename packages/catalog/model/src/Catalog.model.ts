@@ -11,7 +11,6 @@ import { Group, GroupState, GroupEvent } from "./Group/Group.aggregate.ts"
 import type { DecidedGroup } from "./Group/Group.aggregate.ts"
 import { Import, ImportState, ImportEvent } from "./Import/Import.aggregate.ts"
 import { Deciding } from "./Review/Deciding.decision.ts"
-import * as P from "effect/Predicate";
 import { DecidingGroup } from "./Review/DecidingGroup.decision.ts"
 import { Undoing } from "./Review/Undoing.decision.ts"
 import { UndoingGroup } from "./Review/UndoingGroup.decision.ts"
@@ -61,26 +60,29 @@ const everyGroupOfItsImport: {
   (
     all: { readonly Group: ReadonlyArray<Held<GroupState>>; readonly Import: ReadonlyArray<Held<ImportState>> },
     holds: (group: DecidedGroup, life: StagedImport) => boolean
-  ): boolean,
+  ): boolean
   (
     holds: (group: DecidedGroup, life: StagedImport) => boolean
   ): (all: {
-    readonly Group: ReadonlyArray<Held<GroupState>>;
+    readonly Group: ReadonlyArray<Held<GroupState>>
     readonly Import: ReadonlyArray<Held<ImportState>>
   }) => boolean
-} = dual(2, (
-  all: { readonly Group: ReadonlyArray<Held<GroupState>>; readonly Import: ReadonlyArray<Held<ImportState>> },
-  holds: (group: DecidedGroup, life: StagedImport) => boolean
-): boolean =>
-  everyDecidedGroup(all.Group, (group) =>
-    A.every(
-      all.Import,
-      (life) =>
-        group.importId !== life.id ||
-        ImportState.guards.Removed(life.state) ||
-        (!ImportState.guards.Unstaged(life.state) && holds(group, life.state))
+} = dual(
+  2,
+  (
+    all: { readonly Group: ReadonlyArray<Held<GroupState>>; readonly Import: ReadonlyArray<Held<ImportState>> },
+    holds: (group: DecidedGroup, life: StagedImport) => boolean
+  ): boolean =>
+    everyDecidedGroup(all.Group, (group) =>
+      A.every(
+        all.Import,
+        (life) =>
+          group.importId !== life.id ||
+          ImportState.guards.Removed(life.state) ||
+          (!ImportState.guards.Unstaged(life.state) && holds(group, life.state))
+      )
     )
-  ))
+)
 
 /**
  * `holds` of every row an act has reached, beside the import it belongs to. A removed import is asked nothing, as for
@@ -88,26 +90,32 @@ const everyGroupOfItsImport: {
  */
 const everyRowOfItsImport: {
   (
-  all: { readonly Row: ReadonlyArray<Held<RowState>>; readonly Import: ReadonlyArray<Held<ImportState>> },
-  holds: (row: ReachedRow, life: StagedImport) => boolean
-): boolean,
+    all: { readonly Row: ReadonlyArray<Held<RowState>>; readonly Import: ReadonlyArray<Held<ImportState>> },
+    holds: (row: ReachedRow, life: StagedImport) => boolean
+  ): boolean
   (
-  holds: (row: ReachedRow, life: StagedImport) => boolean
-): (all: { readonly Row: ReadonlyArray<Held<RowState>>; readonly Import: ReadonlyArray<Held<ImportState>> }) => boolean
-} = dual(2, (
-  all: { readonly Row: ReadonlyArray<Held<RowState>>; readonly Import: ReadonlyArray<Held<ImportState>> },
-  holds: (row: ReachedRow, life: StagedImport) => boolean
-): boolean => {
-  const besideItsImport = (row: ReachedRow): boolean =>
-    A.every(
-      all.Import,
-      (life) =>
-        row.importId !== life.id ||
-        ImportState.guards.Removed(life.state) ||
-        (!ImportState.guards.Unstaged(life.state) && holds(row, life.state))
-    )
-  return A.every(all.Row, (row) => RowState.guards.Untouched(row.state) || besideItsImport(row.state))
-})
+    holds: (row: ReachedRow, life: StagedImport) => boolean
+  ): (all: {
+    readonly Row: ReadonlyArray<Held<RowState>>
+    readonly Import: ReadonlyArray<Held<ImportState>>
+  }) => boolean
+} = dual(
+  2,
+  (
+    all: { readonly Row: ReadonlyArray<Held<RowState>>; readonly Import: ReadonlyArray<Held<ImportState>> },
+    holds: (row: ReachedRow, life: StagedImport) => boolean
+  ): boolean => {
+    const besideItsImport = (row: ReachedRow): boolean =>
+      A.every(
+        all.Import,
+        (life) =>
+          row.importId !== life.id ||
+          ImportState.guards.Removed(life.state) ||
+          (!ImportState.guards.Unstaged(life.state) && holds(row, life.state))
+      )
+    return A.every(all.Row, (row) => RowState.guards.Untouched(row.state) || besideItsImport(row.state))
+  }
+)
 
 /** A row an act has reached: it names its import. */
 type ReachedRow = Exclude<RowState, typeof RowState.cases.Untouched.Type>
@@ -196,9 +204,7 @@ export class Catalog extends Domain.Model(
       AnImportCanBeTakenBack: (all) =>
         A.some(all.Import, (life) => A.some(life.events, ImportEvent.guards.ImportTakenBack)),
       AnImportCanBeReopened: (all) =>
-        A.some(all.Import, P.Struct({
-          events: A.some(ImportEvent.guards.ImportReopened)
-        })),
+        A.some(all.Import, (life) => A.some(life.events, ImportEvent.guards.ImportReopened)),
       AnImportCanBeRemoved: (all) =>
         A.some(all.Import, (life) => A.some(life.events, ImportEvent.guards.ImportRemoved)),
       ARowCanBeDecided: (all) => A.some(all.Row, (row) => A.some(row.events, RowEvent.guards.RowDecided)),
@@ -208,5 +214,4 @@ export class Catalog extends Domain.Model(
     }
   },
   { description: "The catalog: the review of an import, its rows, the acts on groups of them, and the acts on each" }
-) {
-}
+) {}

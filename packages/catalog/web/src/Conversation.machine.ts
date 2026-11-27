@@ -66,12 +66,13 @@ const LegacyRules = S.Struct({
  * version 1 knew, as its first choice.
  */
 const answeredByV1: {
-  (name: string, note: O.Option<string>): AnsweredBy,
+  (name: string, note: O.Option<string>): AnsweredBy
   (note: O.Option<string>): (name: string) => AnsweredBy
 } = dual(2, (name: string, note: O.Option<string>): AnsweredBy =>
   name === "Rules"
     ? O.match(note, { onNone: () => LegacyRules.make({}), onSome: (reason) => AnsweredBy.cases.Rules.make({ reason }) })
-    : AnsweredBy.cases.Model.make({ provider: "openrouter", model: name, fallback: false }))
+    : AnsweredBy.cases.Model.make({ provider: "openrouter", model: name, fallback: false })
+)
 
 /** A version 1 conversation as version 2: each entry's answerer turned into its case, the rest kept as it was. */
 const fromV1 = (old: typeof ConversationV1.Type): Conversation => ({
@@ -131,7 +132,7 @@ export const readConversation = (key: string): Conversation =>
 
 /** Writes the conversation. A refusal (a private window, a full disk) is ignored: only the refresh loses it. */
 export const writeConversation: {
-  (key: string, conversation: Conversation): void,
+  (key: string, conversation: Conversation): void
   (conversation: Conversation): (key: string) => void
 } = dual(2, (key: string, conversation: Conversation): void => {
   const text = encode(conversation)

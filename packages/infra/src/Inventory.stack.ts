@@ -1,7 +1,8 @@
 /**
- * The app's stack: one D1 database and one Worker that serves the API and the built screens, for the stage being
- * deployed. Everything that differs between stages comes from the stage's plan (`InfraStage`), never from the
- * stage's name read here.
+ * The app's stack: one D1 database, the site's Worker that serves the API and the built screens, and the model's
+ * Worker that hosts the app's models on Durable Objects (`@inventory/model-app`), bound to the site's Worker and
+ * reached through it alone, for the stage being deployed. Everything that differs between stages comes from the
+ * stage's plan (`InfraStage`), never from the stage's name read here.
  *
  * Must not break: production is never seeded and never answers on `workers.dev`; the sign-in secret is minted by
  * the stack and never written anywhere a person can read; a model key reaches only a stage whose plan names one; a
@@ -11,12 +12,15 @@
  * @packageDocumentation
  */
 import * as Cloudflare from "@alchemy.run/cloudflare"
+import * as DomainCloudflare from "@alchemy.run/domain/Cloudflare"
+import ModelWorker from "@inventory/model-app/Worker"
 import * as Alchemy from "alchemy"
 import * as Secrets from "alchemy/Secrets"
 import * as Output from "alchemy/Output"
 import * as A from "effect/Array"
 import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
 import * as Path from "effect/Path"
 import * as Redacted from "effect/Redacted"
@@ -43,7 +47,7 @@ import {
  * The model the app asks, and the one it falls back to. The same two values as `apps/inventory/wrangler.jsonc`,
  * which local development reads; a deployed stage reads these.
  */
-const model = { AI_MODEL: "anthropic/claude-haiku-5.5", AI_FALLBACK_MODELS: "google/gemini-3.8-flash" } as const
+const modelIds = { AI_MODEL: "anthropic/claude-haiku-5.5", AI_FALLBACK_MODELS: "google/gemini-3.8-flash" } as const
 
 /** A variable the deploy's environment holds, when it holds anything: a workflow sets a missing one to nothing. */
 const secretOf = (variable: string) =>
@@ -151,6 +155,12 @@ export const inventory = Effect.gen(function* () {
   // password to be left out, and its owner reads it with a deploy of his own (`goals/infra/PLAN.md`).
   const hidden = yield* Config.String("HIDE_TEST_ACCOUNT_PASSWORD").pipe(Config.withDefault(""))
 
+  // The model's Worker: no `workers.dev` address and no domain on any stage, so the binding below is the only way
+  // in. Its Durable Objects keep the models' records, so a deploy that replaces it loses them. It is yielded before
+  // the site's Worker, which binds it, so under `alchemy dev` it starts first: its own port (`apps/model/src/
+  // Address.ts`) leaves Alchemy's default one to the site.
+  const models = yield* ModelWorker
+
   const website = yield* Cloudflare.Website.Vite("Website", {
     rootDir: app,
     main: "src/server/worker.ts",
@@ -177,13 +187,16 @@ export const inventory = Effect.gen(function* () {
     }),
     env: {
       DB: database,
+      // The service binding to the model's Worker. Nothing reads it yet: the forwarding route (host-04) and the
+      // gateway's `TakeCall` (usage-03) do, typed in the app's `env.d.ts` with them.
+      MODEL: models,
       // The coarse limit in front of sign-in and the model (the app's `AddressLimit.ts`): the same two numbers as
       // `wrangler.jsonc`. The namespace is one for the account, so the app keys each count by its own host.
       ABUSE_LIMIT: Cloudflare.RateLimit("ABUSE_LIMIT", { namespaceId: 1001, simple: { limit: 30, period: 60 } }),
       // Each stage trusts its own address; none is kept by hand.
       BETTER_AUTH_URL: Cloudflare.Worker.URL,
       BETTER_AUTH_SECRET: signInSecret.text,
-      ...model,
+      ...modelIds,
       ...R.getSomes({ OPENROUTER_API_KEY: modelKey }),
       ...R.getSomes({ TEST_ACCOUNT_PASSWORD: O.map(mintedPassword, (password) => password.text) }),
       ...R.getSomes({ TEST_ACCOUNT_PASSWORD: givenPassword }),
@@ -212,6 +225,16 @@ export const inventory = Effect.gen(function* () {
 })
 
 /**
+ * The providers of every stack that deploys the app: Cloudflare's, and the library's for a model hosted on Durable
+ * Objects (the backfill a deploy waits on while a new view or projection receives its history). Without the second,
+ * a deploy of the model's Worker fails: no provider handles `Cloudflare.Domain.Backfill`
+ * (`@alchemy.run/domain/src/Cloudflare/Providers.ts`).
+ *
+ * @category stacks
+ */
+export const stackProviders = Layer.mergeAll(Cloudflare.providers(), DomainCloudflare.providers())
+
+/**
  * The app, for one stage: `bunx alchemy deploy --stage <name>` from the repository root.
  *
  * @category stacks
@@ -219,7 +242,7 @@ export const inventory = Effect.gen(function* () {
 export default Alchemy.Stack(
   "inventory",
   {
-    providers: Cloudflare.providers(),
+    providers: stackProviders,
     state: Cloudflare.state(),
     // What a stage's plan names as a secret is asked of 1Password from a workstation; a workflow's job is given
     // its own. A `.env` at the root is still read first, as before this option was set.

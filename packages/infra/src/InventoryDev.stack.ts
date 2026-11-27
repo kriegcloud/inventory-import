@@ -1,7 +1,7 @@
 /**
  * The trial of `alchemy dev` (`bun run dev:alchemy`, goals/alchemy-uptake step 5): the app's own stack on this
- * machine's local providers, for the personal stage `dev_<user>`. Beside `bun run dev`, never in place of it until
- * Benjamin decides from the trial.
+ * machine's local providers, for the personal stage `dev_<user>`, the model's Worker and its Durable Objects with it.
+ * Beside `bun run dev`, never in place of it (Benjamin, 2026-11-26: "Keep Vite; dev:alchemy beside it").
  *
  * Must not break: this entry reaches no account and writes no secret to a file. Its state is in memory, because
  * Alchemy's local state file holds the sign-in secret in plain text, and still does in the Worker's binding record
@@ -11,11 +11,10 @@
  *
  * @packageDocumentation
  */
-import * as Cloudflare from "@alchemy.run/cloudflare"
 import * as Alchemy from "alchemy"
 import * as Effect from "effect/Effect"
 import { InfraStage } from "./InfraStage.context.ts"
-import { inventory } from "./Inventory.stack.ts"
+import { inventory, stackProviders } from "./Inventory.stack.ts"
 
 /**
  * The local stack's state: in memory, one store for the life of the process however often its layer is built. The
@@ -33,6 +32,6 @@ export const localStackState = Alchemy.inMemoryState()
  */
 export default Alchemy.Stack(
   "inventory",
-  { providers: Cloudflare.providers(), state: localStackState },
+  { providers: stackProviders, state: localStackState },
   inventory.pipe(Effect.provideServiceEffect(InfraStage, InfraStage.personal))
 )

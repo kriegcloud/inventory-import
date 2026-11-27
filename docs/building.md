@@ -97,9 +97,10 @@ readers. Before changing one of those files, read [docs/verify.md](verify.md).
   file (`Prove.report`, `Prove.decisionReport`) takes neither, so each has a check of ours: every rule its report
   names is proved. A model's invariant is only searched, and a `sometimes` rule says only that one sequence gets
   there.
-- **Every check a `decide` makes has a mutant** (`packages/catalog/model/mutants/`): a change that removes it, and one
-  for each field of a new event, which a proof or a story must notice. A new check without one is a gap the nightly
-  cannot see; how to add one is in that folder's README.
+- **Every check a `decide` makes has a mutant** (`packages/catalog/model/mutants/`, and the usage model's in
+  `packages/usage/model/mutants/`): a change that removes it, and one for each field of a new event, which a proof or
+  a story must notice. A new check without one is a gap the nightly cannot see; how to add one is in the catalog's
+  README, and what a second model package must add to use the runner is in its section "A second model package".
 - **The rules as written are locked** (`test/Catalog.lock.json`, written by Verify): a rule taken out or whose text
   changed fails `bun run --cwd packages/catalog/model verify`, and in CI so does a rule the file does not list. To
   change a rule on purpose, run that once with `UPDATE_VERIFY_LOCK=1` and commit the file. Never set it to make a

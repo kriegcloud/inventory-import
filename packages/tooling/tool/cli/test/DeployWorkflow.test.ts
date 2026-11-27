@@ -13,6 +13,7 @@ import * as A from "effect/Array"
 import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Num from "effect/Number"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
@@ -71,6 +72,27 @@ const deploy = Effect.gen(function* () {
 /** One fact about each job, by the job's name. */
 const each = <T>(jobs: Readonly<Record<string, typeof Job.Type>>, read: (job: typeof Job.Type) => T) =>
   R.map(jobs, read)
+
+/** The three jobs that deploy, each of which waits for the model's new views to be filled. */
+const deploys = ["preview", "staging", "production"] as const
+
+/**
+ * How long a deploy waits for a backfill when the model's Worker names no `backfillTimeout`, in seconds, as a text
+ * shaped as `@alchemy.run/domain`'s `Cloudflare/Backfill.ts` states it; none when it states none.
+ */
+const defaultWait = (library: string) =>
+  O.flatMap(Str.match(/\(news\.timeoutSeconds \?\? (\d+)\) \* 1000/)(library), (found) =>
+    O.flatMap(O.fromUndefinedOr(found[1]), Num.parse)
+  )
+
+/** For each deploy job, whether its limit is longer than the wait; none for a job not there or a wait not stated. */
+const againstTheWait = (jobs: Readonly<Record<string, typeof Job.Type>>, wait: O.Option<number>) =>
+  A.map(deploys, (name) =>
+    O.map(
+      O.zipWith(R.get(jobs, name), wait, (job, seconds) => job["timeout-minutes"] * 60 > seconds),
+      (longer) => `${name}: ${longer ? "longer than the wait" : "cut off first"}`
+    )
+  )
 
 /** One line: a condition written over several lines reads as one. */
 const flat = (value: string) => Str.trim(Str.replace(/\s+/g, " ")(value))
@@ -488,6 +510,37 @@ layer(here)("the deploy workflow", (it) => {
           "release-tag": "none",
           production: "deploy-prod-${{ needs.release-tag.outputs.tag }}"
         })
+      })
+  )
+
+  it.effect(
+    "gives each of the three deploy jobs 45 minutes, longer than a deploy waits for the model's views to be filled, and the removal and the release's guard their own",
+    () =>
+      Effect.gen(function* () {
+        const { jobs } = yield* deploy
+        // Benjamin, 2026-11-26, "Deploy jobs to 45 minutes" (explorations/alchemy-domain/DECISIONS.md).
+        expect(each(jobs, (job) => job["timeout-minutes"])).toEqual({
+          preview: 45,
+          cleanup: 20,
+          staging: 45,
+          "release-tag": 10,
+          production: 45
+        })
+        // The wait, read from the library's own code: a job cut off first would end before the library says the fill
+        // is still running. A library whose default reaches the limit, or that no longer states one, fails here; a
+        // lower default passes. The time the job's other steps take beside the wait is not held.
+        const repo = yield* Repo
+        const library = yield* repo.text(
+          repo.join(repo.root, "node_modules/@alchemy.run/domain/src/Cloudflare/Backfill.ts")
+        )
+        const longer = A.map(deploys, (name) => O.some(`${name}: longer than the wait`))
+        expect(againstTheWait(jobs, defaultWait(library))).toEqual(longer)
+        // The same comparison fails on its own: a wait as long as the limit cuts each job off first, and a text that
+        // states no wait is judged for no job.
+        expect(againstTheWait(jobs, defaultWait("(news.timeoutSeconds ?? 2700) * 1000"))).toEqual(
+          A.map(deploys, (name) => O.some(`${name}: cut off first`))
+        )
+        expect(againstTheWait(jobs, defaultWait("news.timeoutSeconds * 1000"))).toEqual(A.map(deploys, () => O.none()))
       })
   )
 

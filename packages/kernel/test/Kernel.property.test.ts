@@ -12,6 +12,7 @@ import { ActivityId, MemberId, OrganizationId, RequestId, UserId } from "@invent
 import { Member } from "@inventory/kernel/Member"
 import { hasRole, Role } from "@inventory/kernel/Role"
 import { RequestSource } from "@inventory/kernel/SameOrigin"
+import { SessionVerdict } from "@inventory/kernel/SessionLookup"
 import { DisplayName, Instant, Sentence } from "@inventory/kernel/Text"
 
 const runs = { arbitrary: { runs: 50 } }
@@ -29,7 +30,8 @@ const schemas: Readonly<Record<string, S.Top>> = {
   AgentRun,
   Activity,
   ActivityJson: Activity.json,
-  RequestSource
+  RequestSource,
+  SessionVerdict
 }
 
 describe("every schema generates only valid values", () => {

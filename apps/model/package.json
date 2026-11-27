@@ -1,0 +1,35 @@
+{
+  "name": "@inventory/model-app",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The model's Worker: the app's models hosted on Durable Objects, the usage model first, reached only through the site's Worker",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    "./Worker": "./src/ModelWorker.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "lint": "oxlint --quiet src test",
+    "test": "vitest run --project fast",
+    "test:slow": "vitest run --project slow"
+  },
+  "dependencies": {
+    "@alchemy.run/cloudflare": "2.0.0-beta.87-e1c3e6d",
+    "@alchemy.run/domain": "2.0.0-beta.87-e1c3e6d",
+    "@beep/d1": "workspace:*",
+    "@inventory/access-model": "workspace:*",
+    "@inventory/kernel": "workspace:*",
+    "@inventory/usage-model": "workspace:*",
+    "alchemy": "2.0.0-beta.87-e1c3e6d",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/platform-node": "catalog:",
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

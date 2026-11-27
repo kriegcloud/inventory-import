@@ -193,6 +193,11 @@ Two more tasks hold the model, both in `bun run check:full`:
   story must notice; `packages/catalog/model/mutants/README.md` has them all, what each class means and what they
   cost. All of them run every night: all but the slowest in one job, and that one (`row-open`) alone in a job of its
   own, where its proof is given 100 minutes.
+- `bun run --cwd packages/usage/model mutants:sample`: six of the usage model's 39 mutants (the allowance's `decide`
+  and `evolve`, the view `AllowanceToday`'s fold and `validate`, `leftOn` and `dayOf`), by the same runner;
+  `packages/usage/model/mutants/README.md` has them all. `mutants` there runs every one, in seconds, and the nightly
+  runs them in a job of their own (`usage-mutants`). `turbo run mutants:sample` with no filter, as CI's `model` job and
+  `bun run proofs` call it, runs both packages' samples.
 
 In CI these four have a job of their own (`proofs` in `.github/workflows/ci.yml`, which runs the tasks of
 `bun run proofs` through turbo itself), which restores turbo's results from the last run on `main` and so runs

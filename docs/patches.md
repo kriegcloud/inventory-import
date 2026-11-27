@@ -43,6 +43,7 @@ packages/patches/
     03-a-schemas-own-guards.patch
     04-a-rule-by-its-name.patch
     05-a-structs-defaults.patch
+    06-a-found-sequence-keeps-its-time.patch
   alchemy-domain.patch                         what bun reads: built from the folder, never edited
   test/alchemy-domain/
     01-computed-instance-id/                   each patch's test, and the small code it runs

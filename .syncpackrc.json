@@ -6,6 +6,7 @@
     "packages/*/package.json",
     "packages/catalog/*/package.json",
     "packages/access/*/package.json",
+    "packages/usage/*/package.json",
     "packages/drivers/*/package.json",
     "packages/foundation/*/*/package.json",
     "packages/tooling/*/*/package.json"

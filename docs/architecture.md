@@ -310,6 +310,16 @@ apps/inventory/         The app: the Worker and the SPA, one Vite build. Its own
   test/                 Unit tests (`*.slow.test.ts` need workerd, D1 or sign-in).
   public/samples/       The sample files the Upload step offers.
   scripts/              The app's development scripts (local migrations, HTTPS, deploy setup, strict count).
+apps/model/             @inventory/model-app: the model's Worker (Benjamin, 2026-11-26), a second Worker that hosts the
+                        models on Durable Objects, the usage model first. `src/ModelWorker.ts` is the Worker, its one
+                        export to the stack (`@inventory/model-app/Worker`); `src/ModelRoutes.ts` sends a path under
+                        `/member` to the member's Api and one under `/server` to the server's, and any other to a 404.
+                        `src/Models.ts` puts it together on the platform it is given (Durable Objects in the Worker,
+                        the memory host in its test). It has no public address (`src/Address.ts`): the stack binds it
+                        to the site's Worker as `MODEL`. Not built yet,
+                        each a seam named in its file: who is signed in (`src/Session.ts` refuses every call until
+                        host-03), the database's binding (`src/Database.ts` holds the D1 client), its spans (host-05).
+                        Its tests call it through its own `fetch` in process; `*.slow.test.ts` needs D1.
 packages/ui/             @inventory/ui: the vendored shadcn, Dice UI and tablecn components and hooks (as published, one
                         exact export each), the theme (`theme.css`, the Tailwind entry) and the shared screen pieces.
 packages/review/         @inventory/review: the review region and its saved progress.
@@ -330,6 +340,10 @@ packages/catalog/        The catalog context (items and the imports that write t
                         decisions that record an act on two of them, their stories and their proofs, docs/verify.md), host/ (the D1 adapters, the
                         model and the allowance as the catalog asks them) and web/ (the import's steps, the Items page,
                         the editor, the assistant, the upload).
+packages/usage/          The usage context (the day's model calls), as two packages: contract/ (what the rest of the app
+                        may know: an organization's calls in a UTC day, and what a call is for) and model/ (the
+                        allowance as a model of `@alchemy.run/domain`: its aggregate, view, Apis, proof, stories and
+                        mutants, hosted by apps/model).
 packages/kernel/, packages/drivers/   @inventory/kernel and the @beep drivers (d1, better-auth, openrouter). The kernel
                         also holds the ERP vocabulary (`Terms.vocab.ts`: the one place a term's facts are written) and
                         the typed helpers a record is marked with (`Terms.pointer.ts`, `@inventory/kernel/TermsPointer`).
@@ -340,10 +354,12 @@ packages/ontology/       @inventory/ontology: what is made from the vocabulary a
                         pinned in `robot.lock.json`); the other two are the type-check and the `ontology-terms` law. Nothing imports it. Its goals are goals/erp-vocabulary and goals/party-slice.
 packages/infra/          @beep/infra: what is deployed, per stage. The stage plan as a schema and a pure function
                         (`StagePlan.rules.ts`: what each stage gets, decided from its name), the app's Alchemy stack
-                        (`Inventory.stack.ts`: one D1 database, one Worker) and the repository's (`GitHub.stack.ts`:
-                        the deploy environments, their secrets, the rule on main). Nothing in the app imports it, but for
-                        one test: `apps/inventory/test/stack/` deploys `InventoryDev` on Alchemy's local providers
-                        (the boundaries law's one exception, `localStackEntry`).
+                        (`Inventory.stack.ts`: one D1 database and two Workers, the site's and the model's, the second
+                        bound to the first as `MODEL`) and the repository's (`GitHub.stack.ts`: the deploy environments, their secrets,
+                        the rule on main). Nothing in the app imports it, but for one test: `apps/inventory/test/stack/`
+                        deploys `InventoryDev` on Alchemy's local providers (the boundaries law's exception,
+                        `localStackEntry`). It imports one file of one app, the model's Worker (`workerEntry` of
+                        `modelApp`, the boundaries law's one row for it, Benjamin's answer of 2026-11-26).
 alchemy.run.ts          The app's stack, re-exported for `bunx alchemy deploy --stage <name>`. A deploy is Benjamin's:
                         no agent runs `alchemy deploy`, `plan`, `destroy`, `login` or `state`, nor
                         `bun run beep infra setup`, which runs them for him, except with `--dry-run`, which
@@ -378,7 +394,7 @@ packages/tooling/tool/cli/  @beep/repo-cli: the repository's own rules as comman
                         block and a command's events and rejections, and every file of a context's contract, model,
                         host and web ending in a kind its layer holds, from the registry of kinds
                         (`commands/Laws/Kinds.schema.ts`); model-inputs: every file a model, an Api, an aggregate or a decision imports an input of
-                        each of its package's tasks that reads it (verify, the mutants, prove); ref-callbacks: no ref callback made on each draw; tags: no `_tag` compared or built by hand in any src or test folder; defaults: absence, starting values and clean-ups are a schema's, counted per file against a baseline that only falls; exports; keys; private-paths: no home path or private folder in the scratchpad; ontology-terms: a record is pointed at the vocabulary through the typed helpers only, and only the ontology package loads the vocabulary as a value; deprecated-apis: no deprecated API used, in any code file git would commit outside `.agents` and `scratchpad`; effect-imports: every Effect import from its own path
+                        each of its package's tasks that reads it (verify, the mutants, prove), the mutants' tasks also walking from each `mutants/mutants.json` and every file it names; ref-callbacks: no ref callback made on each draw; tags: no `_tag` compared or built by hand in any src or test folder; defaults: absence, starting values and clean-ups are a schema's, counted per file against a baseline that only falls; exports; keys; private-paths: no home path or private folder in the scratchpad; ontology-terms: a record is pointed at the vocabulary through the typed helpers only, and only the ontology package loads the vocabulary as a value; deprecated-apis: no deprecated API used, in any code file git would commit outside `.agents` and `scratchpad`; effect-imports: every Effect import from its own path
                         under its one name; and the six bans, each with a ledger in `ledgers/` of today's files whose
                         numbers only fall against the branch's base (where it left main; on a push, the last push whose
                         run passed): assertions, promises, diagnostics, dual,
@@ -386,7 +402,9 @@ packages/tooling/tool/cli/  @beep/repo-cli: the repository's own rules as comman
                         which copies the kit from a beep-effect checkout); `deps update`, `version-sync` and
                         `config-sync`, which move dependencies and keep repeated versions and derived configuration in
                         step (`docs/sync-commands.md`); `patches` (check, installed, prove, build, and carry, which a
-                        re-pin runs: `docs/patches.md`); and `scratch` (new, list, check, graduate, drop). Nothing
+                        re-pin runs: `docs/patches.md`); `mutants <package>` (a model package's mutants, from its
+                        `mutants/mutants.json`: `--all`, `--sample`, `--list`, `--only`;
+                        `packages/catalog/model/mutants/README.md`); and `scratch` (new, list, check, graduate, drop). Nothing
                         imports it.
 scratchpad/             A folder beside the workspaces, not one of them, where an idea is tried in a folder of its own
                         (experiments/<name>/: a NOTE.md, code and a test), importing every package from the root's

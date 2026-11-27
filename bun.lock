@@ -48,6 +48,7 @@
         "@inventory/kernel": "workspace:*",
         "@inventory/review": "workspace:*",
         "@inventory/ui": "workspace:*",
+        "@inventory/usage-contract": "workspace:*",
         "@shadcn/react": "catalog:",
         "@tanstack/react-table": "catalog:",
         "@tanstack/react-virtual": "catalog:",
@@ -98,6 +99,27 @@
         "tsrs": "catalog:",
         "typescript": "catalog:",
         "vite": "^8.4.0",
+        "vitest": "catalog:",
+        "wrangler": "catalog:",
+      },
+    },
+    "apps/model": {
+      "name": "@inventory/model-app",
+      "version": "0.0.0",
+      "dependencies": {
+        "@alchemy.run/cloudflare": "2.0.0-beta.87-e1c3e6d",
+        "@alchemy.run/domain": "2.0.0-beta.87-e1c3e6d",
+        "@beep/d1": "workspace:*",
+        "@inventory/access-model": "workspace:*",
+        "@inventory/kernel": "workspace:*",
+        "@inventory/usage-model": "workspace:*",
+        "alchemy": "2.0.0-beta.87-e1c3e6d",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/platform-node": "catalog:",
+        "@effect/vitest": "catalog:",
+        "@types/node": "catalog:",
         "vitest": "catalog:",
         "wrangler": "catalog:",
       },
@@ -277,9 +299,12 @@
         "sonner": "catalog:",
       },
       "devDependencies": {
+        "@alchemy.run/domain": "2.0.0-beta.87-e1c3e6d",
+        "@effect/platform-node": "catalog:",
         "@effect/vitest": "catalog:",
         "@types/node": "catalog:",
         "@types/react": "catalog:",
+        "alchemy": "2.0.0-beta.87-e1c3e6d",
         "vitest": "catalog:",
       },
       "peerDependencies": {
@@ -453,9 +478,11 @@
       "dependencies": {
         "@alchemy.run/1password": "2.0.0-beta.87-e1c3e6d",
         "@alchemy.run/cloudflare": "2.0.0-beta.87-e1c3e6d",
+        "@alchemy.run/domain": "2.0.0-beta.87-e1c3e6d",
         "@alchemy.run/github": "2.0.0-beta.87-e1c3e6d",
         "@beep/identity": "workspace:*",
         "@beep/schema": "workspace:*",
+        "@inventory/model-app": "workspace:*",
         "alchemy": "2.0.0-beta.87-e1c3e6d",
         "effect": "catalog:",
       },
@@ -489,6 +516,7 @@
         "@beep/vocabulary": "workspace:*",
         "@inventory/access-contract": "workspace:*",
         "@inventory/kernel": "workspace:*",
+        "@inventory/usage-contract": "workspace:*",
         "effect": "catalog:",
         "n3": "^2.13.12",
       },
@@ -616,6 +644,39 @@
       "peerDependencies": {
         "react": "catalog:",
         "react-dom": "catalog:",
+      },
+    },
+    "packages/usage/contract": {
+      "name": "@inventory/usage-contract",
+      "version": "0.0.0",
+      "dependencies": {
+        "@beep/identity": "workspace:*",
+        "@beep/schema": "workspace:*",
+        "@inventory/kernel": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
+        "@types/node": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/usage/model": {
+      "name": "@inventory/usage-model",
+      "version": "0.0.0",
+      "dependencies": {
+        "@alchemy.run/domain": "2.0.0-beta.87-e1c3e6d",
+        "@beep/schema": "workspace:*",
+        "@inventory/kernel": "workspace:*",
+        "@inventory/usage-contract": "workspace:*",
+        "alchemy": "2.0.0-beta.87-e1c3e6d",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/platform-node": "catalog:",
+        "@effect/vitest": "catalog:",
+        "@types/node": "catalog:",
+        "vitest": "catalog:",
       },
     },
   },
@@ -1005,6 +1066,8 @@
 
     "@inventory/kernel": ["@inventory/kernel@workspace:packages/kernel"],
 
+    "@inventory/model-app": ["@inventory/model-app@workspace:apps/model"],
+
     "@inventory/ontology": ["@inventory/ontology@workspace:packages/ontology"],
 
     "@inventory/patches": ["@inventory/patches@workspace:packages/patches"],
@@ -1012,6 +1075,10 @@
     "@inventory/review": ["@inventory/review@workspace:packages/review"],
 
     "@inventory/ui": ["@inventory/ui@workspace:packages/ui"],
+
+    "@inventory/usage-contract": ["@inventory/usage-contract@workspace:packages/usage/contract"],
+
+    "@inventory/usage-model": ["@inventory/usage-model@workspace:packages/usage/model"],
 
     "@jridgewell/gen-mapping": ["@jridgewell/gen-mapping@0.3.13", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.0", "@jridgewell/trace-mapping": "^0.3.24" } }, "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="],
 

@@ -85,12 +85,19 @@
       "outputs": []
     },
     // The mutants of the model (mutants/README.md): each one change to a `decide`, run against its proof and the
-    // stories, which must notice it. The sample is fast and in `bun run check:full`; all of them run every night.
-    // Both read what the proofs read, every block ending Verify reads, the stories and the mutants themselves, and are
-    // replayed until one changes. `bun run beep laws model-inputs` holds each list as it holds Verify's.
-    // The contract's `transit` brings what the contract is built on, as the kernel's does for the kit.
+    // story files `mutants/mutants.json` names (the stories and the Api's test), which must notice it. The sample is
+    // fast and in `bun run check:full`; all of them run every night. Both read what the proofs read, every block
+    // ending Verify reads, those test files and what they import, and the mutants themselves, and are replayed until
+    // one changes. `bun run beep laws model-inputs` holds each list as it holds Verify's. The runner is the
+    // repository's own command (`beep-cli mutants`): the CLI's `transit` brings its source, as a package's `check`
+    // has it. The contract's `transit` brings what the contract is built on, as the kernel's does for the kit.
     "mutants:sample": {
-      "dependsOn": ["//#patches:installed", "@inventory/kernel#transit", "@inventory/catalog-contract#transit"],
+      "dependsOn": [
+        "//#patches:installed",
+        "@inventory/kernel#transit",
+        "@inventory/catalog-contract#transit",
+        "@beep/repo-cli#transit"
+      ],
       "inputs": [
         "package.json",
         "turbo.json",
@@ -108,6 +115,8 @@
         "$TURBO_ROOT$/vendor/alchemy/*.tgz",
         "test/**/*.story.test.ts",
         "test/**/*.prove.test.ts",
+        "test/**/*.api.test.ts",
+        "test/session.ts",
         "mutants/**",
         "src/**/*.model.ts",
         "$TURBO_ROOT$/packages/catalog/contract/package.json",
@@ -118,7 +127,12 @@
       "outputs": []
     },
     "mutants": {
-      "dependsOn": ["//#patches:installed", "@inventory/kernel#transit", "@inventory/catalog-contract#transit"],
+      "dependsOn": [
+        "//#patches:installed",
+        "@inventory/kernel#transit",
+        "@inventory/catalog-contract#transit",
+        "@beep/repo-cli#transit"
+      ],
       "inputs": [
         "package.json",
         "turbo.json",
@@ -136,6 +150,8 @@
         "$TURBO_ROOT$/vendor/alchemy/*.tgz",
         "test/**/*.story.test.ts",
         "test/**/*.prove.test.ts",
+        "test/**/*.api.test.ts",
+        "test/session.ts",
         "mutants/**",
         "src/**/*.model.ts",
         "$TURBO_ROOT$/packages/catalog/contract/package.json",

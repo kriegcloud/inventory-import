@@ -57,8 +57,8 @@
     "prove": "vitest run --project prove",
     "verify": "vitest run --project verify",
     "explore": "vitest run --project explore",
-    "mutants": "python3 -I mutants/run.py --all --jobs 2",
-    "mutants:sample": "python3 -I mutants/run.py --sample"
+    "mutants": "beep-cli mutants . --all",
+    "mutants:sample": "beep-cli mutants . --sample"
   },
   "dependencies": {
     "@alchemy.run/domain": "2.0.0-beta.87-e1c3e6d",

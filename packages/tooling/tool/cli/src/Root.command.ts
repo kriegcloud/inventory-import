@@ -1,6 +1,6 @@
 /**
  * The root command, `beep`: one group per kind of rule, the three commands that keep what is derived in step,
- * `patches`, `release`, and `infra`, the owner's setup before a first deploy.
+ * `patches`, `release`, `mutants`, a model package's mutants, and `infra`, the owner's setup before a first deploy.
  *
  * @packageDocumentation
  */
@@ -11,6 +11,7 @@ import { depsCommand } from "./commands/Deps/Deps.command.ts"
 import { docsCommand } from "./commands/Docs/Docs.command.ts"
 import { infraCommand } from "./commands/Infra/Infra.command.ts"
 import { lawsCommand } from "./commands/Laws/Laws.command.ts"
+import { mutantsCommand } from "./commands/Mutants/Mutants.command.ts"
 import { patchesCommand } from "./commands/Patches/Patches.command.ts"
 import { qualityCommand } from "./commands/Quality/Quality.command.ts"
 import { releaseCommand } from "./commands/Release/Release.command.ts"
@@ -32,6 +33,7 @@ export const rootCommand = Command.make("beep").pipe(
     docsCommand,
     infraCommand,
     lawsCommand,
+    mutantsCommand,
     patchesCommand,
     qualityCommand,
     releaseCommand,

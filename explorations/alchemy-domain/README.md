@@ -259,4 +259,4 @@ pages whose "Where this was read" names a file that changed.
 - 2026-11-26: the installed library read again at `e1c3e6d`, block by block, for the sweep of where a block replaces
   hand-written code ([08](research/08-the-library-at-e1c3e6d.md)); the sub-agent `domain` (`.claude/agents/domain.md`)
   written from it. Its sweep found 221 places a block replaces or adds to hand-written code, in the goal
-  [alchemy-domain-uptake](../../goals/alchemy-domain-uptake/SPEC.md); Foldkit is left out (his answer, the same day).
+  [alchemy-domain-uptake](../../goals/alchemy-domain-uptake/SPEC.md); Foldkit is left out (his answer, the same day). He signed the brief the same day: "I've approved".

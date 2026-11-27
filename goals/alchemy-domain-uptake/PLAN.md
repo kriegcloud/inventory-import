@@ -8,7 +8,7 @@ from: explorations/alchemy-domain
 
 # Plan
 
-[SPEC](SPEC.md) holds the objective and acceptance; [INVENTORY](INVENTORY.md) holds every item. Status is one of `todo`, `doing`, `done`, `closed` (tried, did not hold up, with the reason). Nothing is built yet: this packet was written on 2026-11-26.
+[SPEC](SPEC.md) holds the objective and acceptance; [INVENTORY](INVENTORY.md) holds every item. Status is one of `todo`, `doing`, `done`, `closed` (tried, did not hold up, with the reason). The packet was written on 2026-11-26 and the brief signed the same day.
 
 A step is one move of [the brief](../../explorations/alchemy-domain/BRIEF.md). An item is built by the `domain` agent, one item to a brief, schema first, and its **Fails without it** is the check that closes it. A move's open decisions (42 to 56, 60 to 62 and 21a) are put to Benjamin when the move opens, never before.
 
@@ -36,13 +36,19 @@ Three items need nothing but his word that they count as part of the model alrea
 
 Three more need nothing at all, being tooling of the scratchpad: **tests-40**, **tests-41** and **tests-42**.
 
+## Done
+
+- **tests-01** `done`: `packages/catalog/model/test/StoryCoverage.test.ts`; fails naming `HistoryEnds` with its story taken out, and a command and a rejection added with no story (its own cases). The comment table in `Review.story.test.ts` is gone.
+- **tests-02** `done`: `packages/catalog/model/test/Annotations.test.ts`, which walks `CatalogApi.serves`; a trial Api over a trial view shows it names a silent view and a silent Api. The two cases moved from `ReviewModel.property.test.ts`.
+- **catalog-01** `done`: `Catalog.ARowsChangeIsOneItsImportGave`, a model invariant (searched, not proved); `verify` passes with the lock updated once by `UPDATE_VERIFY_LOCK=1`. No mutant was written for it (it is not a check of a `decide`).
+
 ## Current blocker
 
-The brief is not signed. `.claude/agents/domain.md`, "What binds you", allows nothing to be built before he signs except the pin and the review's model on main. Until then the agent's only job here is to keep the inventory true.
+None for move 1. He signed the brief on 2026-11-26 ("I've approved", the exploration's DECISIONS). Move 2 waits on his re-pin widened to `@alchemy.run/better-auth` and `@alchemy.run/test`, and on its open decisions.
 
 ## What Benjamin does by hand
 
-- Signs the brief, or says which of move 1's items count as part of the model on main.
+- Signed the brief on 2026-11-26.
 - Answers each move's open decisions when it opens.
 - Decides nine of the items under `none` (catalog-48, host-35, ops-11, ops-12, ops-13, tests-39, usage-12, usage-13, web-43): each goes against a decision he answered (25, 26, 38, 39) or asks a new one, and stays `todo` until he decides it or closes it.
 - Hosting: every deploy of the model's Worker and the Durable Objects (moves 2, 3 and 7) is his, as in [infra](../infra/PLAN.md).

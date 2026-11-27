@@ -782,3 +782,11 @@ calls today", built as a Foldkit program at move 7; that page, if it is built, i
 following `AllowanceToday`, as every other screen is ([the Foldkit page](research/concepts/foldkit.md) says what a
 client that is not Foldkit uses). No options were put to him and no recommendation was given. Reverse: a new decision
 by him.
+
+### 2026-11-26 — The brief is signed
+
+Said by him after the goal [alchemy-domain-uptake](../../goals/alchemy-domain-uptake/SPEC.md) was handed to him, whose
+PLAN named the unsigned brief as its one blocker: "I've approved". Question: is the brief signed, so that the build
+past the review's model on main may start? Answer: yes. The moves start in the brief's order; each move's open
+decisions (42 to 56, 60 to 62, 21a) are still put to him when the move opens, and every deploy stays his. No options
+were put to him and no recommendation was given. Reverse: a new decision by him.

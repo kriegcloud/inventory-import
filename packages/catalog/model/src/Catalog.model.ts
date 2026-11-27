@@ -69,6 +69,28 @@ const everyGroupOfItsImport = (
     )
   )
 
+/** A row an act has reached: it names its import. */
+type ReachedRow = Exclude<RowState, typeof RowState.cases.Untouched.Type>
+
+/**
+ * `holds` of every row an act has reached, beside the import it belongs to. A removed import is asked nothing, as for
+ * a group; an import not yet staged has no row, so one found there breaks the rule.
+ */
+const everyRowOfItsImport = (
+  all: { readonly Row: ReadonlyArray<Held<RowState>>; readonly Import: ReadonlyArray<Held<ImportState>> },
+  holds: (row: ReachedRow, life: StagedImport) => boolean
+): boolean => {
+  const besideItsImport = (row: ReachedRow): boolean =>
+    A.every(
+      all.Import,
+      (life) =>
+        row.importId !== life.id ||
+        ImportState.guards.Removed(life.state) ||
+        (!ImportState.guards.Unstaged(life.state) && holds(row, life.state))
+    )
+  return A.every(all.Row, (row) => RowState.guards.Untouched(row.state) || besideItsImport(row.state))
+}
+
 /** The catalog's model: today, the review of an import. */
 export class Catalog extends Domain.Model(
   "Catalog",
@@ -114,6 +136,15 @@ export class Catalog extends Domain.Model(
         everyGroupOfItsImport(
           all,
           (group, life) => group.change >= 1 && group.change <= life.changes && group.undoneAt <= life.changes
+        ),
+      // A row's decision, and the change its last undo took back, are changes its import gave. A row that took no
+      // undo holds 0 there, so that half has only its upper bound.
+      ARowsChangeIsOneItsImportGave: (all) =>
+        everyRowOfItsImport(
+          all,
+          (row, life) =>
+            row.undone.change <= life.changes &&
+            (!RowState.guards.Decided(row) || (row.change >= 1 && row.change <= life.changes))
         ),
       // A group is taken back by a later change than the one that decided it.
       AGroupsUndoComesAfterIt: (all) =>

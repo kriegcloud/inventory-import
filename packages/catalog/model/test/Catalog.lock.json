@@ -613,6 +613,10 @@
       "UndoGroup.AGroupsUndoIsMadeOnEveryChange": {
         "kind": "transition",
         "source": "({ before, command }) =>\n        ImportState.guards.Open(before.life) && command.seen === before.life.changes"
+      },
+      "Catalog.ARowsChangeIsOneItsImportGave": {
+        "kind": "model invariant",
+        "source": "(all) =>\n        everyRowOfItsImport(\n          all,\n          (row, life) =>\n            row.undone.change <= life.changes &&\n            (!RowState.guards.Decided(row) || (row.change >= 1 && row.change <= life.changes))\n        )"
       }
     }
   }

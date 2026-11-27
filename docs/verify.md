@@ -34,7 +34,7 @@ the lock (`test/Proving.test.ts`).
 | An act on a group (`DecideGroup`) | 20 | Proved |
 | Its undo (`UndoGroup`) | 15 | Proved |
 | Between an import and one row, or one group | 2 | Proved: every decision that records on both keeps it |
-| Over every import, row and group at once | 8 | Searched: every sequence of up to three commands, and 200 longer walks. Never proved |
+| Over every import, row and group at once | 9 | Searched: every sequence of up to three commands, and 200 longer walks. Never proved |
 | That each command can be taken | 11 | Reached: one sequence of commands was found that gets there. Not a proof, and it says nothing of any other sequence |
 
 **A proved rule says what never happens.** It is proved from the code of `decide` and `evolve`, for every state the

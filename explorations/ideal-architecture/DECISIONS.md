@@ -2255,3 +2255,71 @@ Asked as the goal's first two steps finished (the plan before a deploy, and the 
 
 Reverse: 1, the check and the binding come out of the Worker and the stack; 2, the policy comes off the preview's
 plan; 3, the two settings come out of the stack; 4, the command writes somewhere else.
+
+### 2026-11-26 — CI speed: the split, the seeds, the cache and the run counts
+
+Asked from the audit of `turbo.json`, the workflows, the tests and the checks
+([goals/ci-speed/AUDIT.md](../../goals/ci-speed/AUDIT.md)): a run is about 11 minutes, its check job replays nothing
+and carries everything on two slots.
+
+1. **The two required check names when the jobs are split?** I chose; the agent recommended the same. "Check, test and
+   build" and "Proofs and search of the model" stay as jobs that wait for their parts and fail when one does; the
+   ruleset and the GitHub stack are untouched, and a job can be added without a deploy. Rejected: requiring each part
+   by name in `GitHub.stack.ts`.
+2. **The 8 recorded seeds of `Draft.machine.test.ts`, each at 1,000 runs?** I chose; the agent recommended the same.
+   Each seed's failing ordering is recovered against the code before its fix and pinned beside the orderings already
+   pinned, and runs once. The 4 unseeded properties keep 1,000 runs. Rejected: keeping the seeds at 1,000 and only
+   splitting the file; the seeds at 1,000 nightly.
+3. **Where the check's turbo results are kept between runs?** I chose against the recommendation. beep-effect's cache
+   Worker from the start, this repository as a team of its own; pull requests read, only main writes. The agent
+   recommended `actions/cache` first, as the proofs job does, and the Worker later. Rejected: `actions/cache` only.
+4. **Property run counts on a pull request?** I chose; the agent recommended the same. One variable; fewer runs on a
+   pull request (500 for `WaitedRows.property`, 2,000 today), today's counts every night, and the variable named in
+   each task's `env` so a result made at one count never replays at another. Rejected: today's counts everywhere;
+   more than today's every night.
+
+Reverse: 1, the parts are named in the stack and I deploy it; 2, the seed loop comes back; 3, the `TURBO_*` settings
+come out of the workflow and a cache step takes their place; 4, the variable is removed and the counts are literals
+again.
+
+### 2026-11-26 — CI speed: who writes to the cache, where its settings live, main's runs and the largest save
+
+The second round, after the cache Worker was chosen.
+
+1. **Who besides CI holds a token for this repository's team?** I chose against the recommendation. The workstation
+   writes too, as beep-effect's `dankstation` principal does there: what a local run made, CI may replay. The agent
+   recommended a read token only, because a local build stores `.dev.vars` in its output today and no environment is
+   hashed. Rejected: CI only. What this asks of the configuration before the token exists is the next entry.
+2. **Where the cache's settings live?** I chose; the agent recommended the same. In `packages/infra/src/GitHub.stack.ts`
+   beside the deploy environments: the variables, the read and write tokens from 1Password references, and an
+   environment for the write token limited to main. I copy the tokens into 1Password and deploy the stack. Rejected:
+   by hand in the repository's settings.
+3. **Does a push to main cancel a run in progress on main?** I chose; the agent recommended the same. No: every run
+   that starts finishes and writes its results. Looked at again only if bursts still queue after the split.
+   Rejected: cancelling on main.
+4. **Where `WriteLimits.slow.test.ts` runs?** I chose; the agent recommended the same. On every pull request, at
+   50,000 rows. Rejected: nightly only; 5,000 rows on a pull request.
+
+Reverse: 1, the workstation's principal is made read-only in beep-effect's policy and its token rotated; 2, the
+declarations come out of the stack; 3, `cancel-in-progress` is true for main; 4, the suite moves to the nightly.
+
+### 2026-11-26 — CI speed: what a shared cache asks, now that the workstation writes
+
+The third round: the conditions under which a result made on my machine may count on CI.
+
+1. **Where CI runs things for real, whatever the cache holds?** I chose; the agent recommended the same. A pull
+   request replays anything, my machine's results included. The push to main runs the check job's tasks (type-check,
+   lint, tests, slow tests, build) with `--force` and writes its own results over them, so a difference between my
+   machine and CI turns main red at the merge. The proofs replay on main too and are forced every night, as now.
+   Rejected: replaying everywhere; a second team so pull requests replay only what main's CI tested.
+2. **The environment?** I chose; the agent recommended the same. `envMode` strict: a task names in `env` what changes
+   its result, a pass-through list names what it needs and that changes nothing, and a variable nobody listed is not
+   seen by the task. This replaces the 2026 choice of loose mode made for workerd and wrangler; the list is found by
+   running `check:full` until it passes. Rejected: loose with `env` lists.
+3. **The proofs' results?** I chose; the agent recommended the same. On the Worker with everything else: the
+   `actions/cache` steps and the key step leave the proofs job, a proof I ran locally replays on the pull request,
+   and the nightly keeps `--force` and every mutant. The lock is unchanged. Rejected: `actions/cache` for the proofs
+   alone.
+
+Reverse: 1, `--force` comes off main's run; 2, `envMode` is loose again and the lists stay as documentation; 3, the
+cache steps return to the proofs job and its turbo call names a local cache folder.

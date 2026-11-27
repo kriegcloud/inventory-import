@@ -14,7 +14,7 @@ pull request is merged, or, for a step with none, when its record below is writt
 | --- | --- | --- | --- |
 | 1 | This packet | | doing |
 | 2 | Benjamin's ruling on what waits for the person's session | none: a decision | done: 2026-11-26 (below) |
-| 3 | The person's session: prepared, run by Benjamin, written down | one for the record | todo |
+| 3 | The person's session: prepared, run by Benjamin, written down | one for the record | doing: prepared |
 | 4 | `CLAUDE.md` as an index: which goal owns it, to what length, then the move | one | todo |
 | 5 | Measure `bun run check`: how long, and what a failure prints | the record below | done: 2026-11-26 |
 | 6 | One summary at the end of a failing check | 35 | done: 2026-11-26 |
@@ -46,6 +46,11 @@ who did not build the import is recorded anywhere in `goals/`, `docs/qa/` or the
 
 The file stays theirs. The record holds counts and observations, never a value, a heading or a name from it. Where
 the session runs (Benjamin's machine with `bun run dev`, or a hosted stage he deploys) is his.
+
+**Prepared, 2026-11-26.** [SESSION.md](SESSION.md) holds the three parts: the page the person reads, what Benjamin
+watches for, and the record he fills in and copies here. Its screen words were read on screen, from the messy sample
+on an empty database at `5aa253aa`. The session itself is Benjamin's to run with the person he brings. Until it is
+recorded here, step 2's ruling holds.
 
 ## 4. `CLAUDE.md`
 

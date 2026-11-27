@@ -250,6 +250,44 @@ by file, so they stay until Benjamin says.
 
 `CLAUDE.md`, "How we work", now says where this repository's worktrees go and when one is removed.
 
+**Compared, 2026-11-26, on Benjamin's answer** (the exploration's decisions, "the commit check's tests, and the
+worktrees left"). Each of the 26 changed `wf_*` worktrees was compared with `origin/main` at `4043181f`, file by
+file: a changed or new file counts as held when its content hashes the same as main's file at that path, a deleted
+file when main no longer has it either. A worktree would be removed only if every file were held. None was, so none
+was removed. Most were cut before main's packages moved (the catalog's web package, the review region), so a
+difference may only mean the file now lives elsewhere, not that it holds work main lacks. That was not checked.
+
+| Worktree | Changed files | Different from main | First of them |
+| --- | --- | --- | --- |
+| `wf_083b9049-27a-1` | 2 | 2 | `packages/review/src/internal/ReviewGrid.tsx`, `packages/review/src/internal/ReviewQueue.tsx` |
+| `wf_0a2b9bdf-fd3-1` | 2 | 2 | `packages/catalog/web/test/Draft.machine.test.ts`, `packages/catalog/web/test/support/draftWorld.ts` |
+| `wf_1d27d04d-290-1` | 23 | 21 | `apps/inventory/test/server/ConfirmRevision.slow.test.ts`, `apps/inventory/test/server/Imports.slow.test.ts`, `apps/inventory/test/server/MatchAtomic.slow.test.ts`, … |
+| `wf_1d27d04d-290-2` | 23 | 20 | `packages/catalog/web/src/Draft.atoms.ts`, `packages/catalog/web/src/Draft.machine.ts`, `packages/catalog/web/src/Notices.atoms.ts`, … |
+| `wf_1d27d04d-290-3` | 39 | 36 | `apps/inventory/src/web/App.tsx`, `apps/inventory/src/web/Workspace.tsx`, `apps/inventory/src/web/components/app/AppSidebar.tsx`, … |
+| `wf_29973122-576-1` | 3 | 3 | `DECISIONS.md`, `packages/catalog/web/src/Draft.machine.ts`, `packages/catalog/web/test/Draft.machine.test.ts` |
+| `wf_29973122-576-2` | 57 | 31 | `apps/inventory/test/web/gridCallbacks.test.ts`, `docs/kit.md`, `docs/standards/engineering.md`, … |
+| `wf_29cd7dc9-997-1` | 11 | 11 | `DECISIONS.md`, `docs/review-table.md`, `packages/review/src/ReviewDraft.rules.ts`, … |
+| `wf_29cece89-99a-1` | 1 | 1 | `packages/catalog/web/test/zz_probe.test.ts` |
+| `wf_29cece89-99a-2` | 50 | 32 | `docs/kit.md`, `docs/standards/engineering.md`, `docs/standards/no-try.md`, … |
+| `wf_2d6f9c1b-d53-1` | 16 | 15 | `apps/inventory/test/server/MatchAtomic.slow.test.ts`, `apps/inventory/test/server/Rematch.slow.test.ts`, `apps/inventory/test/server/WaitedRows.slow.test.ts`, … |
+| `wf_31a2095e-a44-1` | 2 | 2 | `packages/catalog/web/src/Draft.machine.ts`, `packages/catalog/web/test/Draft.machine.test.ts` |
+| `wf_31a2095e-a44-2` | 1 | 1 | `packages/catalog/web/test/SessionAsked.test.ts` |
+| `wf_6903598d-ac8-1` | 4 | 3 | `apps/inventory/test/server/Tenancy.slow.test.ts`, `packages/catalog/host/src/ImportStore.adapter.ts`, `apps/inventory/test/server/WriteLimits.slow.test.ts` |
+| `wf_6903598d-ac8-2` | 1 | 1 | `packages/catalog/web/src/Draft.machine.ts` |
+| `wf_6ea7687d-dc3-1` | 12 | 10 | `goals/atoms/PLAN.md`, `packages/catalog/model/src/Item/ItemSearch.rules.ts`, `packages/catalog/model/src/Review/CellReading.rules.ts`, … |
+| `wf_721d0736-442-1` | 13 | 12 | `apps/inventory/test/server/MatchAtomic.slow.test.ts`, `apps/inventory/test/server/Rematch.slow.test.ts`, `apps/inventory/test/server/WaitedRows.slow.test.ts`, … |
+| `wf_721d0736-442-2` | 23 | 20 | `DECISIONS.md`, `apps/inventory/src/web/Workspace.tsx`, `apps/inventory/src/web/lib/ofThisPage.ts`, … |
+| `wf_85855b04-75e-1` | 21 | 6 | `docs/kit.md`, `goals/atoms/PLAN.md`, `packages/catalog/web/test/ItemsTableAddress.test.ts`, … |
+| `wf_df3fabe5-99a-1` | 27 | 24 | `DECISIONS.md`, `packages/catalog/web/src/Draft.atoms.ts`, `packages/catalog/web/src/Draft.machine.ts`, … |
+| `wf_e0d42d40-674-1` | 14 | 13 | `apps/inventory/test/server/MatchAtomic.slow.test.ts`, `apps/inventory/test/server/Rematch.slow.test.ts`, `apps/inventory/test/server/StaleAccepts.slow.test.ts`, … |
+| `wf_e0d42d40-674-2` | 22 | 21 | `apps/inventory/src/web/Workspace.tsx`, `packages/catalog/web/package.json`, `packages/catalog/web/src/Draft.atoms.ts`, … |
+| `wf_e2345590-b7b-1` | 12 | 10 | `docs/standards/engineering.md`, `docs/standards/no-try.md`, `package.json`, … |
+| `wf_e2345590-b7b-2` | 38 | 23 | `apps/inventory/scripts/grid-keys.mjs`, `docs/kit.md`, `packages/access/web/src/Session.atoms.ts`, … |
+| `wf_e4a7914b-cfd-1` | 20 | 20 | `apps/inventory/test/web/gridAtoms.test.ts`, `docs/kit.md`, `goals/atoms/PLAN.md`, … |
+| `wf_f2fe47fa-07d-1` | 10 | 8 | `goals/atoms/PLAN.md`, `packages/catalog/model/src/Item/ItemSearch.rules.ts`, `packages/catalog/model/src/Review/CellReading.rules.ts`, … |
+
+`integration` and `sean-demo/rebuild` stay, on the same answer.
+
 ## Decided 2026-11-26
 
 All seven questions were answered by dialog, each as recommended, and are written in

@@ -283,6 +283,58 @@ export const stepsFor = (sizes: ReadonlyArray<SetupSize>): ReadonlyArray<Step> =
   ]
 }
 
+/**
+ * What a step is about, in a few words naming the account it works in: the heading a run prints above it and the
+ * line the map at the start lists it by, so "Step 4 of 8" never stands alone.
+ *
+ * @example
+ * stepTitle(Step.cases.StateStore.make({ role: "preview" })) // "Alchemy's record of what is deployed, in the previews' account"
+ */
+export const stepTitle: (step: Step) => string = Step.match({
+  PreviewPassword: () => "the previews' password, in 1Password",
+  Cloudflare: (step) =>
+    step.roles.length === 2
+      ? "which Cloudflare account is the previews' and which is production's"
+      : `which Cloudflare account is ${A.contains(step.roles, "preview") ? "the previews'" : "production's"}`,
+  Profile: (step) => `the Alchemy profile for ${step.role === "preview" ? "the previews'" : "production's"} account`,
+  StateStore: (step) =>
+    `Alchemy's record of what is deployed, in ${step.role === "preview" ? "the previews'" : "production's"} account`,
+  GitHubLogin: () => "who approves a production deploy, on GitHub",
+  Deploy: (step) =>
+    Target.match(step.target, {
+      "test-stage": () => "deploy your test stage, in the previews' account",
+      repository: () => "deploy the repository's stack: GitHub's environments, their secrets and rules",
+      production: () => "deploy production, in production's account"
+    })
+})
+
+/**
+ * What each size a run was given reaches, said before anything else. `--staging` is the one whose name misleads:
+ * it deploys no staging, it sets up what GitHub holds so the workflow can deploy, and that reaches both accounts.
+ */
+export const sizesSaid = (sizes: ReadonlyArray<SetupSize>): ReadonlyArray<string> => [
+  ...(has(sizes, "test-stage") ? ["`--test-stage`: a test stage of your own, in the previews' account."] : []),
+  ...(has(sizes, "staging")
+    ? [
+        "`--staging`: the repository's stack, which deploys no stage itself. It writes what GitHub must hold so the workflow can deploy previews, staging and production, and it reaches both Cloudflare accounts: the previews' (where previews and staging run) and production's (where it makes production's deploy token)."
+      ]
+    : []),
+  ...(has(sizes, "production") ? ["`--production`: production itself, in production's account."] : [])
+]
+
+/**
+ * The map a run prints before its first step: what its sizes reach, then every step by its title, numbered as the
+ * headings are. Nothing is made or deployed without a yes, and the map says so.
+ */
+export const runMap = (sizes: ReadonlyArray<SetupSize>): ReadonlyArray<string> => {
+  const steps = stepsFor(sizes)
+  return [
+    ...sizesSaid(sizes),
+    `This run has ${steps.length} steps. Each says what it found; nothing is made or deployed without your yes.`,
+    ...A.map(steps, (step, index) => `  ${index + 1}. ${stepTitle(step)}`)
+  ]
+}
+
 /** A tool and its arguments, as it is started. */
 export interface Call {
   readonly command: string
@@ -611,6 +663,8 @@ export interface Found {
   readonly previewByToken: boolean
   /** The account that holds production's zone, when cf could tell: production's, whoever is asked. */
   readonly zoneHolder: O.Option<Account>
+  /** The previews' workers.dev subdomain, when Cloudflare gave it: the name that account goes by when cf gives none. */
+  readonly previewSubdomain: O.Option<string>
   /** The id of the account each role's profile deploys into, once read from the profile itself. */
   readonly held: { readonly preview: O.Option<string>; readonly production: O.Option<string> }
 }
@@ -620,6 +674,7 @@ const nothingFound: Found = {
   production: O.none(),
   approver: O.none(),
   previewByToken: false,
+  previewSubdomain: O.none(),
   zoneHolder: O.none(),
   held: { preview: O.none(), production: O.none() }
 }
@@ -628,21 +683,20 @@ const accountOf = (found: Found, role: Role) =>
   Role.match(role, { preview: () => found.preview, production: () => found.production })
 
 /**
- * The account a question is about, by the id its profile deploys into, with its name when cf gave one. Every
+ * The account a line is about, always the same way: its role first, then what tells it apart, its name when cf gave
+ * one (for the previews' account by its token, its workers.dev subdomain) and the id its profile deploys into. Every
  * question that makes something says this, so a yes is always about an account he can tell from his others.
+ *
+ * @example
+ * accountSaid(found, "preview") // "the previews' account (elpresidank.workers.dev, 29979135c6a99c5286187fac6a73f005)"
  */
 const accountSaid = (found: Found, role: Role): string => {
   const id = Role.match(role, { preview: () => found.held.preview, production: () => found.held.production })
-  const name = O.map(accountOf(found, role), (account) => `"${account.name}"`)
-  const which = role === "preview" ? "the previews'" : "production's"
-  return O.match(id, {
-    onNone: () => O.match(name, { onNone: () => `${which} account`, onSome: (said) => `the account ${said}` }),
-    onSome: (held) =>
-      O.match(name, {
-        onNone: () => `the account ${held} (${which})`,
-        onSome: (said) => `the account ${said} (${held})`
-      })
-  })
+  const named = O.map(accountOf(found, role), (account) => `"${account.name}"`)
+  const name = role === "preview" ? O.orElse(named, () => found.previewSubdomain) : named
+  const which = role === "preview" ? "the previews' account" : "production's account"
+  const marks = A.getSomes([name, id])
+  return A.isReadonlyArrayNonEmpty(marks) ? `${which} (${A.join(marks, ", ")})` : which
 }
 
 /** Variables a deploy is given beside the references 1Password fills: names, ids and a flag, none of them secret. */
@@ -847,6 +901,7 @@ export const dryRun = (input: {
   const { options, previewByToken } = input
   return [
     "Dry run: nothing is started and nothing is written. A run would do these steps, in this order:",
+    ...sizesSaid(options.sizes),
     `A run stops before its first tool when one of these is set in your shell or named in the root .env, since a deploy would use it in place of what the run checks: ${A.join(outranking(options.sizes), ", ")}.`,
     ...O.match(input.stopsBefore ?? O.none(), {
       onNone: () => [],
@@ -1327,6 +1382,7 @@ const tokenChecked = Effect.gen(function* () {
   const said = subdomainSaid(subdomain.success)
   if (Result.isFailure(said)) return yield* stop(said.failure)
   yield* workstation.say(said.success)
+  return O.map(O.fromNullishOr(subdomain.success.result), (result) => `${result.subdomain}.workers.dev`)
 })
 
 const profileConnected = Effect.fn("InfraSetup.profileConnected")(function* (
@@ -1570,13 +1626,14 @@ const profileAccountChecked = Effect.fn("InfraSetup.profileAccountChecked")(func
       )
     }
   }
-  yield* workstation.say(
-    `Alchemy: profile "${name}" deploys into the account ${held.value}. Checked against the one named for ${role}.`
-  )
-  return {
+  const checked: Found = {
     ...found,
     held: role === "preview" ? { ...found.held, preview: held } : { ...found.held, production: held }
   }
+  yield* workstation.say(
+    `Alchemy: profile "${name}" deploys into ${accountSaid(checked, role)}, the account named for ${role === "preview" ? "the previews" : "production"}.`
+  )
+  return checked
 })
 
 const profile = Effect.fn("InfraSetup.profile")(function* (
@@ -1602,9 +1659,9 @@ const stateStore = Effect.fn("InfraSetup.stateStore")(function* (role: Role, opt
   const name = profileOf(options, role)
   const account = accountSaid(found, role)
   yield* workstation.say(
-    `State store: Alchemy keeps what it deployed in a small Worker in ${account}. \`state bootstrap\` makes it, or adopts the one that is there (one an older build of Alchemy made is upgraded, one way).`
+    `Alchemy keeps its record of what it deployed in ${account}: a small Worker there, its state store. This step makes it the first time, or uses the one that is there, and changes nothing a person uses. (A record an older Alchemy made is moved to this one's form, which cannot be undone; the deploys it records stay as they are.)`
   )
-  const yes = yield* workstation.confirm(`Make sure the state store exists in ${account}?`)
+  const yes = yield* workstation.confirm(`Make sure Alchemy's record is there in ${account}?`)
   if (!yes) return yield* stop(`Stopped before the state store in ${account}. Nothing was made there by this step.`)
   const code = yield* workstation.hand("bunx", ["alchemy", "state", "bootstrap", "--profile", name])
   if (code !== 0) return yield* stop(stateStoreFailed(name))
@@ -1877,14 +1934,15 @@ export const setup = Effect.fn("InfraSetup.setup")(function* (given: SetupOption
   yield* ownerOnly
   yield* outside(options)
   if (O.isSome(stopsBefore)) return yield* stop(stopsBefore.value)
+  yield* Effect.forEach(runMap(options.sizes), workstation.say, { concurrency: 1, discard: true })
   // Before the first step, so a token that will not do is said before anything is made with it or beside it.
-  if (previewByToken) yield* tokenChecked
+  const previewSubdomain = previewByToken ? yield* tokenChecked : O.none<string>()
   const steps = stepsFor(options.sizes)
   yield* Effect.reduce(
     steps,
-    (): Found => ({ ...nothingFound, previewByToken }),
+    (): Found => ({ ...nothingFound, previewByToken, previewSubdomain }),
     (found, step, index) =>
-      workstation.say(`\nStep ${index + 1} of ${steps.length}.`).pipe(
+      workstation.say(`\nStep ${index + 1} of ${steps.length}: ${stepTitle(step)}.`).pipe(
         Effect.andThen(perform(options, found)(step)),
         // A stop inside a step says what stopped it; what the steps before it made is still there.
         Effect.catchTag("SetupStopped", (stopped) =>

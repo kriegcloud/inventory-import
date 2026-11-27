@@ -38,9 +38,11 @@ import {
   shellQuoted,
   stateStoreFailed,
   type SetupOptions,
+  runMap,
   setup,
   Step,
   stepsFor,
+  stepTitle,
   strayLines,
   withReference
 } from "../src/commands/Infra/InfraSetup.rules.ts"
@@ -563,7 +565,7 @@ describe("infra setup: a test stage", () => {
       ])
       // The one account is used only after he says so, and each thing outside this machine after its own question.
       expect(at(w, 'confirm: Use the Cloudflare account "Previews" for preview? -> yes')).toBeGreaterThan(-1)
-      expect(at(w, "confirm: Make sure the state store exists")).toBeLessThan(
+      expect(at(w, "confirm: Make sure Alchemy's record exists")).toBeLessThan(
         at(w, "hand: bunx alchemy state bootstrap")
       )
       expect(at(w, "hand: bunx alchemy plan")).toBeLessThan(at(w, "confirm: Deploy your test stage test_ben"))
@@ -612,7 +614,7 @@ describe("infra setup: a test stage", () => {
         "ask: cf auth whoami",
         "ask: cf zones list --name beep-effect.com --status active"
       ])
-      const store = world({ yes: (question) => !Str.startsWith("Make sure the state store")(question) })
+      const store = world({ yes: (question) => !Str.startsWith("Make sure Alchemy's record")(question) })
       yield* run(store, options())
       expect(A.some(started(store), Str.includes("state bootstrap"))).toBe(false)
       expect(A.some(started(store), Str.includes("alchemy plan"))).toBe(false)
@@ -1028,7 +1030,7 @@ describe("infra setup: the repository's stack and production", () => {
         )
         A.forEach([earlier, picked, byToken, unread], (w) => {
           expect(A.some(started(w), (entry) => /state bootstrap|alchemy plan|alchemy deploy/.test(entry))).toBe(false)
-          expect(A.some(w.current.log, Str.startsWith("confirm: Make sure the state store"))).toBe(false)
+          expect(A.some(w.current.log, Str.startsWith("confirm: Make sure Alchemy's record"))).toBe(false)
           // What the tool prints beside the account's line reaches no line and no argument.
           expect(A.some(w.current.log, Str.includes(secret))).toBe(false)
         })
@@ -1129,7 +1131,7 @@ describe("infra setup: the repository's stack and production", () => {
     "a stop after earlier steps says they are done; a name that is no stage matters only with a test stage",
     () =>
       Effect.gen(function* () {
-        const w = world({ yes: (question) => !Str.startsWith("Make sure the state store")(question) })
+        const w = world({ yes: (question) => !Str.startsWith("Make sure Alchemy's record")(question) })
         const result = yield* run(w, options())
         expect(O.getOrElse(result.stopped, () => "")).toContain(
           "Steps 1 to 2 of this run are done and stay as they are; a run again goes on from them."
@@ -1401,18 +1403,18 @@ describe("infra setup: the second account by its token", () => {
       const byLogin = world()
       yield* run(byLogin, options())
       A.forEach([byToken, byLogin], (w) => {
-        const making = A.filter(w.current.log, (entry) => /^confirm: (Make sure the state store|Deploy )/.test(entry))
+        const making = A.filter(w.current.log, (entry) => /^confirm: (Make sure Alchemy's record|Deploy )/.test(entry))
         expect(making.length).toBe(2)
         expect(A.every(making, Str.includes("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"))).toBe(true)
         // The id asked about is the one read from the profile the tool is then started with.
         expect(at(w, "ask: bunx alchemy profile show --profile inventory-preview")).toBeLessThan(
-          at(w, "confirm: Make sure the state store")
+          at(w, "confirm: Make sure Alchemy's record")
         )
       })
       // All three sizes: production's questions name production's account, the previews' theirs.
       const all = world({ accounts: productionOnly })
       yield* run(all, options({ sizes: ["test-stage", "staging", "production"] }))
-      const asked = A.filter(all.current.log, (entry) => /^confirm: (Make sure the state store|Deploy )/.test(entry))
+      const asked = A.filter(all.current.log, (entry) => /^confirm: (Make sure Alchemy's record|Deploy )/.test(entry))
       expect(asked.length).toBe(5)
       // The repository's question names both: it makes a token in production's account, and gives previews and
       // staging the previews' account to deploy into.
@@ -1421,7 +1423,7 @@ describe("infra setup: the second account by its token", () => {
       expect(
         at(
           all,
-          'and one token in the account "Production" (bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2); previews and staging then deploy into the account aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1 (the previews\') with your token)'
+          "and one token in production's account (\"Production\", bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2); previews and staging then deploy into the previews' account (previews-owner.workers.dev, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1) with your token)"
         )
       ).toBeGreaterThan(-1)
     })
@@ -1460,7 +1462,7 @@ describe("infra setup: the second account by its token", () => {
       yield* run(blind, options(), untouched, own)
       expect(
         at(blind, "nothing here could say whether the account aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1 holds the zone")
-      ).toBeLessThan(at(blind, "confirm: Make sure the state store"))
+      ).toBeLessThan(at(blind, "confirm: Make sure Alchemy's record"))
       expect(A.some(started(blind), (entry) => entry === "hand: cf auth login")).toBe(false)
     })
   )
@@ -1598,6 +1600,37 @@ describe("infra setup: the second account by its token", () => {
       expect(result.env).toBe(untouched)
     })
   )
+})
+
+describe("infra setup: what a run says it will do", () => {
+  it.effect("a run opens with a map: what its size reaches, then every step by the title its heading carries", () =>
+    Effect.gen(function* () {
+      const w = world({ accounts: productionOnly, profiles: connected })
+      const result = yield* run(w, options({ sizes: ["staging"] }))
+      expect(result.stopped).toEqual(O.none())
+      const steps = stepsFor(["staging"])
+      // --staging says it deploys no stage and reaches both accounts, before any tool is started.
+      expect(at(w, "say: `--staging`: the repository's stack, which deploys no stage itself")).toBe(0)
+      expect(at(w, "it reaches both Cloudflare accounts")).toBeLessThan(at(w, "ask:"))
+      expect(at(w, `say: This run has ${steps.length} steps.`)).toBeGreaterThan(-1)
+      // Each step is in the map and in its heading under the same number and title.
+      A.forEach(steps, (step, index) => {
+        expect(at(w, `say: ${index + 1}. ${stepTitle(step)}`)).toBeGreaterThan(-1)
+        expect(at(w, `say: Step ${index + 1} of ${steps.length}: ${stepTitle(step)}.`)).toBeGreaterThan(-1)
+      })
+      expect(stepTitle(Step.cases.StateStore.make({ role: "preview" }))).toBe(
+        "Alchemy's record of what is deployed, in the previews' account"
+      )
+    })
+  )
+
+  it("the map of a size names only what that size does", () => {
+    expect(A.take(runMap(["test-stage"]), 1)).toEqual([
+      "`--test-stage`: a test stage of your own, in the previews' account."
+    ])
+    expect(A.join(runMap(["production"]), "\n")).not.toContain("--staging")
+    expect(A.join(runMap(["production"]), "\n")).toContain("deploy production, in production's account")
+  })
 })
 
 describe("infra setup: the dry run", () => {

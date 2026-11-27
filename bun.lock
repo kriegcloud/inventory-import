@@ -19,6 +19,7 @@
       "name": "@inventory/app",
       "version": "0.6.1",
       "dependencies": {
+        "@alchemy.run/domain": "2.0.0-beta.87-e1c3e6d",
         "@base-ui/react": "catalog:",
         "@beep/better-auth": "workspace:*",
         "@beep/csv": "workspace:*",
@@ -46,9 +47,11 @@
         "@inventory/catalog-web": "workspace:*",
         "@inventory/client": "workspace:*",
         "@inventory/kernel": "workspace:*",
+        "@inventory/model-app": "workspace:*",
         "@inventory/review": "workspace:*",
         "@inventory/ui": "workspace:*",
         "@inventory/usage-contract": "workspace:*",
+        "@inventory/usage-model": "workspace:*",
         "@shadcn/react": "catalog:",
         "@tanstack/react-table": "catalog:",
         "@tanstack/react-virtual": "catalog:",
@@ -107,13 +110,18 @@
       "name": "@inventory/model-app",
       "version": "0.0.0",
       "dependencies": {
+        "@alchemy.run/better-auth": "2.0.0-beta.87-e1c3e6d",
         "@alchemy.run/cloudflare": "2.0.0-beta.87-e1c3e6d",
         "@alchemy.run/domain": "2.0.0-beta.87-e1c3e6d",
+        "@beep/better-auth": "workspace:*",
         "@beep/d1": "workspace:*",
+        "@cloudflare/workers-types": "catalog:",
+        "@inventory/access-host": "workspace:*",
         "@inventory/access-model": "workspace:*",
         "@inventory/kernel": "workspace:*",
         "@inventory/usage-model": "workspace:*",
         "alchemy": "2.0.0-beta.87-e1c3e6d",
+        "better-auth": "catalog:",
         "effect": "catalog:",
       },
       "devDependencies": {
@@ -223,10 +231,10 @@
         "@beep/d1": "workspace:*",
         "@beep/openrouter": "workspace:*",
         "@beep/schema": "workspace:*",
-        "@inventory/access-contract": "workspace:*",
         "@inventory/catalog-contract": "workspace:*",
         "@inventory/catalog-model": "workspace:*",
         "@inventory/kernel": "workspace:*",
+        "@inventory/usage-contract": "workspace:*",
         "effect": "catalog:",
       },
       "devDependencies": {
@@ -765,6 +773,8 @@
     "@alchemy.run/1password": ["@alchemy.run/1password@vendor/alchemy/alchemy.run-1password-e1c3e6d.tgz", { "dependencies": { "@1password/sdk": "0.5.0" }, "peerDependencies": { "alchemy": "2.0.0-beta.87-e1c3e6d", "effect": "^4.1.4" } }, "sha512-ju8A7Cw3xsJ8fmatJs6+7nRGE6G/sgcWx2YLgsB0veqyGFzjrX3Ti8Er+GL9B7n92bK830N+GU9JFUHZqozQag=="],
 
     "@alchemy.run/acme": ["@alchemy.run/acme@vendor/alchemy/alchemy.run-acme-e1c3e6d.tgz", { "dependencies": { "@distilled.cloud/acme": "1.0.0-rc.20-e1c3e6d" }, "peerDependencies": { "alchemy": "2.0.0-beta.87-e1c3e6d", "effect": "^4.1.4" } }, "sha512-vT+4ngDFnqV1vO/ZeMVhHLY67f/NR8Gv5lEw1Re/QjukqebozxIgFFFC/IZrwH9U4UrgcZdDG7UdzBdX287i+w=="],
+
+    "@alchemy.run/better-auth": ["@alchemy.run/better-auth@vendor/alchemy/alchemy.run-better-auth-e1c3e6d.tgz", { "dependencies": { "@alchemy.run/sql": "2.0.0-beta.87-e1c3e6d" }, "peerDependencies": { "@alchemy.run/aws": "2.0.0-beta.87-e1c3e6d", "@alchemy.run/cloudflare": "2.0.0-beta.87-e1c3e6d", "@better-auth/drizzle-adapter": "^1.7.5", "@cloudflare/workers-types": "5.20261117.1", "@distilled.cloud/aws": "1.0.0-rc.20-e1c3e6d", "@neondatabase/serverless": "^1.0.1", "alchemy": "2.0.0-beta.87-e1c3e6d", "better-auth": "^1.7.5", "drizzle-orm": "1.0.0-rc.5", "effect": "^4.1.4", "kysely": "^0.29.4", "mysql2": "^3.24.2", "pg": "^8.22.0" }, "optionalPeers": ["@alchemy.run/aws", "@alchemy.run/cloudflare", "@better-auth/drizzle-adapter", "@cloudflare/workers-types", "@distilled.cloud/aws", "@neondatabase/serverless", "drizzle-orm", "kysely", "mysql2", "pg"] }, "sha512-ppHkQ4+EPyTjWi5QwpgX4AQpXE7FW1ooh15eLbe93PUOlc+tFV1IWkCHyb2khe/5TecnOLa77jDGfLSvITO5Kg=="],
 
     "@alchemy.run/cloudflare": ["@alchemy.run/cloudflare@vendor/alchemy/alchemy.run-cloudflare-e1c3e6d.tgz", { "dependencies": { "@alchemy.run/acme": "2.0.0-beta.87-e1c3e6d", "@alchemy.run/cloudflare-runtime": "2.0.0-beta.87-e1c3e6d", "@alchemy.run/docker": "2.0.0-beta.87-e1c3e6d", "@alchemy.run/sql": "2.0.0-beta.87-e1c3e6d", "@distilled.cloud/aws": "1.0.0-rc.20-e1c3e6d", "@distilled.cloud/aws4signer": "1.0.0-rc.20-e1c3e6d", "@distilled.cloud/cloudflare": "1.0.0-rc.20-e1c3e6d", "@distilled.cloud/core": "1.0.0-rc.20-e1c3e6d", "@distilled.cloud/iceberg": "1.0.0-rc.20-e1c3e6d", "@effect/sql-d1": "^4.1.4", "pathe": "^2.0.3", "picomatch": "^4.0.7", "rolldown": "1.2.16", "tinyglobby": "^0.2.17" }, "peerDependencies": { "@alchemy.run/frontend-frameworks": "2.0.0-beta.87-e1c3e6d", "@effect/platform-bun": "^4.1.4", "@effect/platform-node": "^4.1.4", "alchemy": "2.0.0-beta.87-e1c3e6d", "effect": "^4.1.4", "vite": "^7.0.0 || ^8.0.0" }, "optionalPeers": ["@alchemy.run/frontend-frameworks", "@effect/platform-bun", "@effect/platform-node", "vite"] }, "sha512-vd/seI8f4lBah1fdWKfW9ZGMuk07ucXoEUGl/v6gxT33Jn7WcARWZdBRbgLi9LfPtuvMTZDew3wLZ1fX2CA9jw=="],
 

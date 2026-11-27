@@ -29,7 +29,10 @@ export const CounterIds = {
   forgottenLooked: CounterId.make("c-forgotten-looked"),
   forgottenShown: CounterId.make("c-forgotten-shown"),
   expired: CounterId.make("c-expired"),
-  returned: CounterId.make("c-returned")
+  returned: CounterId.make("c-returned"),
+  unsigned: CounterId.make("c-unsigned"),
+  unsignedToo: CounterId.make("c-unsigned-too"),
+  lost: CounterId.make("c-lost")
 } as const
 
 export class Bumped extends Domain.Event("Bumped", {

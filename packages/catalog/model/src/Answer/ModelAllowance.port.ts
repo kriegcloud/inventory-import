@@ -1,5 +1,5 @@
 // The day's allowance of model calls, as the catalog needs it: one call taken before a model is asked. The allowance
-// is the access context's to keep; the host translates (`ModelAllowanceViaAccess`), so nothing here knows how many
+// is the usage context's to keep; the host translates (`ModelAllowanceViaUsage`), so nothing here knows how many
 // calls a day there are or where they are counted.
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { CurrentActor } from "@inventory/kernel/Actor"

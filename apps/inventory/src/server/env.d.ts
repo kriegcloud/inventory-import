@@ -5,6 +5,11 @@ interface Env {
   readonly DB: D1Database
   /** The coarse limit's counter: 30 in 60 seconds for each key (AddressLimit.ts). */
   readonly ABUSE_LIMIT: RateLimit
+  /**
+   * The service binding to the model's Worker (Models.ts), which the stack declares under `bun run dev:alchemy` and
+   * deployed. Absent under `bun run dev` (wrangler.jsonc declares none): the models run in memory there.
+   */
+  readonly MODEL?: Fetcher
   readonly AI_MODEL: string
   readonly AI_FALLBACK_MODELS?: string
   readonly AI_ENABLED?: string

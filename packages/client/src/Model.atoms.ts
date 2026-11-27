@@ -22,9 +22,24 @@ import * as Atom from "effect/reactivity/Atom"
 import type * as Reactivity from "effect/reactivity/Reactivity"
 import * as Stream from "effect/Stream"
 import type { RequestId } from "@inventory/kernel/Ids"
-import { type ApiAtoms, apiRuntime, invalidate, makeApiAtoms, makeHolds, perKey } from "@inventory/client/Api"
+import {
+  type ApiAtoms,
+  apiRuntime,
+  invalidate,
+  makeApiAtoms,
+  makeHolds,
+  perKey,
+  type Query,
+  type QueryOptions
+} from "@inventory/client/Api"
 import { newRequestId } from "@inventory/client/ApiRuntime"
-import { member as memberAtom, memberKey } from "@inventory/client/MemberAtoms"
+import {
+  member as memberAtom,
+  memberKey,
+  readAsPageMember,
+  refusedForWantOfAMember,
+  sentAsPageMember
+} from "@inventory/client/MemberAtoms"
 import type { Member } from "@inventory/kernel/Member"
 
 /**
@@ -51,12 +66,16 @@ export interface LiveReads<Id, R> {
 /** A watched key's state as the screen reads it: the view's snapshots as they are pushed. */
 export type Watched<A, E> = Atom.Atom<AsyncResult.AsyncResult<A, E | Cause.NoSuchElementError>>
 
-/** The atoms one web package makes against a model's client: the HTTP kit's, and a model's command and watch. */
+/**
+ * The atoms one web package makes against a model's client: the HTTP kit's, its `query` asking a read the model
+ * refused for want of a member again as the page's member (`readAsPageMember`), and a model's command and watch.
+ */
 export interface ModelAtoms<Id, Client> extends ApiAtoms<Id, Client> {
   /**
    * A command, sent by setting the atom to its input. Every press runs on its own with its own command id (`Sent`),
    * made before the send and kept for it: a failure that may pass is sent again, twice at most, with that same id, so
-   * the model gives the first receipt instead of deciding again. A refusal is never sent again. When it succeeds the
+   * the model gives the first receipt instead of deciding again. A refusal is never sent again, except one for want of
+   * a member, which is sent again as the page's member or not at all (`sentAsPageMember`). When it succeeds the
    * reads under `reactivityKeys` (the HTTP reads that show what it changed) are asked again.
    */
   readonly command: <Input>() => {
@@ -117,8 +136,9 @@ export const makeModelAtoms: {
         apiRuntime.fn<Input>()(
           (input) => {
             // The id is made here, once per press, outside what `send` sends again.
+            // Refused for want of a member, sent again as the page's member or not at all (`sentAsPageMember`).
             const sent = Effect.sync(newRequestId).pipe(
-              Effect.flatMap((commandId) => api.send((c) => self(c, input, { commandId })))
+              Effect.flatMap((commandId) => api.send((c) => sentAsPageMember(self(c, input, { commandId }))))
             )
             return O.match(options.reactivityKeys, {
               onNone: () => sent,
@@ -133,10 +153,23 @@ export const makeModelAtoms: {
       watchOne((who) =>
         // Fresh, built for this read: without it the stream keeps the client the page's layer built, at the address
         // every member shares.
-        Stream.unwrap(Effect.map(client, (c) => self(c, key))).pipe(Stream.provide(Layer.fresh(live.liveClient(who))))
+        // A read refused for want of a member asks who is signed in, once (`refusedForWantOfAMember`).
+        Stream.unwrap(Effect.map(client, (c) => self(c, key))).pipe(
+          Stream.tapError(refusedForWantOfAMember),
+          Stream.provide(Layer.fresh(live.liveClient(who)))
+        )
       )
     )
-  return { ...api, command, watched }
+  // A read of the model refused for want of a member is asked again as the page's member (`readAsPageMember`).
+  const query = dual<
+    (
+      options: QueryOptions
+    ) => <A, E>(self: (client: Client, get: Atom.AtomContext) => Effect.Effect<A, E>) => Query<A, E>,
+    <A, E>(self: (client: Client, get: Atom.AtomContext) => Effect.Effect<A, E>, options: QueryOptions) => Query<A, E>
+  >(2, <A, E>(self: (client: Client, get: Atom.AtomContext) => Effect.Effect<A, E>, options: QueryOptions) =>
+    api.query((c, get) => readAsPageMember(self(c, get)), options)
+  )
+  return { ...api, query, command, watched }
 })
 
 /**

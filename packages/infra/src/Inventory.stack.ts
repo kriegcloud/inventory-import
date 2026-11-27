@@ -13,7 +13,7 @@
  */
 import * as Cloudflare from "@alchemy.run/cloudflare"
 import * as DomainCloudflare from "@alchemy.run/domain/Cloudflare"
-import ModelWorker from "@inventory/model-app/Worker"
+import ModelWorker, { ModelWorkerEnv, modelWorkerEnv } from "@inventory/model-app/Worker"
 import * as Alchemy from "alchemy"
 import * as Secrets from "alchemy/Secrets"
 import * as Output from "alchemy/Output"
@@ -158,8 +158,16 @@ export const inventory = Effect.gen(function* () {
   // The model's Worker: no `workers.dev` address and no domain on any stage, so the binding below is the only way
   // in. Its Durable Objects keep the models' records, so a deploy that replaces it loses them. It is yielded before
   // the site's Worker, which binds it, so under `alchemy dev` it starts first: its own port (`apps/model/src/
-  // Address.ts`) leaves Alchemy's default one to the site.
-  const models = yield* ModelWorker
+  // Address.ts`) leaves Alchemy's default one to the site. It reads who a call acts as from the site's own sign-in
+  // (host-03; Benjamin, 2026-11-26, "Model's Worker only"): the site's database, which stays declared here ("Stay in
+  // packages/infra", 2026-11-27), the site's secret, and whether the site's cookie is a Secure one, which it is
+  // exactly when the site's address is `https:`: on every deployed stage, and not under `alchemy dev`, where the site
+  // answers on `http://localhost:1337`. The names they are bound under are the Worker's (`modelWorkerEnv`), never
+  // written here, so neither side can rename one alone.
+  const dev = yield* Alchemy.ALCHEMY_DEV
+  const models = yield* ModelWorker.pipe(
+    Effect.provideService(ModelWorkerEnv, modelWorkerEnv({ database, secret: signInSecret.text, secureCookies: !dev }))
+  )
 
   const website = yield* Cloudflare.Website.Vite("Website", {
     rootDir: app,
@@ -187,8 +195,9 @@ export const inventory = Effect.gen(function* () {
     }),
     env: {
       DB: database,
-      // The service binding to the model's Worker. Nothing reads it yet: the forwarding route (host-04) and the
-      // gateway's `TakeCall` (usage-03) do, typed in the app's `env.d.ts` with them.
+      // The service binding to the model's Worker, typed in the app's `env.d.ts`: the forwarding route a page reaches
+      // the member Api by (host-04) and the allowance's gateway, which sends `TakeCall` to the server Api (usage-03),
+      // both in the app's `src/server/Models.ts`. Without it the site runs the models in memory (`bun run dev` only).
       MODEL: models,
       // The coarse limit in front of sign-in and the model (the app's `AddressLimit.ts`): the same two numbers as
       // `wrangler.jsonc`. The namespace is one for the account, so the app keys each count by its own host.

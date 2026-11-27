@@ -16,6 +16,7 @@ import {
   askWhoIsSignedIn,
   memberKey,
   notSentElsewhere,
+  onceBackAs,
   onceSignedInKnown,
   whoIsSignedInAsked
 } from "@inventory/client/MemberAtoms"
@@ -60,18 +61,6 @@ export const ofThisPage = (client: HttpClient.HttpClient): HttpClient.HttpClient
     })
   )
 
-/** Done once the page is the given member's again: a read held for them waits here, and no longer than that. */
-const onceBackAs = (registry: AtomRegistry.AtomRegistry, key: string): Effect.Effect<void> =>
-  Effect.callback<void>((resume) => {
-    if (registry.get(memberKey) === key) return resume(Effect.void)
-    const stop = registry.subscribe(memberKey, (now) => {
-      if (now !== key) return
-      stop()
-      resume(Effect.void)
-    })
-    return Effect.sync(stop)
-  })
-
 /** An answer as this page takes it: one refused for want of a member waits until who is signed in is known. */
 const answeredFor = <E>(input: {
   readonly registry: AtomRegistry.AtomRegistry
@@ -97,7 +86,7 @@ const answeredFor = <E>(input: {
           // page is that member's again (never, if it is left); a write was refused before it did anything, and is said
           // as not sent.
           return request.method === "GET"
-            ? Effect.andThen(onceBackAs(registry, sentFor), input.send)
+            ? Effect.andThen(onceBackAs({ registry, key: sentFor }), input.send)
             : Effect.die(notSentElsewhere())
         })
       )

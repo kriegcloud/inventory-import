@@ -19,10 +19,11 @@ import {
   TakeCall
 } from "../src/Allowance/Allowance.aggregate.ts"
 import { dayOf } from "../src/Allowance/AllowanceLeft.rules.ts"
-import { AllowanceToday, AllowanceTodayLive } from "../src/Allowance/AllowanceToday.view.ts"
+import { AllowanceToday } from "../src/Allowance/AllowanceToday.view.ts"
+import { AllowanceTodayAnyone } from "./session.ts"
 import { Usage } from "../src/Usage.model.ts"
 
-const story = Story.make(Usage, { layer: AllowanceTodayLive })
+const story = Story.make(Usage, { layer: AllowanceTodayAnyone })
 
 const prairie = Allowance.ref("org_prairie")
 const harbor = Allowance.ref("org_harbor")

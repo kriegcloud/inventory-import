@@ -9,8 +9,9 @@
  * The source is read in each execution with only the runtime's own services, whatever its type says, so it is the
  * bound database's client or an Effect of a binding already in hand (an Effect that reads a service of the Layer
  * failed "Service not found" when this was built; no test holds it). `D1Binding` is not provided: only the test
- * database's seed reads it. The binding itself is the seam: which module declares the D1 database so both Workers
- * bind it is open (the stack declares it today), and nothing in the Worker reads D1 at move 2.
+ * database's seed reads it. The stack declares the D1 database and binds it to both Workers (Benjamin, 2026-11-27,
+ * "Stay in packages/infra"); on this Worker the member directory of the session lookup reads it, over the binding as
+ * `Bindings.ts` hands it (`boundDatabase`).
  *
  * @packageDocumentation
  */

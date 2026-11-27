@@ -12,6 +12,7 @@ import * as HttpApiScalar from "effect/http-api/HttpApiScalar"
 import { AccessLive } from "@inventory/access-host/Host"
 import { SignInRoute } from "@inventory/access-host/SignIn"
 import type { Identity } from "@inventory/kernel/Identity"
+import type { SessionLookup } from "@inventory/kernel/SessionLookup"
 import type * as SqlClient from "effect/sql/SqlClient"
 import { Api, docsPath, openApiPath } from "../api/v1/Api.ts"
 import { sessionCookieScheme } from "../api/v1/Document.ts"
@@ -24,6 +25,8 @@ import * as Observability from "./Observability.ts"
 import { RequestTelemetry } from "./RequestTelemetry.ts"
 import { type AddressLimit, LimitedByAddress } from "./AddressLimit.ts"
 import { SameOriginLive } from "./SameOrigin.ts"
+import { ModelAllowanceOverUsage, type Models } from "./Models.ts"
+import { ModelRoute } from "./ModelRoute.ts"
 import { unsecuredAnswer, withSecurityHeaders } from "./security.ts"
 import { HttpTracing, OtlpProxyRoute, RequestMetrics } from "./Telemetry.ts"
 
@@ -67,8 +70,9 @@ export const DocsRoute = import.meta.env.DEV
   : Layer.empty
 
 /**
- * The HttpApi with its OpenAPI document, Better Auth's routes at /api/auth/* beside it (@inventory/access-host/SignIn), and the middleware
- * every request passes through, needing the services and `BetterAuth`. `identity` is the `Identity` middleware's
+ * The HttpApi with its OpenAPI document, Better Auth's routes at /api/auth/* beside it (@inventory/access-host/SignIn),
+ * the route a page reaches the models by (/api/model/*, ModelRoute.ts), and the middleware every request passes
+ * through, needing the services and `BetterAuth`. `identity` is the `Identity` middleware's
  * implementation: the caller chooses it (worker.ts passes `SessionIdentityLive`, which reads the session; the tests
  * pass the header identity, `IdentityLive`), so this file never pulls one into a build.
  */
@@ -83,6 +87,7 @@ export const makeRoutes = <E, R>(options: {
     SignInRoute,
     options.docs ? DocsRoute : Layer.empty,
     OtlpProxyRoute,
+    ModelRoute,
     RequestMetrics,
     LimitedByAddress.pipe(Layer.provide(options.limit))
   ).pipe(
@@ -93,17 +98,26 @@ export const makeRoutes = <E, R>(options: {
   )
 
 /**
- * Every service the handlers use, on a given model service: the Worker passes `ModelLive` (its key), the tests none
- * or a scripted model. Built once and shared by the Worker and the tests, so a service added here is added everywhere.
+ * Every service the handlers use, on a given model service, the app's models and the one session lookup: the Worker
+ * passes `ModelLive` (its key), the models where they run (over the binding, or in memory under `bun run dev`) and
+ * `SessionLookupLive`; the tests none or a scripted model, the models in memory and the header lookup. Built once and
+ * shared by the Worker and the tests, so a service added here is added everywhere.
  */
-export const servicesWith = <E, R>(options: {
+export const servicesWith = <E, R, ME, MR, SE, SR>(options: {
   readonly ai: Layer.Layer<OpenRouter, E, R>
   readonly production: boolean
+  /** Where the app's models run (`Models.ts`): over the service binding, or in this Worker's memory. */
+  readonly models: Layer.Layer<Models, ME, MR>
+  /** The one session lookup: what the forwarding route checks a live read's address by, and the memory host reads. */
+  readonly sessions: Layer.Layer<SessionLookup, SE, SR>
 }) => {
-  // The access context (its ports on D1, the session answer, the gateway to the day's model allowance) and the model.
+  // The access context (its ports on D1 and the session answer) and the model.
   const base = Layer.mergeAll(AccessLive(options), options.ai)
+  // The app's models, the session lookup beside them, and the gateway to the day's model allowance through them.
+  const reach = options.models.pipe(Layer.provideMerge(options.sessions), Layer.provide(base))
+  const gateway = ModelAllowanceOverUsage.pipe(Layer.provide(reach))
   // The catalog: its two stores on D1, and suggestions and the table assistant, which use the model and the allowance.
-  return Layer.mergeAll(base, CatalogLive.pipe(Layer.provide(base)))
+  return Layer.mergeAll(base, reach, gateway, CatalogLive.pipe(Layer.provide(Layer.merge(base, gateway))))
 }
 
 /**
@@ -113,7 +127,7 @@ export const servicesWith = <E, R>(options: {
  * is Better Auth on the D1 binding (`signIn` in SignIn.ts), which the identity, the session answer and /api/auth/* share;
  * `http` is how it reaches the collector, so a test can answer for it without the network.
  */
-export const makeApp = <E, R, IE, IR, AE, AR>(options: {
+export const makeApp = <E, R, IE, IR, AE, AR, ME, MR, SE, SR>(options: {
   readonly database: Layer.Layer<D1 | SqlClient.SqlClient, E, R>
   readonly identity: Layer.Layer<Identity, IE, IR>
   readonly auth: Layer.Layer<BetterAuth, AE, AR>
@@ -123,10 +137,21 @@ export const makeApp = <E, R, IE, IR, AE, AR>(options: {
   readonly http: Layer.Layer<HttpClient.HttpClient>
   /** The coarse limit in front of sign-in and the model: the Worker's rate-limit binding (AddressLimit.ts). */
   readonly limit: Layer.Layer<AddressLimit>
+  /** Where the app's models run (`Models.ts`), chosen by worker.ts. */
+  readonly models: Layer.Layer<Models, ME, MR>
+  /** The one session lookup (`SessionLookupLive` in the Worker). */
+  readonly sessions: Layer.Layer<SessionLookup, SE, SR>
 }) =>
   makeRoutes({ docs: options.docs, identity: options.identity, limit: options.limit }).pipe(
     Layer.provide(options.http),
-    Layer.provide(servicesWith({ ai: ModelLive, production: options.production })),
+    Layer.provide(
+      servicesWith({
+        ai: ModelLive,
+        production: options.production,
+        models: options.models,
+        sessions: options.sessions
+      })
+    ),
     Layer.provide(options.auth),
     Layer.provide(options.database),
     Layer.provide(HttpServer.layerServices),

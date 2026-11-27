@@ -1,8 +1,12 @@
 // The service binding, as a test has it: an `HttpClient` whose every request is answered by the model Worker's own
 // `fetch` in this process, with no socket and no deploy. A Worker reaches the model's Worker the same way over its
 // binding (a request in, a response out), so a client given this one sends what the site's Worker will send. And the
-// session the tests run behind: one header names a person below, and a call with none is refused.
+// session the tests run behind: one header names a person below, and a call with none is refused. And the kernel's
+// session lookup those tests give the usage model's view: the people below are still in their organizations.
 import { NotSignedIn } from "@inventory/kernel/AccessError"
+import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
+import { Member } from "@inventory/kernel/Member"
+import { SessionLookup } from "@inventory/kernel/SessionLookup"
 import { type Actor, CurrentActor } from "@inventory/usage-model/Actor"
 import { Session } from "@inventory/usage-model/Session"
 import type { HttpEffect } from "alchemy/Http"
@@ -37,6 +41,34 @@ export const SessionTest = Layer.succeed(Session, (effect, { headers }) =>
       onSome: (actor) => Effect.provideService(effect, CurrentActor, actor)
     }
   )
+)
+
+/**
+ * The kernel's `SessionLookup` behind the test session: a member asked about is still in while the people above hold
+ * them in that organization. It reads no session, since `SessionTest` names who acts.
+ */
+export const PeopleStillIn = Layer.succeed(
+  SessionLookup,
+  SessionLookup.of({
+    verdictOf: Effect.fn("SessionLookup.verdictOf")(function* () {
+      return yield* NotSignedIn.make({ reason: "The test reads no session." })
+    }),
+    memberNow: Effect.fn("SessionLookup.memberNow")(function* (asked) {
+      return yield* Effect.succeed(
+        O.filter(HashMap.get(people, asked.id), (actor) => actor.organizationId === asked.organizationId).pipe(
+          O.map((actor) =>
+            Member.make({
+              id: MemberId.make(actor.memberId),
+              name: `Member ${actor.memberId}`,
+              role: actor.role,
+              organizationId: OrganizationId.make(actor.organizationId),
+              organizationName: `Organization ${actor.organizationId}`
+            })
+          )
+        )
+      )
+    })
+  })
 )
 
 /**

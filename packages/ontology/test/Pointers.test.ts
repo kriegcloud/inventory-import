@@ -55,8 +55,7 @@ const person = "packages/access/contract/src/People/Person.read.ts#Person"
 const auditTrail = "packages/access/contract/src/Activity/AuditTrail.read.ts#AuditTrail"
 const agentRun = "packages/kernel/src/AgentRun.schema.ts#AgentRun"
 const organizationChoice = "packages/access/contract/src/Session/SessionState.read.ts#OrganizationChoice"
-const modelCallPurpose = "packages/access/contract/src/Allowance/ModelAllowance.port.ts#ModelCallPurpose"
-const usageModelCallPurpose = "packages/usage/contract/src/Allowance/ModelCall.payload.ts#ModelCallPurpose"
+const modelCallPurpose = "packages/usage/contract/src/Allowance/ModelCall.payload.ts#ModelCallPurpose"
 const membership = "packages/access/contract/src/Session/SessionState.read.ts#Membership"
 
 /** A mark as the reader reads it in a field's key annotations: the helper's object, put on a throwaway schema. */
@@ -182,7 +181,7 @@ class Uneven extends Model.Class<Uneven>("Uneven")(
 ) {}
 
 describe("gate 5, record pointers", () => {
-  it.effect("finds nothing in the ten enrolled exports, the committed enrolment list and the vocabulary", () =>
+  it.effect("finds nothing in the nine enrolled exports, the committed enrolment list and the vocabulary", () =>
     Effect.gen(function* () {
       const found = yield* gate({})
       expect(found).toEqual([])
@@ -190,7 +189,7 @@ describe("gate 5, record pointers", () => {
   )
 
   it.effect(
-    "reads enrolment.json as section 3.7's five entries, report 18's four and the usage contract's one, and Enrolled.ts maps the ten",
+    "reads enrolment.json as section 3.7's five entries and report 18's four, its ModelCallPurpose the usage contract's since move 2, and Enrolled.ts maps the nine",
     () =>
       Effect.gen(function* () {
         const enrolment = yield* decodeEnrolment(enrolmentFile)
@@ -204,7 +203,6 @@ describe("gate 5, record pointers", () => {
           agentRun,
           organizationChoice,
           modelCallPurpose,
-          usageModelCallPurpose,
           membership
         ])
         expect(A.map(enrolment, (entry) => entry.as)).toEqual([
@@ -215,7 +213,6 @@ describe("gate 5, record pointers", () => {
           "collection",
           "record",
           "record",
-          "scheme",
           "scheme",
           "noTerm"
         ])

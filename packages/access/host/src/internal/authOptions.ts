@@ -59,8 +59,23 @@ type AuthOptionsInput = {
   readonly rateLimit: boolean
 }
 
+/**
+ * The choices both constructions of Better Auth are made from, with no database and no secret: the site's
+ * (`authOptions`, below) and the model Worker's on Alchemy's package (`apps/model/src/SignIn.ts`), which is given its
+ * database by a layer and the site's secret in its own field. One module, so both read the same tables, sign and read
+ * the same cookie, and keep the same sessions.
+ */
+export type AuthRulesInput = Omit<AuthOptionsInput, "database" | "secret">
+
 /** Builds Better Auth from explicit security choices, omitting absent third-party options. */
-export const authOptions = (input: AuthOptionsInput) => {
+export const authOptions = (input: AuthOptionsInput) =>
+  ({ ...authRules(input), database: input.database, secret: input.secret }) satisfies BetterAuthOptions
+
+/**
+ * Everything of Better Auth's configuration but its database and its secret, from explicit security choices, omitting
+ * absent third-party options.
+ */
+export const authRules = (input: AuthRulesInput) => {
   const settings = input
   const address = settings.baseURL
   const addressOptions: Pick<BetterAuthOptions, "baseURL"> = R.getSomes({ baseURL: address })
@@ -80,8 +95,6 @@ export const authOptions = (input: AuthOptionsInput) => {
   })
   return {
     appName: "Inventory",
-    database: input.database,
-    secret: input.secret,
     // Unset locally: Better Auth then takes the origin of each request, so any dev or preview port works.
     ...addressOptions,
     basePath: "/api/auth",
@@ -213,5 +226,5 @@ export const authOptions = (input: AuthOptionsInput) => {
         }
       })
     ]
-  } satisfies BetterAuthOptions
+  } satisfies Omit<BetterAuthOptions, "database" | "secret">
 }

@@ -14,6 +14,7 @@ import { MemberId, OrganizationId, UserId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { SessionLookup } from "@inventory/kernel/SessionLookup"
 import * as A from "effect/Array"
+import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Formatter from "effect/Formatter"
 import * as Layer from "effect/Layer"
@@ -47,7 +48,8 @@ const danaSignedIn = BetterAuthTest.signedIn(
   AuthSession.make({
     userId: AuthUserId.make("usr_mem_dana"),
     email: AuthEmail.make("dana@example.com"),
-    activeOrganizationId: O.some(AuthOrganizationId.make("org_prairie"))
+    activeOrganizationId: O.some(AuthOrganizationId.make("org_prairie")),
+    expiresAt: DateTime.makeUnsafe("1970-01-08T00:00:00.000Z")
   })
 )
 

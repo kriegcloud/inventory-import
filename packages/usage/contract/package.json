@@ -2,13 +2,14 @@
   "name": "@inventory/usage-contract",
   "version": "0.0.0",
   "private": true,
-  "description": "What the rest of the app may know of the day's model calls: how many an organization may make in a UTC day, and what a call is for",
+  "description": "What the rest of the app may know of the day's model calls: how many an organization may make in a UTC day, what a call is for, and the gateway every model call takes one through",
   "license": "MIT",
   "type": "module",
   "sideEffects": [],
   "exports": {
     "./package.json": "./package.json",
-    "./ModelCall": "./src/Allowance/ModelCall.payload.ts"
+    "./ModelCall": "./src/Allowance/ModelCall.payload.ts",
+    "./ModelAllowance": "./src/Allowance/ModelAllowance.port.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",

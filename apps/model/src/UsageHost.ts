@@ -16,11 +16,18 @@ import * as Effect from "effect/Effect"
 import { routeByPrefix } from "./ModelRoutes.ts"
 
 /**
- * The usage model hosted, on the platform provided to it. Its layer options are the library's defaults for now:
- * telemetry (host-05), which views fill lazily (host-11) and whether it takes over a class from before Domain
- * version 0 (host-12) are each an item of their own.
+ * How the Worker hosts the usage model, apart from its handlers. `legacyData: false` (host-12): nothing was hosted
+ * before Domain version 0 in this Worker, so the model takes over no earlier Durable Object class; its classes are its
+ * own (`Usage.AllowanceAggregate`) and claim no former name, as decision 37 ("Start empty") says of the data. Left at
+ * the library's defaults for now: telemetry (host-05) and which views fill lazily (host-11), each an item of its own.
  */
-export const UsageHosted = Usage.layer(AllowanceTodayLive)
+export const usageLayerOptions = { legacyData: false } as const
+
+/**
+ * The usage model hosted, on the platform provided to it, its view's `validate` reading the member record through the
+ * kernel's `SessionLookup` the Worker gives it.
+ */
+export const UsageHosted = Usage.layer(AllowanceTodayLive, usageLayerOptions)
 
 /**
  * What the Worker answers for the usage model: its `fetch`, with the member's Api (`AllowanceToday`, no command)

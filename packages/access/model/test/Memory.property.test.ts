@@ -4,10 +4,10 @@ import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 import { EmailToFind } from "@inventory/access-contract/PeoplePayload"
-import { MemoryAccount, MemoryMembership, MemoryCall, AccessMemoryState } from "../src/internal/memory.ts"
+import { MemoryAccount, MemoryMembership, AccessMemoryState } from "../src/internal/memory.ts"
 import { seed } from "./support.ts"
 
-const empty = { accounts: [], memberships: [], lines: [], calls: [] }
+const empty = { accounts: [], memberships: [], lines: [] }
 
 describe("the access twin's initial state", () => {
   it.effect("constructs and decodes empty tables when a seed leaves them out", () =>
@@ -46,7 +46,7 @@ describe("the access twin's initial state", () => {
   )
 })
 
-for (const row of [MemoryAccount, MemoryMembership, MemoryCall]) {
+for (const row of [MemoryAccount, MemoryMembership]) {
   it.prop("generates valid memory rows", [Arbitrary.schema(row)], ([value]) => {
     expect(S.is(row)(value)).toBe(true)
   })

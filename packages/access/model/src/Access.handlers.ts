@@ -6,7 +6,6 @@
  */
 import { handlersOf } from "./Access.ports.ts"
 import { activityCount, recentActivity } from "./Activity/Activity.handler.ts"
-import { takeModelCall } from "./Allowance/Allowance.handler.ts"
 import { addPerson, changeRole, listPeople, removePerson } from "./People/People.handler.ts"
 import { actorOf, membersOfActor, sessionState } from "./Session/Session.handler.ts"
 
@@ -24,6 +23,5 @@ export const accessHandlers = handlersOf({
   sessionState,
   membersOfActor,
   recentActivity,
-  activityCount,
-  takeModelCall
+  activityCount
 })

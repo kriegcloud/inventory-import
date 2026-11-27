@@ -33,6 +33,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@alchemy.run/domain": "2.0.0-beta.87-e1c3e6d",
     "@base-ui/react": "catalog:",
     "@beep/better-auth": "workspace:*",
     "@beep/csv": "workspace:*",
@@ -60,9 +61,11 @@
     "@inventory/catalog-web": "workspace:*",
     "@inventory/client": "workspace:*",
     "@inventory/kernel": "workspace:*",
+    "@inventory/model-app": "workspace:*",
     "@inventory/review": "workspace:*",
     "@inventory/ui": "workspace:*",
     "@inventory/usage-contract": "workspace:*",
+    "@inventory/usage-model": "workspace:*",
     "@shadcn/react": "catalog:",
     "@tanstack/react-table": "catalog:",
     "@tanstack/react-virtual": "catalog:",

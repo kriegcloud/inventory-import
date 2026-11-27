@@ -9,6 +9,8 @@ import { AddressLimit, CounterFailed } from "./AddressLimit.ts"
 import { makeApp, toTracedServe } from "./App.ts"
 import { RequestTelemetry } from "./RequestTelemetry.ts"
 import { SessionIdentityLive } from "@inventory/access-host/SessionIdentity"
+import { SessionLookupLive } from "@inventory/access-host/SessionLookup"
+import { Models } from "./Models.ts"
 import { signIn } from "@inventory/access-host/SignIn"
 import { collector } from "./Telemetry.ts"
 
@@ -20,6 +22,17 @@ import { collector } from "./Telemetry.ts"
 // the work after it.
 
 const settings = ConfigProvider.layer(ConfigProvider.fromUnknown(env))
+
+// Where the app's models run (Models.ts): in the model's Worker over the service binding the stack declares, under
+// `bun run dev:alchemy` and deployed; in this Worker's memory under `bun run dev`, where Vite runs this Worker alone and
+// wrangler.jsonc declares no binding. A production build with no binding is a fault of the stack: nothing is served.
+const models = O.match(O.fromUndefinedOr(env.MODEL), {
+  onSome: (binding) => Models.overBinding(binding),
+  onNone: () =>
+    import.meta.env.DEV
+      ? Models.inMemory
+      : Layer.effect(Models, Effect.die("The site's Worker has no binding to the model's Worker (MODEL)."))
+})
 
 const app = makeApp({
   database: D1.layer({ db: env.DB }),
@@ -44,7 +57,10 @@ const app = makeApp({
     }).pipe(Effect.map((counted) => counted.success))
   ),
   // The one place the Worker's fetch is chosen: the collector's exporters and the browser's batches go through it.
-  http: FetchHttpClient.layer
+  http: FetchHttpClient.layer,
+  models,
+  // The one session lookup, which the identity reads too: here for the forwarding route and the models in memory.
+  sessions: SessionLookupLive
 }).pipe(Layer.provide(settings))
 
 const { serve } = toTracedServe({

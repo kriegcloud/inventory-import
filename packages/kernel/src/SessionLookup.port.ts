@@ -2,9 +2,9 @@
  * The one session lookup and the one member check every model's `Session` middleware is to rest on (Benjamin,
  * 2026-11-26: "A port in the kernel", implemented once in the access context's host). A model's middleware is to ask
  * who a request's session acts as and get a verdict it may trust for at most one minute (his answer of the same day,
- * "One minute at most"); a guarded read is to ask whether a member is still in their organization. Today only the
- * `/api/v1` `Identity` middleware asks: no model's `Session` Layer and no guarded read calls this port yet. The one
- * thing not to break: nothing a request sends chooses who acts. The headers can only refuse, never name the member.
+ * "One minute at most"); a guarded read is to ask whether a member is still in their organization. The `/api/v1`
+ * `Identity` middleware asks it, and so do the usage model's `Session` Layer on the model's Worker
+ * (`apps/model/src/Session.ts`) and its one guarded read (`AllowanceToday`'s `validate`). The one thing not to break: nothing a request sends chooses who acts. The headers can only refuse, never name the member.
  *
  * @packageDocumentation
  */
@@ -25,8 +25,8 @@ const $I = $KernelId.create("SessionLookup")
 const trustedFor = Duration.minutes(1)
 
 /**
- * Who a request's session acts as, and until when that answer may be trusted. A live read is to be judged again at
- * `until`, once a model's `Session` Layer sets that expiry (none does yet); a command or a query is judged on every
+ * Who a request's session acts as, and until when that answer may be trusted. A live read is judged again at `until`,
+ * which a model's `Session` Layer sets as its expiry (the usage model's does); a command or a query is judged on every
  * call, so it reads `member` only.
  *
  * **Example** (A verdict made now, for a session that lasts for days)
@@ -57,9 +57,8 @@ export class SessionVerdict extends S.Opaque<SessionVerdict, { readonly brand: u
 ) {
   /**
    * The verdict made `at` a moment about `member`: trusted until the earlier of one minute later and the session's
-   * end, when the session's end is known. Once a live read ends at `until`, a session that is revoked or ends is to
-   * be noticed within a minute; until a model's `Session` Layer sets that expiry, only a command or a query, judged
-   * on every call, notices it.
+   * end, when the session's end is known. A live read ends at `until`, so a session that is revoked or ends is
+   * noticed within a minute, there as on a command or a query, which is judged on every call.
    */
   static readonly judged = (made: {
     readonly member: Member
@@ -101,8 +100,8 @@ export class SessionLookup extends Context.Service<
     readonly verdictOf: (headers: Headers.Headers) => Effect.Effect<SessionVerdict, NotSignedIn>
     /**
      * The member as their organization's record holds them now: none once they were removed, or when they were never
-     * in that organization. A guarded read is to ask it on every push, so that a removed member receives nothing
-     * more (access-04); no read asks it yet.
+     * in that organization. A guarded read asks it on every push, so that a removed member receives nothing
+     * more (access-04): the usage model's `AllowanceToday` does.
      */
     readonly memberNow: (member: Pick<Member, "id" | "organizationId">) => Effect.Effect<O.Option<Member>>
   }

@@ -21,10 +21,7 @@
     "./MemberDirectory": "./src/Session/MemberDirectory.port.ts",
     "./SessionHandler": "./src/Session/Session.handler.ts",
     "./AuditTrailStore": "./src/Activity/AuditTrailStore.port.ts",
-    "./ActivityHandler": "./src/Activity/Activity.handler.ts",
-    "./AllowanceRules": "./src/Allowance/Allowance.rules.ts",
-    "./AllowanceStore": "./src/Allowance/AllowanceStore.port.ts",
-    "./AllowanceHandler": "./src/Allowance/Allowance.handler.ts"
+    "./ActivityHandler": "./src/Activity/Activity.handler.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",

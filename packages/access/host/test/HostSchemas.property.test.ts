@@ -1,6 +1,5 @@
 // The host's own schemas generate only values they accept (docs/standards/schema-first.md, SF-7).
 import { describe, expect, it } from "@effect/vitest"
-import { ReservationRow } from "@inventory/access-host/AllowanceStoreD1"
 import { StagePassword } from "@inventory/access-host/Config"
 import * as Arbitrary from "effect/Arbitrary"
 import * as S from "effect/Schema"
@@ -19,6 +18,5 @@ const generatesOnlyValid = <Schema extends S.Top>(name: string, schema: Schema) 
   )
 
 describe("every host schema generates only valid values", () => {
-  generatesOnlyValid("ReservationRow", ReservationRow)
   generatesOnlyValid("StagePassword", StagePassword)
 })

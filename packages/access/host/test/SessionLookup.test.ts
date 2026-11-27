@@ -59,13 +59,16 @@ const twins = accessMemory({
 
 const lookupOver = (auth: Layer.Layer<BetterAuth>) => SessionLookupLive.pipe(Layer.provide(Layer.merge(twins, auth)))
 
-const danaSignedIn = BetterAuthTest.signedIn(
+/** Dana's session, ending at `expiresAt`: seven days on by default, as Better Auth stores a new one. */
+const danaSession = (expiresAt: DateTime.Utc) =>
   AuthSession.make({
     userId: AuthUserId.make("usr_mem_dana"),
     email: AuthEmail.make("dana@example.com"),
-    activeOrganizationId: O.some(AuthOrganizationId.make("org_prairie"))
+    activeOrganizationId: O.some(AuthOrganizationId.make("org_prairie")),
+    expiresAt
   })
-)
+
+const danaSignedIn = BetterAuthTest.signedIn(danaSession(DateTime.makeUnsafe("1970-01-08T00:00:00.000Z")))
 
 const verdictOf = (headers: Headers.Headers) => Effect.flatMap(SessionLookup, (sessions) => sessions.verdictOf(headers))
 
@@ -139,7 +142,8 @@ layer(
       AuthSession.make({
         userId: AuthUserId.make("usr_nobody"),
         email: AuthEmail.make("nobody@example.com"),
-        activeOrganizationId: O.none()
+        activeOrganizationId: O.none(),
+        expiresAt: DateTime.makeUnsafe("1970-01-08T00:00:00.000Z")
       })
     )
   )
@@ -151,3 +155,16 @@ layer(
     })
   )
 })
+
+layer(lookupOver(BetterAuthTest.signedIn(danaSession(DateTime.makeUnsafe("1970-01-01T00:00:20.000Z")))))(
+  "Dana's session ending in twenty seconds",
+  (it) => {
+    it.effect("is trusted until the session ends, not for the whole minute", () =>
+      Effect.gen(function* () {
+        const verdict = yield* verdictOf(Headers.empty)
+        expect(verdict.member).toEqual(dana)
+        expect(DateTime.formatIso(verdict.until)).toBe("1970-01-01T00:00:20.000Z")
+      })
+    )
+  }
+)

@@ -18,6 +18,7 @@ import { apiPrefix } from "../../api/v1/Version.ts"
 import { makeApi } from "@inventory/client/ApiRuntime"
 import { ofThisPage } from "./ofThisPage.ts"
 import { browserTelemetry } from "./telemetry.ts"
+import { UsageClientLive } from "./models.ts"
 
 /** A client derived from the API contract. Methods, payloads and errors are all typed from src/api/v1/Api.ts. */
 export type Client = HttpApiClient.ForApi<typeof Api>
@@ -50,7 +51,7 @@ class ApiClient extends Context.Service<ApiClient, Client>()("@inventory/app/web
 }
 
 /**
- * The browser's one runtime: the API client and, in development when `VITE_EFFECT_DEVTOOLS=true`, Effect DevTools
+ * The browser's one runtime: the API client, each model's member client and, in development when `VITE_EFFECT_DEVTOOLS=true`, Effect DevTools
  * (`./devtools.ts`). Reading a file and restoring saved progress run here too (`browserRuntime` in `./runtime.ts`),
  * so DevTools has one connection and a Cancel anywhere interrupts the fiber it started.
  */
@@ -61,6 +62,8 @@ export const appRuntime = ManagedRuntime.make(
       Layer.effect(AccessClient, Effect.service(ApiClient)),
       Layer.effect(CatalogClient, Effect.service(ApiClient))
     ).pipe(Layer.provideMerge(ApiClient.layer)),
+    // Each model's member client over its WebSocket protocol (./models.ts), the usage model's first (web-02).
+    UsageClientLive,
     devToolsLayer
   ).pipe(Layer.provideMerge(browserTelemetry))
 )

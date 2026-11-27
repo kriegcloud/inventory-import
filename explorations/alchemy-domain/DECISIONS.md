@@ -790,3 +790,22 @@ PLAN named the unsigned brief as its one blocker: "I've approved". Question: is 
 past the review's model on main may start? Answer: yes. The moves start in the brief's order; each move's open
 decisions (42 to 56, 60 to 62, 21a) are still put to him when the move opens, and every deploy stays his. No options
 were put to him and no recommendation was given. Reverse: a new decision by him.
+
+### 2026-11-26 — Move 1's three open points
+
+Put to him after move 1 was pushed (pull request 32), through `/grill-me`.
+
+| Question | Options, the recommended one first | Answer |
+| --- | --- | --- |
+| How far does the file-ending law (`laws block-files`) reach? | Hold all kinds: an aggregate, a decision, a model and a command sit in a file with their own ending too, and a contract package declares no block of the library outside its reserved endings; model packages only; leave it at the eleven kinds with a listed ending | "Hold all kinds" |
+| `src/**/*.rules.ts` became an input of the model's four tasks because `Review/ItemsOfRow.context.ts`, a handler's context, imports five rule files. Which way out? | Rename the context to an ending the proofs do not read and drop `*.rules.ts` from the four tasks; name the five files only; keep every rule file as an input | "Rename the context" |
+| How do the tutorial's parts 2 and 3 stand until a view and a policy exist? | Expected to fail (`it.effect.fails`), red the day the block lands; red from today; removed until their move | "Expected to fail" |
+
+I chose; the agent recommended the same, all three. Rejected: a law that stops at model packages or at the eleven
+kinds (a misplaced aggregate or command would be left to review); the five rule files named one by one, or all
+seventeen kept as inputs (a proof run after an edit to a rule no `decide` reads); tutorial tests red from today (the
+branch could not merge before move 5) or removed (nothing would say they are owed). Reverse: a new decision by him.
+
+The context's new ending, asked next: `.reference.ts` (`Review/ItemsOfRow.reference.ts`: it is a `Context.Reference`
+with a default, the only one in the repository), against `.port.ts` (it has a default and no adapter) and folding it
+into `Review.rules.ts` (a rules file would import `effect/Context`). I chose; the agent recommended the same.

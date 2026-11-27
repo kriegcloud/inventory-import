@@ -1,23 +1,32 @@
 /**
- * Every block of a model has one file ending, so a reader finds a block by its file's name and Verify's inputs can
- * name each kind by its ending (goals/alchemy-domain-uptake/INVENTORY.md, tests-06; the library's own layout,
- * `@alchemy.run/domain/skills/alchemy-domain/references/layout.md`). In a workspace whose `beep.layer` is `model`, a
- * file under `src` that declares a `Domain.View`, `Query`, `Projection`, `Stream`, `Policy`, `Saga`, `ExternalSystem`,
- * `Api`, `Rewrite` or `Compaction`, or extends `RpcMiddleware.Service`, ends `.view.ts`, `.query.ts`,
- * `.projection.ts`, `.stream.ts`, `.policy.ts`, `.saga.ts`, `.external.ts`, `.api.ts`, `.rewrite.ts`,
- * `.compaction.ts` or `.middleware.ts` (`.tsx`, `.mts` or `.cts` the same, and each refusal keeps the file's own);
- * and a file with one of those endings declares that block and nothing of another kind: no other of the eleven, and
- * no `Domain.Model`, `Aggregate`, `Decision`, `Command`, `Event`, `Rejection`, `RequestContext` or `Relation`, and no
- * hand-written `Context.Service` port. A file ending `.model.ts`, `.aggregate.ts`, `.decision.ts` or `.context.ts`
- * holds blocks of its own, and only the eleven are moved out of it: a command, its events and its rejections beside
- * their aggregate or decision are where the layout puts them, and pass. In a `model` or `contract` workspace two
- * endings are reserved (decision 32: "A `Domain.Command` takes `.command.ts`; a payload left in `contract` becomes
- * `.payload.ts`"): a file ending `.command.ts` declares a `Domain.Command`, and one ending `.external.ts` a
- * `Domain.ExternalSystem`.
+ * Every block of a model has the file its kind is kept in, so a reader finds a block by its file's name and Verify's
+ * inputs can name each kind by its ending (goals/alchemy-domain-uptake/INVENTORY.md, tests-06; the library's own
+ * layout, `@alchemy.run/domain/skills/alchemy-domain/references/layout.md`; Benjamin, 2026-11-26, "Hold all kinds").
  *
- * Each refusal names the file and the line to write: the ending the file should have, when it holds blocks of one kind
- * only and none of the kind its ending names, or else the file beside it a block moves to; for a reserved ending,
- * `.payload.ts` for a payload schema and `.port.ts` for a hand-written `Context.Service` port.
+ * In a workspace whose `beep.layer` is `model`, every block under `src` sits in a file whose ending keeps its kind:
+ * a `Domain.View`, `Query`, `Projection`, `Stream`, `Policy`, `Saga`, `ExternalSystem`, `Api`, `Rewrite` or
+ * `Compaction`, and a class extending `RpcMiddleware.Service`, in `.view.ts`, `.query.ts`, `.projection.ts`,
+ * `.stream.ts`, `.policy.ts`, `.saga.ts`, `.external.ts`, `.api.ts`, `.rewrite.ts`, `.compaction.ts` or
+ * `.middleware.ts`, and a file with one of those endings holds that block alone; a `Domain.Model` in `.model.ts`, with
+ * the `Domain.Relation`s it lists; a `Domain.Aggregate` in `.aggregate.ts`, a `Domain.Decision` in `.decision.ts`;
+ * a `Domain.Command`, its `Domain.Event`s and its `Domain.Rejection`s in `.command.ts` or beside the aggregate or
+ * decision that decides it (the layout's `OpenAccount.command.ts`, "command + its events + its rejections"; the
+ * catalog's aggregates and decisions hold theirs), and a rejection shared by several commands in `.rejection.ts`; a
+ * `Domain.RequestContext` in `.context.ts`, with the schema it carries. A hand-written `Context.Service` port is free
+ * in any other file (`.port.ts`, `.store.ts`, a memory twin), and refused in a file with one of those endings. (`.tsx`,
+ * `.mts` or `.cts` the same, and each refusal keeps the file's own.) In a `model` or `contract` workspace two endings
+ * are reserved (decision 32: "A `Domain.Command` takes `.command.ts`; a payload left in `contract` becomes
+ * `.payload.ts`"): a file ending `.command.ts` declares a `Domain.Command`, and one ending `.external.ts` a
+ * `Domain.ExternalSystem`. In a `contract` workspace no other block of the library is declared at all: those two in
+ * their own endings only, and any other moves to the model package beside it. A port and an `RpcMiddleware.Service`
+ * are not the library's, and a contract keeps its gateways.
+ *
+ * Each refusal names the file, the block by its own name and what to write: the ending the file should have, when its
+ * blocks are of one kind, none of them the kind its ending names, and it holds no other code; or else the file the
+ * block moves to, beside it or in the model package. An event is sent to its command's file when the file holds one
+ * command, and a relation to the package's `.model.ts` when it has exactly one; otherwise the refusal names the kinds
+ * of file it may go to. Only the reserved and the eleven endings must hold their block: a `.model.ts`, `.aggregate.ts`,
+ * `.decision.ts`, `.rejection.ts` or `.context.ts` that declares none is not refused, and is left to review.
  *
  * The blocks are read from each file's syntax tree (`internal/blocksCode.ts`), never from its text, so a comment, a
  * string or a fixture that names one is not taken for it, and a callee is read through what only wraps it
@@ -141,7 +150,24 @@ const declarers: Readonly<Record<string, string>> = {
   relation: "Domain.Relation"
 }
 
-/** The ending each other kind's file takes, where the layout gives it one. */
+/** Beside the aggregate or the decision that decides it: a command, its events and its rejections. */
+const besideItsDecider = ["command", "event", "rejection"]
+
+/**
+ * The endings of a model's block files, each with the kinds a file with it may hold. A kind that is not under an
+ * ending is refused there, and a port, which no ending keeps, is refused under every one of them.
+ */
+const holds: Readonly<Record<string, ReadonlyArray<string>>> = {
+  ...R.map(placed, (_declarer, kind) => A.of(kind)),
+  command: besideItsDecider,
+  model: ["model", "relation"],
+  aggregate: A.prepend(besideItsDecider, "aggregate"),
+  decision: A.prepend(besideItsDecider, "decision"),
+  rejection: ["rejection"],
+  context: ["context"]
+}
+
+/** The ending each other kind's file takes when it moves: a port's, or the first of its homes. */
 const homes: Readonly<Record<string, string>> = {
   command: "command",
   port: "port",
@@ -152,14 +178,8 @@ const homes: Readonly<Record<string, string>> = {
   context: "context"
 }
 
-/** Where a block of a kind with no file of its own goes. */
-const elsewhere: Readonly<Record<string, string>> = {
-  event: "move it to the .aggregate.ts or .command.ts whose command records it",
-  relation: "move it into the model's relations, in its .model.ts"
-}
-
-/** Endings of files that hold blocks of their own: a block of another kind there moves out, the file keeps its name. */
-const holdsItsOwn = ["model", "aggregate", "decision", "context"]
+/** The kinds a contract may declare, `Context.Service` and `RpcMiddleware.Service`, which are not the library's. */
+const notTheLibrarys = ["port", "middleware"]
 
 /**
  * A file of a package's code: TypeScript under `src` (`.ts`, `.tsx`, `.mts`, `.cts`), not a test (`*.test.ts`,
@@ -199,6 +219,16 @@ const declarerOf = (kind: string): string =>
 /** The ending a kind's file takes: its own, a placed one, or none (an event, a relation). */
 const homeOf = (kind: string): O.Option<string> => (R.has(placed, kind) ? O.some(kind) : R.get(homes, kind))
 
+/** Whether a model's block may sit in a file with this ending: under an ending that keeps it, or a port under none. */
+const keptBy = (ending: O.Option<string>, kind: string): boolean => {
+  const kinds = O.flatMap(ending, (word) => R.get(holds, word))
+  return kind === "port" ? O.isNone(kinds) : O.exists(kinds, (held) => A.contains(held, kind))
+}
+
+/** The block's own name, or the file's when it gave none. */
+const nameOf = (file: string, block: BlockAt): string =>
+  O.match(block.name, { onNone: () => stemOf(file), onSome: identity })
+
 /** What a file whose reserved ending is taken by something else is renamed to: a port's ending, or a payload's. */
 const freed = (file: string, blocks: ReadonlyArray<BlockAt>): string => {
   const extension = extensionOf(file)
@@ -207,29 +237,77 @@ const freed = (file: string, blocks: ReadonlyArray<BlockAt>): string => {
     : `rename it to ${stemOf(file)}.payload.${extension} (a payload schema), or ${stemOf(file)}.port.${extension} if it is a hand-written Context.Service port`
 }
 
+/**
+ * The ending a file is renamed to: when every block it holds is of one kind, all of them out of place, none of them
+ * the kind its own ending names, and it holds no other code. Otherwise each block moves to a file beside it.
+ */
+const renameTo = (
+  ending: O.Option<string>,
+  blocks: ReadonlyArray<BlockAt>,
+  misplaced: ReadonlyArray<BlockAt>,
+  alone: boolean
+): O.Option<string> =>
+  O.filter(
+    O.flatMap(A.head(misplaced), (block) => homeOf(block.kind)),
+    () =>
+      alone &&
+      misplaced.length === blocks.length &&
+      A.dedupe(A.map(blocks, (block) => block.kind)).length === 1 &&
+      !O.exists(ending, (word) => has(blocks, word))
+  )
+
+/** What one package's files show the law, read once: the package's one `.model.ts`, when it has exactly one. */
+interface Package {
+  readonly model: O.Option<string>
+}
+
+/** Where a block with no file of its own (an event, a relation) or one of its kind (a rejection) goes in a model. */
+const besideInModel = (
+  file: string,
+  block: BlockAt,
+  blocks: ReadonlyArray<BlockAt>,
+  pkg: Package
+): O.Option<string> => {
+  const extension = extensionOf(file)
+  const commands = A.filter(blocks, (other) => other.kind === "command")
+  const withItsCommand = O.map(
+    commands.length === 1 ? A.head(commands) : O.none(),
+    (command) =>
+      `move it to ${nameOf(file, command)}.command.${extension}, beside this file, with the command that records it`
+  )
+  return block.kind === "event"
+    ? O.orElse(withItsCommand, () =>
+        O.some(
+          `move it to the .command.${extension}, .aggregate.${extension} or .decision.${extension} of the command that records it`
+        )
+      )
+    : block.kind === "rejection"
+      ? withItsCommand
+      : block.kind === "relation"
+        ? O.some(
+            O.match(pkg.model, {
+              onNone: () => "move it into the relations of the package's .model.ts",
+              onSome: (model) => `move it into the relations of the model in ${model}`
+            })
+          )
+        : O.none()
+}
+
 /** The findings of one model file. */
-const inModel = (file: string, blocks: ReadonlyArray<BlockAt>): ReadonlyArray<BlockFilesFinding> => {
+const inModel = (
+  file: string,
+  read: { readonly found: ReadonlyArray<BlockAt>; readonly alone: boolean },
+  pkg: Package
+): ReadonlyArray<BlockFilesFinding> => {
+  const blocks = read.found
   const ending = endingOf(file)
   const extension = extensionOf(file)
   const named = O.filter(ending, (word) => R.has(placed, word) || R.has(reserved, word))
   const own = O.exists(named, (word) => has(blocks, word))
-  // A file with a placed ending holds its block and nothing else; any other file only gives up the placed blocks.
-  const misplaced = O.match(
-    O.filter(ending, (word) => R.has(placed, word)),
-    {
-      onSome: (word) => A.filter(blocks, (block) => block.kind !== word),
-      onNone: () => A.filter(blocks, (block) => R.has(placed, block.kind))
-    }
-  )
-  const kinds = A.dedupe(A.map(blocks, (block) => block.kind))
-  // Blocks of one kind only, which has an ending, in a file of no block of its own: the file is renamed. Otherwise
-  // each block moves to a file beside it.
-  const renamedTo = O.filter(
-    O.flatMap(A.head(misplaced), (block) => homeOf(block.kind)),
-    () => !own && kinds.length === 1 && !O.exists(ending, (word) => A.contains(holdsItsOwn, word))
-  )
+  const misplaced = A.filter(blocks, (block) => !keptBy(ending, block.kind))
+  const renamedTo = renameTo(ending, blocks, misplaced, read.alone)
   const moved = A.map(misplaced, (block) => {
-    const name = O.match(block.name, { onNone: () => stemOf(file), onSome: identity })
+    const name = nameOf(file, block)
     return BlockFilesFinding.cases.Misplaced.make({
       file,
       line: block.line,
@@ -238,9 +316,13 @@ const inModel = (file: string, blocks: ReadonlyArray<BlockAt>): ReadonlyArray<Bl
       write: O.match(renamedTo, {
         onSome: (word) => `rename the file to ${stemOf(file)}.${word}.${extension}`,
         onNone: () =>
-          O.match(homeOf(block.kind), {
-            onSome: (word) => `move it to ${name}.${word}.${extension}, beside this file`,
-            onNone: () => O.match(R.get(elsewhere, block.kind), { onNone: () => "move it out", onSome: identity })
+          O.match(besideInModel(file, block, blocks, pkg), {
+            onSome: identity,
+            onNone: () =>
+              O.match(homeOf(block.kind), {
+                onSome: (word) => `move it to ${name}.${word}.${extension}, beside this file`,
+                onNone: () => "move it out"
+              })
           })
       })
     })
@@ -264,23 +346,69 @@ const inModel = (file: string, blocks: ReadonlyArray<BlockAt>): ReadonlyArray<Bl
   return A.appendAll(moved, unfilled)
 }
 
-/** The findings of one contract file: only its reserved ending is read. */
-const inContract = (file: string, blocks: ReadonlyArray<BlockAt>): ReadonlyArray<BlockFilesFinding> =>
-  O.match(
-    O.filter(endingOf(file), (word) => R.has(reserved, word) && !has(blocks, word)),
+/**
+ * The findings of one contract file. `model` is the folder of the model package beside the contract that the file's
+ * own folder matches (`packages/shop/model/src/Basket` for `packages/shop/contract/src/Basket/Watch.view.ts`), when
+ * the context has one.
+ */
+const inContract = (
+  file: string,
+  read: { readonly found: ReadonlyArray<BlockAt>; readonly alone: boolean },
+  model: O.Option<string>
+): ReadonlyArray<BlockFilesFinding> => {
+  const blocks = read.found
+  const ending = endingOf(file)
+  const extension = extensionOf(file)
+  const misplaced = A.filter(
+    blocks,
+    (block) =>
+      !A.contains(notTheLibrarys, block.kind) && !(R.has(reserved, block.kind) && O.contains(ending, block.kind))
+  )
+  const renamedTo = O.filter(renameTo(ending, blocks, misplaced, read.alone), (word) => R.has(reserved, word))
+  const moved = A.map(misplaced, (block) => {
+    const name = nameOf(file, block)
+    const declarer = declarerOf(block.kind)
+    const inTheModel = (place: string): string =>
+      O.match(model, {
+        onNone: () => `a contract declares no ${declarer}: move it to ${place} in the context's model package`,
+        onSome: (folder) => `a contract declares no ${declarer}: move it to ${folder}/${place}`
+      })
+    return BlockFilesFinding.cases.Misplaced.make({
+      file,
+      line: block.line,
+      name,
+      block: declarer,
+      write: R.has(reserved, block.kind)
+        ? O.match(renamedTo, {
+            onSome: (word) => `rename the file to ${stemOf(file)}.${word}.${extension}`,
+            onNone: () => `move it to ${name}.${block.kind}.${extension}, beside this file`
+          })
+        : O.match(homeOf(block.kind), {
+            onSome: (word) => inTheModel(`${name}.${word}.${extension}`),
+            onNone: () =>
+              block.kind === "relation"
+                ? `a contract declares no ${declarer}: move it into the relations of the model's .model.${extension}`
+                : `a contract declares no ${declarer}: move it to the model package, beside the command that records it`
+          })
+    })
+  })
+  const unfilled = O.match(
+    O.filter(ending, (word) => R.has(reserved, word) && !has(blocks, word) && O.isNone(renamedTo)),
     {
       onNone: () => A.empty<BlockFilesFinding>(),
       onSome: (word) =>
         A.of<BlockFilesFinding>(
           BlockFilesFinding.cases.Unfilled.make({
             file,
-            ending: `.${word}.${extensionOf(file)}`,
+            ending: `.${word}.${extension}`,
             block: declarerOf(word),
             write: freed(file, blocks)
           })
         )
     }
   )
+  return A.appendAll(moved, unfilled)
+}
 
 /**
  * Reads every file of the model and contract packages and holds each block to its file's ending.
@@ -290,17 +418,32 @@ const inContract = (file: string, blocks: ReadonlyArray<BlockAt>): ReadonlyArray
 export const blockFiles = Effect.fn("BlockFiles.blockFiles")(function* () {
   const repo = yield* Repo
   const all = yield* repo.workspaces
-  const read = A.filter(
-    all,
-    (workspace) => workspace.manifest.beep?.layer === "model" || workspace.manifest.beep?.layer === "contract"
+  const layered = A.map(
+    A.filter(
+      all,
+      (workspace) => workspace.manifest.beep?.layer === "model" || workspace.manifest.beep?.layer === "contract"
+    ),
+    (workspace) => ({ dir: workspace.dir, model: workspace.manifest.beep?.layer === "model" })
   )
   const perPackage = yield* Effect.forEach(
-    read,
+    layered,
     Effect.fnUntraced(function* (workspace) {
-      const model = workspace.manifest.beep?.layer === "model"
-      const everything = yield* repo.files(repo.join(workspace.dir, "src"))
+      const src = repo.join(workspace.dir, "src")
+      const everything = yield* repo.files(src)
       // In the order of their paths, so the refusals come out the same on every machine.
       const files = A.sort(A.filter(everything, isCode), Order.String)
+      const models = A.filter(files, (path) => O.contains(endingOf(path), "model"))
+      const pkg: Package = {
+        model: O.map(
+          O.filter(A.head(models), () => models.length === 1),
+          (path) => repo.relative(path, repo.root)
+        )
+      }
+      // The model package of the same context, for a block a contract moves out: the model folder beside it.
+      const twin = A.findFirst(
+        layered,
+        (other) => other.model && repo.dirname(other.dir) === repo.dirname(workspace.dir)
+      )
       const findings = yield* Effect.forEach(
         files,
         Effect.fnUntraced(function* (path) {
@@ -309,7 +452,16 @@ export const blockFiles = Effect.fn("BlockFiles.blockFiles")(function* () {
           const blocks = readBlocks({ file, source })
           return O.match(blocks.unread, {
             onSome: (why) => A.of<BlockFilesFinding>(BlockFilesFinding.cases.Unread.make({ file, why })),
-            onNone: () => (model ? inModel(file, blocks.found) : inContract(file, blocks.found))
+            onNone: () =>
+              workspace.model
+                ? inModel(file, blocks, pkg)
+                : inContract(
+                    file,
+                    blocks,
+                    O.map(twin, (other) =>
+                      repo.relative(repo.join(other.dir, "src", repo.relative(repo.dirname(path), src)), repo.root)
+                    )
+                  )
           })
         }),
         { concurrency: 1 }
@@ -324,7 +476,7 @@ export const blockFiles = Effect.fn("BlockFiles.blockFiles")(function* () {
     : A.of<BlockFilesFinding>(
         BlockFilesFinding.cases.Held.make({
           files: A.reduce(perPackage, 0, (sum, one) => sum + one.files),
-          packages: read.length
+          packages: layered.length
         })
       )
 })

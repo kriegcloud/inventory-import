@@ -8,7 +8,7 @@
   "sideEffects": [],
   "exports": {
     "./package.json": "./package.json",
-    "./ItemsOfRow": "./src/Review/ItemsOfRow.context.ts",
+    "./ItemsOfRow": "./src/Review/ItemsOfRow.reference.ts",
     "./Review": "./src/Review/Review.rules.ts",
     "./SheetLayout": "./src/Reading/SheetLayout.rules.ts",
     "./Spreadsheet": "./src/Reading/Spreadsheet.rules.ts",

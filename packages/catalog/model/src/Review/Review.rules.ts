@@ -162,7 +162,7 @@ export const oneItemPerRow: ItemsOfRow = ({ file }) => [{ part: O.none(), file }
 
 /**
  * How this project's files turn rows into items. One line to change, like `ruleFixes`: the review screen and the
- * server both review with it (the server through `ItemsOfRow` in `packages/catalog/model/src/Review/ItemsOfRow.context.ts`, which defaults to it).
+ * server both review with it (the server through `ItemsOfRow` in `packages/catalog/model/src/Review/ItemsOfRow.reference.ts`, which defaults to it).
  */
 export const itemsOfRow: ItemsOfRow = oneItemPerRow
 

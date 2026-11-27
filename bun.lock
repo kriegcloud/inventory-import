@@ -74,8 +74,12 @@
         "vaul": "catalog:",
       },
       "devDependencies": {
+        "@alchemy.run/cloudflare": "2.0.0-beta.87-e1c3e6d",
+        "@alchemy.run/test": "2.0.0-beta.87",
+        "@beep/infra": "workspace:*",
         "@cloudflare/vite-plugin": "^1.70.2",
         "@cloudflare/workers-types": "catalog:",
+        "@effect/platform-node": "catalog:",
         "@effect/tsgo": "catalog:",
         "@effect/vitest": "catalog:",
         "@shadcn/lint": "0.2.5",
@@ -85,6 +89,7 @@
         "@types/react": "catalog:",
         "@types/react-dom": "catalog:",
         "@vitejs/plugin-react": "^6.3.0",
+        "alchemy": "2.0.0-beta.87-e1c3e6d",
         "compression": "1.8.2",
         "oxlint": "catalog:",
         "oxlint-tsgolint": "catalog:",
@@ -715,6 +720,8 @@
     "@alchemy.run/sigil": ["@alchemy.run/sigil@0.1.0-alpha.5", "", { "peerDependencies": { "@types/react": ">=19.2.0", "react-devtools-core": ">=6.1.2" }, "optionalPeers": ["@types/react", "react-devtools-core"] }, "sha512-cd8fLeGVMfSK+8aptKcfRJ8Wop30FotAMU5EYi2wED5j5r3Paqni1DiJxivenSDRbhw+O4XIn5QAlA0Eyi1roQ=="],
 
     "@alchemy.run/sql": ["@alchemy.run/sql@vendor/alchemy/alchemy.run-sql-e1c3e6d.tgz", { "peerDependencies": { "@effect/sql-libsql": "^4.1.4", "@effect/sql-mysql2": "^4.1.4", "@effect/sql-pg": "^4.1.4", "@types/pg": "^8.20.0", "alchemy": "2.0.0-beta.87-e1c3e6d", "effect": "^4.1.4", "mysql2": "^3.24.2", "pg": "^8.22.0" }, "optionalPeers": ["@effect/sql-libsql", "@effect/sql-mysql2", "@effect/sql-pg", "@types/pg", "mysql2", "pg"] }, "sha512-bU1ELvHQQXuAJrkkjhZvOfGfVZA/wbz3FyFqnGH6tVt8Nt/rhUpTcVd/PGTDzEKzzE7F2TnQM67zIMbAlV1Lnw=="],
+
+    "@alchemy.run/test": ["@alchemy.run/test@2.0.0-beta.87", "", { "dependencies": { "@effect/platform-bun": "^4.1.4" }, "peerDependencies": { "@effect/vitest": "^4.1.4", "@opentui/core": "^0.6.6", "alchemy": "2.0.0-beta.87", "effect": "^4.1.4", "vitest": "^5.0.4" }, "optionalPeers": ["@effect/vitest", "@opentui/core", "alchemy", "vitest"], "bin": { "alchemy-test": "./bin/alchemy-test.ts" } }, "sha512-DC4K09kM+wwr7QuAe1zuYjFKAKQaHijgbcXMmLbP88uWKVLrJPDCgAN6R1lfhR78O9//oYvCdHLV52wsdOjYZA=="],
 
     "@babel/runtime": ["@babel/runtime@8.1.2", "", {}, "sha512-Ay6HdEKZJAeGs6KKJ/ezCK5ssjFmkvUiR0TEGv/B1abyjLWrQ2RU+M507Ppk0NikhvVFhlEFC1/rHfCiYqSUcw=="],
 

@@ -196,6 +196,46 @@ describe("laws boundaries", () => {
     })
   )
 
+  it.effect(
+    "lets an app's tests import the infra package's local stack, declared for its tests, and nothing else of it",
+    () =>
+      Effect.gen(function* () {
+        const report = yield* inTree(
+          {
+            ...base,
+            "packages/infra/package.json": pkg("@x/infra", { family: "infra" }),
+            "apps/shop/package.json": json({
+              name: "@x/shop",
+              beep: {},
+              dependencies: {},
+              devDependencies: { "@x/infra": "workspace:*" }
+            }),
+            "apps/shop/test/stack.slow.test.ts": 'import "@x/infra/InventoryDev"\n',
+            "apps/shop/test/other.test.ts": 'import "@x/infra/Inventory"\nimport "@x/infra"\n',
+            "apps/shop/src/main.ts": 'import "@x/infra/InventoryDev"\n',
+            "apps/till/package.json": pkg("@x/till", {}, { "@x/infra": "workspace:*" }),
+            "apps/till/test/stack.slow.test.ts": 'import "@x/infra/InventoryDev"\n',
+            "packages/kernel/package.json": json({
+              name: "@x/kernel",
+              beep: { family: "kernel" },
+              devDependencies: { "@x/infra": "workspace:*" }
+            }),
+            "packages/kernel/test/stack.test.ts": 'import "@x/infra/InventoryDev"\n'
+          },
+          Effect.map(boundaries(), render(boundariesSentence))
+        )
+        expect(printed(report)).toEqual([
+          "err: check-boundaries FAIL",
+          "err:   apps/shop/src/main.ts imports @x/infra, which @x/shop declares only for its tests (devDependencies): declare it in dependencies, or keep it in test",
+          "err:   apps/shop/test/other.test.ts imports @x/infra, which its layer may not use",
+          "err:   @x/till declares @x/infra, which its layer may not use",
+          "err:   apps/till/test/stack.slow.test.ts imports @x/infra, which its layer may not use",
+          "err:   @x/kernel declares @x/infra, which its layer may not use",
+          "err:   packages/kernel/test/stack.test.ts imports @x/infra, which its layer may not use"
+        ])
+      })
+  )
+
   // Report 14 section 7.2: the ontology package may use the foundation, the kernel and a context's contract package,
   // and nothing else of the repository's.
   it.effect("lets the ontology package use the foundation, the kernel and a context's contract, and nothing else", () =>

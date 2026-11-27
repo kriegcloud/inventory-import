@@ -59,7 +59,7 @@ proving the capability here before anything depends on it.
 
 ## Acceptance
 
-- [ ] `bun run check:full` runs a stack test that deploys the stack locally, signs in as a test account over HTTP
+- [x] `bun run check:full` runs a stack test that deploys the stack locally, signs in as a test account over HTTP
       with its cookie, imports `items_clean.csv` and reads 25 items back; the run leaves no secret in a file
       (a test reads the state folder).
 - [x] `deploy.yml` shows `alchemy plan` for the stage before each `alchemy deploy --yes`, and a plan that destroys

@@ -18,12 +18,21 @@ import { InfraStage } from "./InfraStage.context.ts"
 import { inventory } from "./Inventory.stack.ts"
 
 /**
+ * The local stack's state: in memory, one store for the life of the process however often its layer is built. The
+ * app's stack test is given it too (`apps/inventory/test/stack`), so it reads the records the deploy wrote: the
+ * stack's own `state` wins over the one a test harness names.
+ *
+ * @category stacks
+ */
+export const localStackState = Alchemy.inMemoryState()
+
+/**
  * The app on this machine: `bun run dev:alchemy` from the repository root.
  *
  * @category stacks
  */
 export default Alchemy.Stack(
   "inventory",
-  { providers: Cloudflare.providers(), state: Alchemy.inMemoryState() },
+  { providers: Cloudflare.providers(), state: localStackState },
   inventory.pipe(Effect.provideServiceEffect(InfraStage, InfraStage.personal))
 )

@@ -10,8 +10,6 @@
     "tests": "vitest run",
     "serve": "vite --config vite.config.ts"
   },
-  "dependencies": {
-    "@alchemy.run/test": "2.0.0-beta.87"
-  },
+  "dependencies": {},
   "devDependencies": {}
 }

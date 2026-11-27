@@ -18,7 +18,7 @@ closes the step with what was seen; it does not get worked around.
 | 1 | CLI inspection: `docs/operations.md` with plan, drift, logs and state for a stage; the plan and its guard before each deploy in `deploy.yml` | nothing | done |
 | 2 | Limits and placement: measure a sign-in and a confirm of a large file, then declare them | a deployed stage to measure on: his | waits for his measurement ("What Benjamin does by hand"); nothing declared |
 | 3 | D1 export: `beep infra export --dry-run` and the procedure in `docs/operations.md` | answered 2026-11-26: his workstation, by hand | built; the dump and the restore seen on a local database, never on a deployed one. A real run is his |
-| 4 | Stack tests: the harness in `scratchpad/` first (does it deploy this stack locally, where does its state go), then one test in `check:full` | npm's `@alchemy.run/test` 2.0.0-beta.87 in `scratchpad/` (the registry never builds it) | trial passed in `scratchpad/` ("What was proved"); how the harness is kept for `check:full` is Benjamin's |
+| 4 | Stack tests: the harness in `scratchpad/` first (does it deploy this stack locally, where does its state go), then one test in `check:full` | npm's `@alchemy.run/test` 2.0.0-beta.87 (the registry never builds it) | done: `apps/inventory/test/stack/Stack.slow.test.ts` in `check:full`; not yet run on CI |
 | 5 | `alchemy dev` trial: `bun run dev:alchemy` beside `bun run dev`, compared and written up here | nothing | done: it runs; my recommendation is that the no-go stands ("The `alchemy dev` trial", below). His to decide |
 | 6 | Rate limiter: the binding in the stack and locally, the check in front of sign-in and the model | answered 2026-11-26: by address, 30 a minute, a failed binding lets the request on | done locally; not seen on a deployed stage |
 | 7 | Access on previews: the policy in `planFor` for `pr-<number>` | answered 2026-11-26: the emails in the preview environment's secret `PREVIEW_ACCESS` | built; waits for his three steps under "What Benjamin does by hand" |
@@ -29,10 +29,9 @@ The order is smallest and least blocked first: 1 and 5 need nothing from him; 4 
 
 ## Current blocker
 
-Step 4's trial passed in `scratchpad/`; the test in `check:full` waits on how the harness is kept, which is
-Benjamin's. Step 2 waits for Benjamin, and steps 6, 7, 8
-and 3 are built and unseen on a real account: each is under "What Benjamin does by hand" and "What waits for a real
-account".
+Nothing an agent can do is left. Step 2 waits for Benjamin, and steps 6, 7, 8 and 3 are built and unseen on a real
+account: each is under "What Benjamin does by hand" and "What waits for a real account". Step 4's stack test runs in
+`check:full` on this machine; it has not run on CI yet.
 
 ## What each proof must show
 
@@ -152,7 +151,22 @@ is back to the five packages, so a re-pin runs again.
 
 ## What was proved on this machine
 
-- **Step 4, the trial** (2026-11-26, `scratchpad/experiments/stack-harness`; its `NOTE.md` has the detail).
+- **Step 4, the test** (2026-11-26, `apps/inventory/test/stack/Stack.slow.test.ts`, a slow test, so in
+  `check:full`). The harness deploys `InventoryDev` on the local providers for the stage `dev_stacktest`, with the
+  stack's own in-memory store (`localStackState`, now exported: a stack's own `state` wins over the one the harness
+  names, so a store given to the harness alone read empty). Over HTTP: the signed-out session offers the test
+  accounts, the first signs in, and the app's own typed client (`HttpApiClient.make(Api)`, the cookie and the
+  page's `origin` on every request) uploads `items_clean.csv` through the same helpers every slow test uses: 25
+  rows, 25 Ready; the confirm created 25 and the items list read 25. Then the secret is read from the state
+  (`SignInSecret`, 64 characters) and every file under the app's `.alchemy` is searched for it: none holds it. The
+  search must read the run's own database or the test fails (a first version read no file and passed: a relative
+  path and the harness's file system, whose `recursive` listing answers nothing, together). Turned around to look
+  for the test account's email, which is in the database, the test failed and named the database's write-ahead log.
+  When it ends it destroys the stack and removes the database files the run added under `.alchemy/local/d1`; after
+  a failed run too. Its first runs took 6 to 12 seconds. **Not seen:** the test on CI (`check:ci` runs the slow
+  tests), and the same against a deployed test stage (never: no account here).
+- **Step 4, the trial** (2026-11-26, `scratchpad/experiments/stack-harness`, graduated into the test above; its
+  line is in `scratchpad/LOG.md`).
   npm's `@alchemy.run/test@2.0.0-beta.87`, installed into the scratchpad only (`--omit=peer`, so `alchemy`,
   `effect` and vitest are the root's: the vendored build of e1c3e6d). Its source imports 26 `alchemy/...` modules
   and every one is in the vendored build; it passes the scratchpad's type-checker with the Effect diagnostics. On
@@ -389,3 +403,12 @@ secret in the clear. It is worth another look when Alchemy seals a Worker's bind
   answer). Against it: packing `packages/alchemy-test` from the library's source at the pin (its types are in a
   `lib/` only the library's build makes), waiting for the library to add it to `pkg.yml`, and a stack test with no
   harness. npm's `2.0.0-beta.87` goes in the scratchpad's own `package.json`, never a workspace's.
+- **The harness is a devDependency, and the stack test is the app's** (step 4; Benjamin, 2026-11-26, the
+  recommended answers to two questions). `@alchemy.run/test` 2.0.0-beta.87, exact, in `apps/inventory`'s
+  devDependencies beside `@beep/infra`, the pinned `alchemy` and `@alchemy.run/cloudflare`; `.syncpackrc.json` holds
+  it with how to move it after a re-pin. Against it: a file in `vendor/alchemy` fetched from npm by the re-pin, and
+  keeping it in the scratchpad only. The test is in `apps/inventory/test/stack/`, because it needs the app's API,
+  its samples and its upload helpers; the boundaries law has one exception for it (`localStackEntry` in
+  `Laws/Boundaries.rules.ts`): an app may declare an infra package for its tests only, and a test of the app may
+  import its `InventoryDev` entry and nothing else of it. Against it: a test in `packages/infra` writing the upload's
+  JSON by hand, and a narrower acceptance with no import.

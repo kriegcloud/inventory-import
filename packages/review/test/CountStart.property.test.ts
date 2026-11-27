@@ -15,6 +15,13 @@ describe("new facet groups and comparison text", () => {
   it.prop("comparison transforms every typed string into trimmed text", [Arbitrary.schema(S.String)], ([text]) => {
     strictEqual(S.is(S.Trimmed)(ReviewText.comparison(text)), true)
   })
+  it.prop(
+    "comparison keeps the text between the spaces it takes off",
+    [Arbitrary.schema(S.Trimmed), Arbitrary.schema(S.Literals(["", " ", "\t", "\n ", "\u00A0"]))],
+    ([text, space]) => {
+      strictEqual(ReviewText.comparison(`${space}${text}${space}`), text)
+    }
+  )
   it("keeps each facet group's mutable spelling dictionary independent", () => {
     const a = FacetStart.make({})
     const b = FacetStart.make({})

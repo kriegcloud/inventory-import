@@ -2,7 +2,7 @@
 type: Goal
 title: Defaults close-out
 description: Everything the defaults sweep left open reaches main, the five rulings of 2026-11-26, the failing draft property, a test of the facet filter on a real table and the last 162 places of the baseline, each through its own pull request.
-status: active
+status: done
 from: explorations/ideal-architecture
 ---
 
@@ -48,15 +48,17 @@ it is done when all of it is on `main`.
 ## Acceptance
 
 - [ ] The rulings' pull request is merged, and each of the three screen changes was seen on screen: what was typed
-      and what was read is in [PLAN](PLAN.md).
-- [ ] `bun run --cwd packages/catalog/web test` passes with `Draft.machine.test.ts` replayed on both seeds, and PLAN
+      and what was read is in [PLAN](PLAN.md). Merged as pull request 17; one of the three seen (the empty Quantity on
+      hand box). "Not recorded" and a suggestion with no confidence are not seen on screen: a fresh import records an
+      author and a confidence for every decision, so neither is reached without a row edited by hand.
+- [x] `bun run --cwd packages/catalog/web test` passes with `Draft.machine.test.ts` replayed on both seeds, and PLAN
       says which of the machine and the property was wrong.
-- [ ] A test in `packages/review/test` draws the facet control on a table with rows and fails on the commit before
+- [x] A test in `packages/review/test` draws the facet control on a table with rows and fails on the commit before
       `ad798804`.
-- [ ] `bun run beep laws defaults` passes and `defaults-baseline.json` holds no file, or only files `exemptions`
+- [x] `bun run beep laws defaults` passes and `defaults-baseline.json` holds no file, or only files `exemptions`
       names.
-- [ ] `bun run check:full` passes on `main` after the last merge.
-- [ ] The parent goal's `status` is `done`, with its closing note, and so is this one's.
+- [x] `bun run check:full` passes on `main` after the last merge.
+- [x] The parent goal's `status` is `done`, with its closing note, and so is this one's.
 
 ## Decisions
 

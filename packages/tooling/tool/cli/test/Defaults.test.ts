@@ -70,6 +70,34 @@ const UppercaseHelper = (props: Props) => props.title === undefined`),
         "10 absence props.title === undefined"
       ]
     )
+    // A static computed key reads a prop as a dotted one does; a key held in a name does not.
+    deepStrictEqual(
+      places(`const Card = (props: Props) =>
+  <b>{props["aria-label"] === undefined ? "" : props[key] === undefined}</b>`),
+      ["2 absence props[key] === undefined"]
+    )
+    // A factory that returns a renderer draws nothing itself.
+    deepStrictEqual(
+      places(`function MakeRenderer(options: Options) {
+  const missing = options.title === undefined
+  return () => <b>{missing}</b>
+}`),
+      ["2 absence options.title === undefined"]
+    )
+    // A catch clause or a loop that binds the name again reads its own value, not the prop.
+    deepStrictEqual(
+      places(`const Card = (props: Props) => {
+  try { run() } catch (props) { inspect(props.title === undefined) }
+  for (const props of list) inspect(props.title === undefined)
+  for (let props = first; props.title === undefined; ) inspect(props)
+  return <b>{props.title === undefined}</b>
+}`),
+      [
+        "2 absence props.title === undefined",
+        "3 absence props.title === undefined",
+        "4 absence props.title === undefined"
+      ]
+    )
     deepStrictEqual(places(`const Card = (props: Props) => props.title === undefined`, "a.ts"), [
       "1 absence props.title === undefined"
     ])

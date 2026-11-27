@@ -210,6 +210,29 @@ What the lanes taught, beyond the pilot's list:
 - **A third-party API's optional properties are spread with `R.getSomes`** (`...R.getSomes({ baseURL })`), and an
   Option sorts with `O.makeOrder`: no fallback is written for either.
 
+## Closing note
+
+2026-11-26. Done. The four rows above still marked "partly" (8, 9, 10 and 13) were finished by
+[the close-out goal](../defaults-closeout/PLAN.md), pull requests 17 to 22, which also took the five rulings on the
+defaults nobody decided to the screens. `defaults-baseline.json` now holds `files: {}`: no file of any package holds
+a counted place, and every file the law leaves alone is on `exemptions` with Benjamin's word and its reason. Main
+began this goal with 2,120 places in 248 files.
+
+What changed. Absence is an Option decoded where a value enters, a starting value is on its schema's field and a
+clean-up is a transformation, in every contract, model, host and web package; a reviewed cell keeps its reader, as
+decided. The law counts more than it did at the start (a test's branch on an Option, a literal `onNone`, an
+unwrapped `optionalKey`, `getOrThrow` and `runSync`), and stops at a component's own optional prop.
+
+What was learned. A lane that clears the law by any means clears it badly: two rounds were refused, one for
+`Result.getOrThrow` decodes and one for `.valueOrUndefined`, and the law now counts both. A schema the browser sends
+must be crossed in a test (`postMessage` drops what makes an Option one: the app was broken for a stretch of commits
+with every check green). And a rule about what code may write needs its exceptions named by file and reason up
+front, or each lane invents its own.
+
+Checked: `bun run check:full` on `main` at `e71f2b5d` (114 of 114 tasks, 93 replayed by turbo from runs on the same inputs), and again on pull request 25's branch at `89da8db6`, `main` at `64885a89` with 22's review fix, 114 of 114 with none replayed; SF-3's, SF-4's and SF-5's `rg` lines over every swept
+package; the Verify lock equal to `main`'s throughout; the messy sample on screen after every lane that changed a
+schema the browser sends.
+
 ## Evidence
 
 - beep-effect lints study, 2026-11-23, at beep-effect `92be3a06`: read by a Codex lane from source, each claim with

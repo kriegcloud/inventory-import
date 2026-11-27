@@ -54,9 +54,11 @@ already there use (`Catalog.api.ts`, `Actor/Session.middleware.ts`); for a kind 
 suffix (`.view.ts`, `.query.ts`, `.projection.ts`, `.stream.ts`, `.policy.ts`, `.saga.ts`, `.external.ts`,
 `.rewrite.ts`, `.compaction.ts`). `bun run beep laws block-files` holds every kind to its file: a model in
 `.model.ts` with its relations, an aggregate in `.aggregate.ts`, a decision in `.decision.ts`, a command with its events
-and rejections in `.command.ts` or beside its aggregate or decision, a shared rejection in `.rejection.ts`, a request
-context in `.context.ts`, and no port in any of those files. A contract package declares no block of the library but a
-command in `.command.ts` and an external system in `.external.ts`. A payload schema left in a contract package ends
+and rejections in `.command.ts` or in the file of the aggregate or decision that decides it, an event beside the view
+or stream that emits it, a rejection beside the saga that fails with it, a shared rejection in `.rejection.ts`, a
+request context in `.context.ts`, and no port in any of those files. A contract package declares no block of the
+library but a command, with its events and rejections, in `.command.ts` and an external system in `.external.ts`, and
+those two files hold nothing else, ports and middleware included. A payload schema left in a contract package ends
 `.payload.ts`, and a hand-written port in a model package `.port.ts` (`Answer/Answerer.port.ts`,
 `Answer/ModelAllowance.port.ts`), so `.command.ts` and `.external.ts` name only their blocks.
 

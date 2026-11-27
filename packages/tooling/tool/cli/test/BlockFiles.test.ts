@@ -103,7 +103,7 @@ describe("laws block-files", () => {
       )
       expect(printed(report).slice(1)).toEqual([
         "err:   packages/shop/model/src/Basket/Links.aggregate.ts:3 declares owns with Domain.Relation: move it into the relations of the model in packages/shop/model/src/Shop.model.ts",
-        "err:   packages/shop/model/src/Basket/Lost.rules.ts:2 declares Lost with Domain.Event: move it to the .command.ts, .aggregate.ts or .decision.ts of the command that records it",
+        "err:   packages/shop/model/src/Basket/Lost.rules.ts:2 declares Lost with Domain.Event: move it to the .command.ts, .aggregate.ts or .decision.ts of the command that records it, or the .view.ts or .stream.ts that emits it",
         "err:   packages/shop/model/src/Basket/Lost.rules.ts:3 declares Gone with Domain.Rejection: move it to Gone.rejection.ts, beside this file",
         "err:   packages/shop/model/src/Basket/Open.rules.ts:2 declares Open with Domain.Command: move it to Open.command.ts, beside this file",
         "err:   packages/shop/model/src/Basket/Open.rules.ts:3 declares Opened with Domain.Event: move it to Open.command.ts, beside this file, with the command that records it",
@@ -141,7 +141,7 @@ describe("laws block-files", () => {
       )
       expect(printed(report).slice(1)).toEqual([
         "err:   packages/shop/contract/src/Basket/Basket.read.ts:2 declares Basket with Domain.Aggregate: a contract declares no Domain.Aggregate: move it to packages/shop/model/src/Basket/Basket.aggregate.ts",
-        "err:   packages/shop/contract/src/Basket/Basket.read.ts:3 declares Opened with Domain.Event: a contract declares no Domain.Event: move it to the model package, beside the command that records it",
+        "err:   packages/shop/contract/src/Basket/Basket.read.ts:3 declares Opened with Domain.Event: a contract declares a Domain.Event only beside its command, in .command.ts: move it to the file of the command that records it",
         "err:   packages/shop/contract/src/Watch.view.ts:2 declares Watch with Domain.Policy: a contract declares no Domain.Policy: move it to packages/shop/model/src/Watch.policy.ts"
       ])
     })
@@ -343,6 +343,119 @@ describe("laws block-files", () => {
         "err:   packages/shop/model/src/Lines.store.cts:2 declares Lines with Domain.View: move it to Lines.view.cts, beside this file",
         "err:   packages/shop/model/src/Lines.store.cts:3 declares Totals with Domain.Query: move it to Totals.query.cts, beside this file",
         "err:   packages/shop/model/src/Thing.view.mts:2 declares Thing with Domain.Policy: rename the file to Thing.policy.mts"
+      ])
+    })
+  )
+
+  // Each case below passed, or was refused against the library's own layout, before the law kept a command, an event,
+  // a rejection and a relation beside their own block only, and held a contract's two endings to their blocks.
+  it.effect("refuses a command, an event, a rejection or a relation in a decider's or a model's file without it", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        {
+          ...placed,
+          "packages/shop/model/src/Basket/Pay.aggregate.ts": `${domain}export class Pay extends Domain.Command("Pay", {}) {}\n`,
+          "packages/shop/model/src/Basket/Paid.decision.ts": `${domain}export class Paid extends Domain.Event("Paid", {}) {}\nexport class Late extends Domain.Rejection("Late", {}) {}\n`,
+          "packages/shop/model/src/Owns.model.ts": `${domain}export const owns = Domain.Relation({})\n`
+        },
+        Effect.map(blockFiles(), render(blockFilesSentence))
+      )
+      expect(printed(report).slice(1)).toEqual([
+        "err:   packages/shop/model/src/Basket/Paid.decision.ts:2 declares Paid with Domain.Event: move it to the .command.ts, .aggregate.ts or .decision.ts of the command that records it, or the .view.ts or .stream.ts that emits it",
+        "err:   packages/shop/model/src/Basket/Paid.decision.ts:3 declares Late with Domain.Rejection: move it to Late.rejection.ts, beside this file",
+        "err:   packages/shop/model/src/Basket/Pay.aggregate.ts:2 declares Pay with Domain.Command: rename the file to Pay.command.ts",
+        "err:   packages/shop/model/src/Owns.model.ts:2 declares owns with Domain.Relation: move it into the relations of the model in packages/shop/model/src/Shop.model.ts"
+      ])
+    })
+  )
+
+  it.effect("keeps an event beside the view or stream that emits it, and a rejection beside its saga", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        {
+          ...placed,
+          "packages/shop/model/src/Account/AccountCard.stream.ts": `${domain}export class CardChanged extends Domain.Event("CardChanged", {}) {}\nexport class AccountCard extends Domain.Stream("AccountCard", { entries: [CardChanged] }) {}\n`,
+          "packages/shop/model/src/Account/Statement.view.ts": `${domain}export class StatementLine extends Domain.Event("StatementLine", {}) {}\nexport class Statement extends Domain.View("Statement", { events: [StatementLine] }) {}\n`,
+          "packages/shop/model/src/Transfer/ExecuteTransfer.saga.ts": `${domain}export class DestinationClosed extends Domain.Rejection("DestinationClosed") {}\nexport class ExecuteTransfer extends Domain.Saga("ExecuteTransfer", { rejects: [DestinationClosed] }) {}\n`
+        },
+        Effect.map(blockFiles(), render(blockFilesSentence))
+      )
+      expect(printed(report)).toEqual([
+        "out: block-files:check OK  18 files in 2 model and contract packages, each block in the file its ending names"
+      ])
+    })
+  )
+
+  it.effect("refuses an event in a stream file without its stream, and a rejection beside a view", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        {
+          ...placed,
+          "packages/shop/model/src/Account/Card.stream.ts": `${domain}export class CardChanged extends Domain.Event("CardChanged", {}) {}\n`,
+          "packages/shop/model/src/Account/Summary.view.ts": `${domain}export class NotOwner extends Domain.Rejection("NotOwner", {}) {}\nexport class Summary extends Domain.View("Summary", { rejects: [NotOwner] }) {}\n`
+        },
+        Effect.map(blockFiles(), render(blockFilesSentence))
+      )
+      expect(printed(report).slice(1)).toEqual([
+        "err:   packages/shop/model/src/Account/Card.stream.ts:2 declares CardChanged with Domain.Event: move it to the .command.ts, .aggregate.ts or .decision.ts of the command that records it, or the .view.ts or .stream.ts that emits it",
+        "err:   packages/shop/model/src/Account/Card.stream.ts ends .stream.ts, which is kept for Domain.Stream, and declares none: declare its Domain.Stream here, or give the file the ending of what it holds",
+        "err:   packages/shop/model/src/Account/Summary.view.ts:2 declares NotOwner with Domain.Rejection: move it to NotOwner.rejection.ts, beside this file"
+      ])
+    })
+  )
+
+  it.effect("holds a contract's .command.ts and .external.ts to their block, ports and middleware included", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        {
+          ...placed,
+          "packages/shop/contract/src/Ext.external.ts": `${domain}${context}export class Ext extends Domain.ExternalSystem("Ext", {}) {}\nexport class Client extends Context.Service<Client, {}>()("Client") {}\n`,
+          "packages/shop/contract/src/Basket/Remove.command.ts": `${domain}import * as RpcMiddleware from "effect/rpc/RpcMiddleware"\nexport class Remove extends Domain.Command("Remove", {}) {}\nexport class Guard extends RpcMiddleware.Service<Guard>()("Guard", {}) {}\n`,
+          "packages/shop/contract/src/Only.external.ts": `${context}export class Only extends Context.Service<Only, {}>()("Only") {}\n`
+        },
+        Effect.map(blockFiles(), render(blockFilesSentence))
+      )
+      expect(printed(report).slice(1)).toEqual([
+        "err:   packages/shop/contract/src/Basket/Remove.command.ts:4 declares Guard with RpcMiddleware.Service: move it to Guard.middleware.ts, beside this file",
+        "err:   packages/shop/contract/src/Ext.external.ts:4 declares Client with Context.Service: move it to Client.port.ts, beside this file",
+        "err:   packages/shop/contract/src/Only.external.ts:2 declares Only with Context.Service: rename the file to Only.port.ts"
+      ])
+    })
+  )
+
+  it.effect("keeps a contract command's events and rejections beside it, and sends them there from another file", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        {
+          ...placed,
+          "packages/shop/contract/src/Basket/Add.command.ts": `${domain}export class Added extends Domain.Event("Added", {}) {}\nexport class Full extends Domain.Rejection("Full", {}) {}\nexport class Add extends Domain.Command("Add", { events: [Added], rejects: [Full] }) {}\n`,
+          "packages/shop/contract/src/Basket/Edit.payload.ts": `${domain}export class Edited extends Domain.Event("Edited", {}) {}\nexport class Edit extends Domain.Command("Edit", { events: [Edited] }) {}\n`
+        },
+        Effect.map(blockFiles(), render(blockFilesSentence))
+      )
+      expect(printed(report).slice(1)).toEqual([
+        "err:   packages/shop/contract/src/Basket/Edit.payload.ts:2 declares Edited with Domain.Event: move it to Edit.command.ts, beside this file, with the command that records it",
+        "err:   packages/shop/contract/src/Basket/Edit.payload.ts:3 declares Edit with Domain.Command: move it to Edit.command.ts, beside this file"
+      ])
+    })
+  )
+
+  it.effect("reads a maker through an optional chain, and a namespace bound by import = require", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        {
+          ...placed,
+          "packages/shop/model/src/Chain.rules.ts": `${domain}export class Chain extends (Domain?.Aggregate)("Chain", {}) {}\n`,
+          "packages/shop/model/src/Required.rules.ts":
+            'import Domain = require("@alchemy.run/domain")\nexport class Required extends Domain.View("Required", {}) {}\n',
+          "packages/shop/model/src/Typed.rules.ts":
+            'import type Domain = require("@alchemy.run/domain")\nexport class Typed extends Domain.View("Typed", {}) {}\n'
+        },
+        Effect.map(blockFiles(), render(blockFilesSentence))
+      )
+      expect(printed(report).slice(1)).toEqual([
+        "err:   packages/shop/model/src/Chain.rules.ts:2 declares Chain with Domain.Aggregate: rename the file to Chain.aggregate.ts",
+        "err:   packages/shop/model/src/Required.rules.ts:2 declares Required with Domain.View: rename the file to Required.view.ts"
       ])
     })
   )

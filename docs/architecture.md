@@ -371,9 +371,11 @@ goals/                  Work with a definition of done: SPEC.md and PLAN.md.
 packages/tooling/tool/cli/  @beep/repo-cli: the repository's own rules as commands (`bun run beep <group> <command>`):
                         `laws` (boundaries: which package may import which; screens: every package with screens in
                         both stylesheet lists; block-files: every kind of block of a model in the file its ending names
-                        (a command, its events and rejections beside its aggregate or decision too), a file with a
-                        block's ending holding only what it keeps, `.command.ts` and `.external.ts` only for their
-                        block, and a contract declaring no block of the library outside those two; model-inputs: every file a model, an Api, an aggregate or a decision imports an input of
+                        (a command, its events and rejections in the file of the aggregate or decision that decides it
+                        too, an event beside its view or stream, a rejection beside its saga), a file with a block's
+                        ending holding only what it keeps, `.command.ts` and `.external.ts` only for their block, and a
+                        contract declaring no block of the library outside those two, and in them nothing but their
+                        block and a command's events and rejections; model-inputs: every file a model, an Api, an aggregate or a decision imports an input of
                         each of its package's tasks that reads it (verify, the mutants, prove); ref-callbacks: no ref callback made on each draw; tags: no `_tag` compared or built by hand in any src or test folder; defaults: absence, starting values and clean-ups are a schema's, counted per file against a baseline that only falls; exports; keys; private-paths: no home path or private folder in the scratchpad; ontology-terms: a record is pointed at the vocabulary through the typed helpers only, and only the ontology package loads the vocabulary as a value; deprecated-apis: no deprecated API used, in any code file git would commit outside `.agents` and `scratchpad`; effect-imports: every Effect import from its own path
                         under its one name; and the six bans, each with a ledger in `ledgers/` of today's files whose
                         numbers only fall against the branch's base (where it left main; on a push, the last push whose

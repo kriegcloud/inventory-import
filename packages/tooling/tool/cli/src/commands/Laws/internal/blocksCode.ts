@@ -1,18 +1,19 @@
 // The blocks of @alchemy.run/domain one file declares, read from its syntax tree: a call of a block's maker, under
 // whichever name the file imported it by (`Domain.View(` through `import * as Domain from "@alchemy.run/domain"`, or
-// from `"@alchemy.run/domain/index"`, `View(` through `import { View } from "@alchemy.run/domain"`, `View.make(`
-// through `import * as View from "@alchemy.run/domain/View"`, `Domain["View"](` or `Domain[\`View\`](` with the
-// name written out), a call of `RpcMiddleware.Service` (`effect/rpc/RpcMiddleware`) and of `Context.Service`
-// (`effect/Context`, a hand-written port). A callee, and the object of a member, is read through what only wraps it:
-// parentheses, `!`, `as`, `satisfies`, `<T>x`, `x<T>` and the last expression of a sequence (`(0, Domain.View)(`).
+// from `"@alchemy.run/domain/index"`, or through `import Domain = require("@alchemy.run/domain")`, `View(` through
+// `import { View } from "@alchemy.run/domain"`, `View.make(` through `import * as View from
+// "@alchemy.run/domain/View"`, `Domain["View"](` or `Domain[\`View\`](` with the name written out), a call of
+// `RpcMiddleware.Service` (`effect/rpc/RpcMiddleware`) and of `Context.Service` (`effect/Context`, a hand-written port).
+// A callee, and the object of a member, is read through what only wraps it: parentheses, `!`, `as`, `satisfies`,
+// `<T>x`, `x<T>`, an optional chain (`(Domain?.View)(`) and the last expression of a sequence (`(0, Domain.View)(`).
 // Every maker the library's index exports a block by is read (`Model`, `Aggregate`, `Decision`, `Command`, `Event`,
 // `Rejection`, `RequestContext`, `Relation` and the eleven the block-files law places); `Sealed` makes a field, not a
 // block, and is not. A pattern over the text would also take the words out of a comment, a string or a test's fixture
 // text, so the tree is read. It also says whether the file holds anything besides its blocks: a statement at its top
 // that is not an import, a declaration of types only, or one that declares a block. What it cannot see: a maker
-// passed through a variable of the file's own (`const V = Domain.View`), or reached through a module that re-exports
-// it; a type-only import makes nothing and is not read. The walk keeps its own list, so no file nests it past the
-// stack.
+// passed through a name of the file's own (`const V = Domain.View`, `import V = Domain.View`), reached through a module
+// that re-exports it, or called through `.call(...)` or `.apply(...)` (`Domain.View.call(undefined, "V", {})`); a
+// type-only import makes nothing and is not read. The walk keeps its own list, so no file nests it past the stack.
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
@@ -127,7 +128,8 @@ const wrappers = [
   "TSAsExpression",
   "TSSatisfiesExpression",
   "TSTypeAssertion",
-  "TSInstantiationExpression"
+  "TSInstantiationExpression",
+  "ChainExpression"
 ]
 
 /** The expression a wrapper holds, or a sequence's last, which is its value. */
@@ -187,6 +189,36 @@ const membersOf = (written: string): Readonly<Record<string, BlockKind>> => {
           )
       })
 }
+
+/**
+ * What `import Domain = require("@alchemy.run/domain")` binds: its name, as a namespace of the module's makers. One
+ * that names another name (`import V = Domain.View`) binds nothing here.
+ */
+const requiredOf = (declaration: Node): Bindings => {
+  const members = typeOnly(declaration)
+    ? R.empty<string, BlockKind>()
+    : O.match(
+        O.flatMap(
+          O.filter(
+            child(declaration, "moduleReference"),
+            (reference) => reference.type === "TSExternalModuleReference"
+          ),
+          (reference) => stringOf(reference, "expression")
+        ),
+        { onNone: () => R.empty<string, BlockKind>(), onSome: membersOf }
+      )
+  const namespaces =
+    R.size(members) > 0 ? O.toArray(O.map(nameOf(declaration, "id"), (local) => [local, members] as const)) : []
+  return { namespaces: R.fromEntries(namespaces), names: R.empty<string, BlockKind>() }
+}
+
+/** The `import X = ...` declarations at a file's top, `export import X = ...` included. */
+const importEqualsOf = (statement: Node): ReadonlyArray<Node> =>
+  statement.type === "TSImportEqualsDeclaration"
+    ? A.of(statement)
+    : statement.type === "ExportNamedDeclaration"
+      ? O.toArray(O.filter(child(statement, "declaration"), (inner) => inner.type === "TSImportEqualsDeclaration"))
+      : []
 
 /** What one import declaration binds: the members a namespace of its module holds as makers, and each name it imports. */
 const bindingsOf = (declaration: Node): Bindings => {
@@ -257,7 +289,13 @@ const declaredName = (node: Node): O.Option<string> =>
     : O.none()
 
 /** Statements that bring names in or declare types only: they hold no code beside a file's blocks. */
-const typesOnly = ["ImportDeclaration", "TSTypeAliasDeclaration", "TSInterfaceDeclaration", "EmptyStatement"]
+const typesOnly = [
+  "ImportDeclaration",
+  "TSImportEqualsDeclaration",
+  "TSTypeAliasDeclaration",
+  "TSInterfaceDeclaration",
+  "EmptyStatement"
+]
 
 /** Whether a statement at a file's top holds no code: an import, types only, or `export { names }`. */
 const holdsNoCode = (statement: Node): boolean =>
@@ -283,7 +321,7 @@ export const readBlocks = (input: { readonly file: string; readonly source: stri
   const program = parsed.program
   const body = A.filter(A.isArray(program["body"]) ? program["body"] : [], isNode)
   const declarations = A.filter(body, (statement) => statement.type === "ImportDeclaration")
-  const bound = A.map(declarations, bindingsOf)
+  const bound = A.appendAll(A.map(declarations, bindingsOf), A.map(A.flatMap(body, importEqualsOf), requiredOf))
   const bindings: Bindings = {
     namespaces: A.reduce(bound, R.empty<string, Readonly<Record<string, BlockKind>>>(), (all, one) => ({
       ...all,

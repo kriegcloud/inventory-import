@@ -8,9 +8,10 @@ import { decimalPattern, ItemFields, skuPattern, UnitCost } from "@inventory/cat
 import { skuKey } from "@inventory/catalog-contract/SkuKey"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
-import * as Result from "effect/Result"
 import * as S from "effect/Schema"
+import * as Str from "effect/String"
 import * as SqlClient from "effect/sql/SqlClient"
+import type * as SqlError from "effect/sql/SqlError"
 import { TestDatabase } from "./support/app.ts"
 
 const runs = { arbitrary: { runs: 40 } }
@@ -43,20 +44,41 @@ const parents = Effect.gen(function* () {
   return sql
 })
 
-/** Writes one item and says whether the table took it. The item is gone again afterwards, with any copy of it. */
-const writeItem = Effect.fn("writeItem")(function* (
+/** Whether D1 says a CHECK of the table refused the row: the only failure these properties count as a refusal. */
+const refusedByCheck = (error: SqlError.SqlError) => Str.includes("CHECK constraint failed")(String(error.reason.cause))
+
+/**
+ * Runs one write and says whether the table took it: `false` when a CHECK refused the row. Any other failure says
+ * nothing about the row (once, in `bun run check:full` on a loaded machine, a copy with a valid cost failed and the
+ * same input passed on replay), so the write is tried again, twice at most, and a failure that stays fails the test
+ * with D1's own words, never as a refusal.
+ */
+const held = <R>(write: Effect.Effect<unknown, SqlError.SqlError, R>) =>
+  write.pipe(
+    Effect.retry({ times: 2, while: (error) => !refusedByCheck(error) }),
+    Effect.as(true),
+    Effect.catchIf(refusedByCheck, () => Effect.succeed(false)),
+    Effect.orDie
+  )
+
+/** Writes one item and says whether the table took it. */
+const writeItem = (
   sql: SqlClient.SqlClient,
   item: { readonly sku: string; readonly key: string; readonly cost: string }
-) {
-  const written = yield* sql`INSERT INTO item (id, organizationId, sku, skuKey, name, category, uom, unitCost,
+) =>
+  held(sql`INSERT INTO item (id, organizationId, sku, skuKey, name, category, uom, unitCost,
         importId, batchId, sourceRow, createdById, createdBy, createdAt)
       VALUES ('itm_checks', 'org_prairie', ${item.sku}, ${item.key}, 'Checked item', 'supplies', 'EA', ${item.cost},
-        'imp_checks', 'bat_checks', 1, 'mem_dana', 'Dana Whitfield', '2026-11-23T00:00:00.000Z')`.pipe(Effect.result)
-  return Result.isSuccess(written)
-})
+        'imp_checks', 'bat_checks', 1, 'mem_dana', 'Dana Whitfield', '2026-11-23T00:00:00.000Z')`)
 
-const removeItem = (sql: SqlClient.SqlClient) =>
-  sql`DELETE FROM item WHERE organizationId = 'org_prairie' AND id = 'itm_checks'`
+/**
+ * Takes the item away again, with any copy of it, however the run ended: a run that fails must leave nothing behind,
+ * or each shrink after it meets the item it left and fails for that instead.
+ */
+const removeItem = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient
+  yield* sql`DELETE FROM item WHERE organizationId = 'org_prairie' AND id = 'itm_checks'`
+}).pipe(Effect.orDie)
 
 layer(TestDatabase, { timeout: "60 seconds" })("the item table's own checks", (it) => {
   it.effect.prop(
@@ -68,9 +90,8 @@ layer(TestDatabase, { timeout: "60 seconds" })("the item table's own checks", (i
         const own = skuKey({ sku })
         const given = key.of === "own" ? own : key.of === "written" ? sku : key.other
         const written = yield* writeItem(sql, { sku, key: given, cost })
-        yield* removeItem(sql)
         expect(written).toBe(skuPattern.test(sku) && given === own)
-      }),
+      }).pipe(Effect.ensuring(removeItem)),
     runs
   )
 
@@ -81,9 +102,8 @@ layer(TestDatabase, { timeout: "60 seconds" })("the item table's own checks", (i
       Effect.gen(function* () {
         const sql = yield* parents
         const written = yield* writeItem(sql, { sku, key: skuKey({ sku }), cost })
-        yield* removeItem(sql)
         expect(written).toBe(decimalPattern.test(cost))
-      }),
+      }).pipe(Effect.ensuring(removeItem)),
     runs
   )
 
@@ -93,15 +113,15 @@ layer(TestDatabase, { timeout: "60 seconds" })("the item table's own checks", (i
     ([sku, cost, kept]) =>
       Effect.gen(function* () {
         const sql = yield* parents
-        const held = yield* writeItem(sql, { sku, key: skuKey({ sku }), cost })
-        expect(held).toBe(true)
-        const copied = yield* sql`INSERT INTO importReplaced (organizationId, importId, batchId, itemId, sourceRow,
-            name, category, uom, unitCost, quantityOnHand, isActive, lotTracked, tags, vendors, revision, revisionAfter)
+        const itemHeld = yield* writeItem(sql, { sku, key: skuKey({ sku }), cost })
+        expect(itemHeld).toBe(true)
+        const copied = yield* held(sql`INSERT INTO importReplaced (organizationId, importId, batchId, itemId,
+            sourceRow, name, category, uom, unitCost, quantityOnHand, isActive, lotTracked, tags, vendors, revision,
+            revisionAfter)
           VALUES ('org_prairie', 'imp_checks', 'bat_checks', 'itm_checks', 1, 'Checked item', 'supplies', 'EA',
-            ${kept}, 0, 1, 0, '[]', '[]', 1, 2)`.pipe(Effect.result)
-        yield* removeItem(sql)
-        expect(Result.isSuccess(copied)).toBe(decimalPattern.test(kept))
-      }),
+            ${kept}, 0, 1, 0, '[]', '[]', 1, 2)`)
+        expect(copied).toBe(decimalPattern.test(kept))
+      }).pipe(Effect.ensuring(removeItem)),
     runs
   )
 })

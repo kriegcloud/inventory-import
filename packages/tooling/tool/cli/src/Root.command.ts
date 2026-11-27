@@ -5,6 +5,7 @@
  * @packageDocumentation
  */
 import * as Command from "effect/cli/Command"
+import { checkCommand } from "./commands/Check/Check.command.ts"
 import { configSyncCommand } from "./commands/ConfigSync/ConfigSync.command.ts"
 import { depsCommand } from "./commands/Deps/Deps.command.ts"
 import { docsCommand } from "./commands/Docs/Docs.command.ts"
@@ -25,6 +26,7 @@ import { versionSyncCommand } from "./commands/VersionSync/VersionSync.command.t
 export const rootCommand = Command.make("beep").pipe(
   Command.withDescription("The repository's own rules, as commands"),
   Command.withSubcommands([
+    checkCommand,
     configSyncCommand,
     depsCommand,
     docsCommand,

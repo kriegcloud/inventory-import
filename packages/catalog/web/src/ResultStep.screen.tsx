@@ -63,7 +63,7 @@ const columns: ReadonlyArray<RecordColumn<RowOutcome>> = [
     // Why, for a row that was already there or not imported; and who left it out, when someone did.
     cell: (row) =>
       row.outcome === "notImported" && row.decidedBy.kind === "person"
-        ? `${row.reason} (${row.decidedBy.name})`
+        ? `${row.reason} (${O.match(row.decidedBy.name, { onNone: () => importWords.notRecorded, onSome: (name) => name })})`
         : O.match(outcomeReasonOf(row), { onNone: () => null, onSome: (reason) => reason })
   },
   {

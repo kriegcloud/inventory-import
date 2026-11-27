@@ -192,7 +192,7 @@ describe("every row says why", () => {
 
 // A kind nothing on the screen can settle: the item the row names is not in the system yet.
 const kinds: ReadonlyArray<ProblemKind> = [
-  ProblemKind.make({ id: "unit", label: "Unit", tone: "decision" }),
+  ProblemKind.make({ id: "unit", label: "Unit", tone: "decision", fixable: true }),
   ProblemKind.make({ id: "unknown", label: "Not in system", tone: "blocker", fixable: false })
 ]
 const columns: ReadonlyArray<ReviewColumn> = [ReviewColumn.make({ display: identity, id: "name", label: "Name" })]

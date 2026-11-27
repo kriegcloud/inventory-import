@@ -1,3 +1,4 @@
+import { Dom } from "./internal/dom.adapter.ts"
 import { parameter } from "./internal/browser.ts"
 import { useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as O from "effect/Option"
@@ -155,7 +156,7 @@ export function ImportPage() {
   const reachable = (value: Step): boolean =>
     value === "upload" || (O.isSome(importId) && O.isSome(view.data) && (value === "result") === imported)
 
-  const barSlot = useAtomValue(barSlotAtom)
+  const barSlot = Dom.portalTarget(useAtomValue(barSlotAtom))
   const narrow = useAtomValue(isNarrow)
 
   const go = (value: string) => {
@@ -235,10 +236,10 @@ export function ImportPage() {
 
   return (
     <Stepper value={step} onValueChange={go} aria-label="Import steps" className="flex h-full flex-col">
-      {barSlot !== null && !narrow ? (
+      {O.isSome(barSlot) && !narrow ? (
         // On a desk the steps sit in the shell's top bar, beside the breadcrumb: one bar, and the review table
         // gets the band's height.
-        createPortal(stepNav, barSlot, stepsKey)
+        createPortal(stepNav, barSlot.value, stepsKey)
       ) : (
         // On a phone, a band of their own. One height whatever the step puts beside it (the sheet button),
         // so the step below never moves when that button arrives.

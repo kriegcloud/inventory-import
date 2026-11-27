@@ -1,4 +1,6 @@
 import * as O from "effect/Option"
+import * as S from "effect/Schema"
+import * as Effect from "effect/Effect"
 import * as R from "effect/Record"
 import * as A from "effect/Array"
 import { LineSkeleton } from "@inventory/ui/PageHeader"
@@ -108,6 +110,17 @@ export function TableSkeleton(props: {
   )
 }
 
+/** The grid's layout keeps a flexible column distinct from the space it contributes to the minimum width. */
+class GridLayoutColumn extends S.Opaque<GridLayoutColumn, { readonly brand: unique symbol }>()(
+  S.Struct({
+    width: S.Option(S.Finite).annotateKey({ description: "Fixed pixels, or a flexible column" }),
+    minimumWidth: S.Finite.pipe(
+      S.annotateKey({ description: "Pixels contributed to the grid's minimum width, including flexible columns" }),
+      S.withConstructorDefault(Effect.succeed(240))
+    )
+  }).annotate({ description: "A skeleton grid column's fixed or flexible layout and minimum room" })
+) {}
+
 /**
  * The review's grid while its rows are on their way: the review region's own frame (the sticky table it draws, with
  * its pinned first column), so the review does not move when it arrives.
@@ -121,12 +134,16 @@ function GridSkeleton({
   readonly columns: ReadonlyArray<SkeletonColumn>
   readonly rows?: number
 }) {
-  const minWidth = A.reduce(columns, 0, (total, column) => total + (column.width ?? 240))
+  const layout = A.map(columns, (column) => {
+    const width = O.fromUndefinedOr(column.width)
+    return GridLayoutColumn.make({ width, ...R.getSomes({ minimumWidth: width }) })
+  })
+  const minWidth = A.reduce(layout, 0, (total, column) => total + column.minimumWidth)
   return (
     <StickyTableFrame label={`${caption}, loading`} aria-busy="true">
       <StickyTable
         caption={caption}
-        widths={A.map(columns, (column) => column.width)}
+        widths={A.map(layout, (column) => O.match(column.width, { onNone: () => undefined, onSome: (width) => width }))}
         minWidth={minWidth}
         rowCount={rows + 1}
       >

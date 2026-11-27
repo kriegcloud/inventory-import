@@ -2,16 +2,21 @@
   "$schema": "../../node_modules/turbo/schema.json",
   "extends": ["//"],
   "tasks": {
-    // Gate 4 reads one file outside the package: the decision log, whose headings say which decisions are answered
-    // (rule C12; report 14 section 6.10). It is neither in the package nor a dependency's source, so it is named here,
-    // or an edit to it, or its removal, replays gate 4's last pass. The kernel's literal is covered by the dependency
-    // edge, and the exception list by `$TURBO_DEFAULT$`.
+    // Three places outside the package are read by the tests: the decision log, whose headings say which decisions are
+    // answered (gate 4's rule C12; report 14 section 6.10), report 18, whose section 9 is Sutton's coverage table that
+    // gate 4's test reads against the module (party-slice PLAN, step 14), and the party slice's question folder, whose
+    // queries and fixtures gate 8 reads through `?raw` imports (decision 36). None is in the package nor a dependency's
+    // source, so each is named here, or an edit to one of its files, or its removal, replays the last pass. The
+    // kernel's literal is covered by the dependency edge, and the exception list and the thread's fixtures by
+    // `$TURBO_DEFAULT$`.
     "test": {
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/vitest.shared.ts",
         "$TURBO_ROOT$/vitest.retries.ts",
-        "$TURBO_ROOT$/explorations/erp-ontology/DECISIONS.md"
+        "$TURBO_ROOT$/explorations/erp-ontology/DECISIONS.md",
+        "$TURBO_ROOT$/explorations/erp-ontology/research/18-party-slice-terms.md",
+        "$TURBO_ROOT$/explorations/erp-ontology/assets/requirements/cq/**"
       ]
     },
     // Gate 9, the reasoner (report 14 sections 6.9 and 6.10). Never cached: its pass depends on the Java installed

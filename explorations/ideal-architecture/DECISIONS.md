@@ -2120,6 +2120,53 @@ Reverse: 1, the brief's move 2 names the driver for the session lookup instead; 
 and the driver is deleted; 3 and 4, the screens and `authOptions.ts` call Better Auth as before and the ledger's
 counts for them stay.
 
+### 2026-11-26 — the defaults law's last edges: own props, one storage twin, an adapter per library
+
+Asked by dialog once two lanes had brought the baseline to 104 places in 30 files and listed what would not move.
+
+1. **A React component checking its own optional prop in its body** (`props.line === undefined`, 34 places)? I
+   chose; the agent recommended the same. The law stops counting it. `??` in a body stays refused. Rejected: each
+   component file on the exemptions list; the props made required Options, which reverses 2026-11-23.
+2. **The tests' stand-in for the browser's storage** (`kept[key] ?? null`, 10 places in 8 test files)? I chose; the
+   agent recommended the same. One shared file that every one of them imports, and that file on the exemptions
+   list. Rejected: the eight files listed as they are; leaving them counted.
+3. **Another library handing back nothing** (the table, the virtual list, an atom's first read of itself, a portal
+   target, the Web Locks default: about 17 places in 5 files)? I chose; the agent recommended the same. Each behind
+   a small adapter file of ours that gives an Option, and only those files exempted, so the grid's own files end at
+   none. Rejected: the five files listed; leaving them counted.
+4. **`ImportStore.listOpen` and `listPast`**? I chose; the agent recommended the same. One named query,
+   `{ organizationId, limit }`, not dual: a list has no value it acts on. Rejected: the organization first and
+   dual; the limit first, as merged.
+
+Next: a lane builds 1 to 3 (`goals/defaults-closeout`, step 7b); 4 is on main.
+
+Reverse: 1, the law counts the checks again and the files go back into the baseline; 2 and 3, the stand-in and the
+adapters are inlined and their files leave the list; 4, the two methods take two arguments again.
+
+### 2026-11-26 — the defaults baseline's last four places, and the starting values the last lane kept
+
+Asked by dialog once the lane of step 7b (`goals/defaults-closeout`) had brought the baseline to 4 places in 4 files.
+
+1. **The three public APIs that run `Effect.runSync`** (`stringify` in `packages/ui/src/Json.codec.ts`, the one
+   Reactivity in `packages/client/src/Api.atoms.ts`, the workbook writer in
+   `packages/foundation/modeling/xlsx/src/Xlsx.codec.ts`)? I chose; the agent recommended the same. The three files
+   on the exemptions list, each as the synchronous edge a caller outside Effect needs. Rejected: making them
+   Effects, which changes `stringify`'s and the writer's signatures and their callers on screens; leaving them
+   counted.
+2. **`TotalCells.text`, which reads a column outside the region's declared columns as empty text** (1 place)? I
+   chose; the agent recommended the same. It returns an Option and the screen decides at its last step. No saved
+   progress changes. Rejected: exempting `ReviewDraft.rules.ts` for the one fallback; leaving it counted.
+3. **Four starting values nobody had ruled on**, each now on a schema: a count starts at 0 (`CountStart`), a new
+   facet group has 0 rows and no spellings (`FacetStart`), and in test support only a pending tab handle is ""
+   (`TabIdentity`) and an unrecorded writer is "somebody else" (`WriterStart`)? I chose; the agent recommended the
+   same. All four ratified as they were. Rejected: the two test values made Options in a follow-up.
+
+Next: 1 and 2 are built on the branch of step 7b; the baseline then names no file.
+
+Reverse: 1, the three files leave the list and are counted again; 2, the reader returns text with `""` for a column
+it does not hold; 3, the value moves or becomes an Option on its schema.
+
+
 ### 2026-11-26 — Alchemy uptake: the goal's edges
 
 After the sweep in [research 05](research/05-alchemy-unused.md) I asked for a goal that makes use of all of it:

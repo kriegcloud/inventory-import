@@ -12,7 +12,7 @@ import { fixableBy } from "@inventory/review/ReviewDraft"
 // instances are read back and folded.
 import { Story } from "@alchemy.run/domain/Story"
 import { expect, it } from "@effect/vitest"
-import { assertSome, assertTrue } from "@effect/vitest/utils"
+import { assertDefined, assertSome, assertTrue } from "@effect/vitest/utils"
 import { RowDecision, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { ImportId, RowId } from "@inventory/catalog-contract/Ids"
 import { fields, type StagedTable } from "@inventory/catalog-contract/Staged"
@@ -112,6 +112,32 @@ const GroupRows = S.String.pipe(S.Array, S.Array, S.fromJsonString)
 
 const undecided = ReviewDecision.make({})
 const sameDecision = S.toEquivalence(ReviewDecision)
+
+/** One complete patch application, starting from an open row when no decision has been recorded. */
+class PatchApplication extends S.Opaque<PatchApplication, { readonly brand: unique symbol }>()(
+  S.Struct({
+    decision: ReviewDecision.pipe(
+      S.annotateKey({ description: "Decision before the press, initially open" }),
+      S.withConstructorDefault(Effect.succeed(undecided))
+    ),
+    patch: Patch.annotateKey({ description: "The press applied to that decision" })
+  }).annotate({ description: "The independent fold's complete input for applying one patch" })
+) {}
+
+/** Every staged row starts with no undo recorded; a taken undo replaces both fields together. */
+class LastUndo extends S.Opaque<LastUndo, { readonly brand: unique symbol }>()(
+  S.Struct({
+    change: S.Natural.pipe(
+      S.annotateKey({ description: "Change undone, zero before any undo" }),
+      S.withConstructorDefault(Effect.succeed(0))
+    ),
+    by: S.String.pipe(
+      S.annotateKey({ description: "Author of the undo, empty before any undo" }),
+      S.withConstructorDefault(Effect.succeed(""))
+    )
+  }).annotate({ description: "A staged row's complete last-undo comparison" })
+) {}
+
 const without = (list: ReadonlyArray<string>, item: string): ReadonlyArray<string> =>
   A.filter(list, (entry) => entry !== item)
 const keptFlag = (decision: ReviewDecision): boolean =>
@@ -119,8 +145,9 @@ const keptFlag = (decision: ReviewDecision): boolean =>
 
 /** One patch on a row's decision, as `act` writes it. */
 const applyPatch = (before: O.Option<ReviewDecision>, patch: Patch): ReviewDecision => {
-  const d = O.getOrElse(before, () => undecided)
-  return Patch.match(patch, {
+  const application = PatchApplication.make({ patch, ...R.getSomes({ decision: before }) })
+  const d = application.decision
+  return Patch.match(application.patch, {
     accept: ({ column, lift }) =>
       ReviewDecision.make({
         ...d,
@@ -366,9 +393,20 @@ const Texts = S.Record(S.String, S.fromJsonString(RowDecision))
 const Flags = S.fromJsonString(RowDecision)
 const textsOf = (decisions: SavedDecisions): Effect.Effect<Readonly<Record<string, string>>> =>
   Effect.orDie(S.encodeEffect(Texts)(decisions))
-/** What a row is decided as, as text; a row with no decision reads as one that decides nothing. */
-const textOf = (texts: Readonly<Record<string, string>>, row: string): string =>
-  O.getOrElse(R.get(texts, row), () => NO_DECISION)
+/** Both sides of one independent-oracle comparison; an unwritten decision is the existing empty decision text. */
+class ComparedRow extends S.Opaque<ComparedRow, { readonly brand: unique symbol }>()(
+  S.Struct({
+    row: S.String.annotateKey({ description: "Row compared between the model fold and the reference reducer" }),
+    folded: S.String.pipe(
+      S.annotateKey({ description: "Model fold's stored flags, initially no decision" }),
+      S.withConstructorDefault(Effect.succeed(NO_DECISION))
+    ),
+    expected: S.String.pipe(
+      S.annotateKey({ description: "Reference reducer's stored flags, initially no decision" }),
+      S.withConstructorDefault(Effect.succeed(NO_DECISION))
+    )
+  }).annotate({ description: "A complete comparison of one row's independent decision texts" })
+) {}
 /** The region's decisions as the texts the server is sent. */
 const regionTexts = (decisions: Readonly<Record<string, ReviewDecision>>) => textsOf(toServerDecisions(decisions))
 
@@ -509,7 +547,14 @@ const modelSide = (input: { readonly rows: number; readonly rowIds: ReadonlyArra
   let behindCoveredOtherwise = 0
   let behindGroupUndos = 0
   // Each row's last undo taken: the change it took back and whose undo it was.
-  let undoneOf: Readonly<Record<string, { readonly change: number; readonly by: string }>> = {}
+  let undoneOf: Readonly<Record<string, LastUndo>> = R.fromEntries(
+    A.map(input.rowIds, (row) => [row, LastUndo.make({})])
+  )
+  const lastUndo = (row: string): LastUndo => {
+    const undone = undoneOf[row]
+    assertDefined(undone)
+    return undone
+  }
   // Before each recorded change: whose it is, and what a screen that has not received it says it saw.
   const history: Array<{ readonly by: string; readonly before: Seen }> = []
   // Press sequences the bookkeeping cannot foresee the model's answer to: a failure, not a guess.
@@ -518,8 +563,7 @@ const modelSide = (input: { readonly rows: number; readonly rowIds: ReadonlyArra
   const stackOf = (row: string): ReadonlyArray<Held> => O.match(R.get(own, row), { onNone: A.empty, onSome: identity })
   const topOf = (stack: ReadonlyArray<Held>): number =>
     O.match(A.last(stack), { onNone: () => 0, onSome: (held) => held.level.change })
-  const undoneChange = (row: string): number =>
-    O.match(R.get(undoneOf, row), { onNone: () => 0, onSome: (undone) => undone.change })
+  const undoneChange = (row: string): number => lastUndo(row).change
   /** Called just before a change is recorded: the screen that will not have it yet saw what is there now. */
   const recording = (actor: Actor): void => {
     history.push({
@@ -618,7 +662,7 @@ const modelSide = (input: { readonly rows: number; readonly rowIds: ReadonlyArra
     return O.match(onRow, {
       onSome: identity,
       onNone: () => {
-        const undone = O.getOrElse(R.get(undoneOf, input.row), () => ({ change: 0, by: "" }))
+        const undone = lastUndo(input.row)
         return seen.sawUndone !== undone.change
           ? refused("UndoneSince", Story.rejected(UndoneSince.make({ by: undone.by, change: undone.change })))
           : { name: "Taken" as const, step: O.none() }
@@ -635,7 +679,8 @@ const modelSide = (input: { readonly rows: number; readonly rowIds: ReadonlyArra
   ) {
     as(actor)
     const texts = yield* regionTexts({ [row]: decision })
-    const flags = textOf(texts, row)
+    const flags = texts[row]
+    assertDefined(flags)
     const stack = stackOf(row)
     const top = A.last(stack)
     const saw = topOf(stack)
@@ -795,7 +840,7 @@ const modelSide = (input: { readonly rows: number; readonly rowIds: ReadonlyArra
       const sawUndone = staleUndo.value
       // The row holds the sender's decision now as that screen shows it, with an undo on the row between that the
       // screen has not received (another person decided over it and took that back): held, with whose undo it was.
-      const undone = O.getOrElse(R.get(undoneOf, row), () => ({ change: 0, by: "" }))
+      const undone = lastUndo(row)
       if (mine && sawUndone === undone.change) return
       const keptThen = then.length >= 3
       const thirdLastThen = A.get(then, then.length - 3)
@@ -863,7 +908,7 @@ const modelSide = (input: { readonly rows: number; readonly rowIds: ReadonlyArra
     )
     touchedRows = A.append(touchedRows, row)
     own = R.set(own, row, rest)
-    undoneOf = R.set(undoneOf, row, { change: undo, by: actor.memberId })
+    undoneOf = R.set(undoneOf, row, LastUndo.make({ change: undo, by: actor.memberId }))
     return "taken"
   }
 
@@ -1117,12 +1162,12 @@ const decoded = Effect.fnUntraced(function* (reading: Reading) {
 const apartFrom = Effect.fnUntraced(function* (reading: Reading, expected: Readonly<Record<string, string>>) {
   const instances = yield* decoded(reading)
   const folded = yield* regionTexts(fold(instances))
+  const comparisons = A.map(A.dedupe([...R.keys(folded), ...R.keys(expected)]), (row) =>
+    ComparedRow.make({ row, ...R.getSomes({ folded: R.get(folded, row), expected: R.get(expected, row) }) })
+  )
   return A.map(
-    A.filter(
-      A.dedupe([...R.keys(folded), ...R.keys(expected)]),
-      (row) => textOf(folded, row) !== textOf(expected, row)
-    ),
-    (row) => `${row}: the fold ${textOf(folded, row)}, act ${textOf(expected, row)}`
+    A.filter(comparisons, (comparison) => comparison.folded !== comparison.expected),
+    ({ row, folded, expected }) => `${row}: the fold ${folded}, act ${expected}`
   )
 })
 
@@ -1385,7 +1430,10 @@ const liveReview = (input: {
             assertTrue(O.isSome(expectedTouches), "a redo with an answer has expected touches")
             decisions = out.state.decisions
             touch = { ...touch, ...back.after }
-            taken = O.getOrElse(A.head(out.state.undo), () => mirror)
+            // Redo receives exactly one source step above; travel always moves its mirror onto undo.
+            const redone = out.state.undo[0]
+            assertDefined(redone)
+            taken = redone
             done = {
               action: back.action,
               unit,

@@ -7,12 +7,16 @@
  * predicates, so a predicate or a type the projector starts to write is refused until it is added here on purpose.
  * The lists hold no sameness, no key, no inverse, no characteristic and no restriction: those are the constructs by
  * which a reasoner could conclude that two tenants are one organization (the fifth forbidden conclusion), and each is
- * a finding the moment a file states it. The gate works on parsed statements, never on text.
+ * a finding the moment a file states it. A gist subject is a class or a property the vocabulary's gist list holds, and
+ * carries only its declaration and, for a class, its parent and pairs: never gist's words (decision 14), domain or
+ * range (decision 16). A gist property's own gist parent, which decision 16 copies, is refused too: the metamodel has
+ * no field for one and no slice-1 term needs one (PLAN, step 2), so the projector writes none, and this rule changes
+ * with the step that builds the field. The gate works on parsed statements, never on text.
  *
  * @packageDocumentation
  */
 import { LiteralKit } from "@beep/schema/LiteralKit"
-import type { Vocabulary } from "@beep/vocabulary/Model"
+import { GistProperty, type Vocabulary } from "@beep/vocabulary/Model"
 import * as A from "effect/Array"
 import * as Eq from "effect/Equal"
 import { dual, identity } from "effect/Function"
@@ -163,7 +167,11 @@ const allowedPredicates = (kind: FileKind, vocabulary: Vocabulary): ReadonlyArra
       term("dcterms", "source"),
       term("skos", "prefLabel"),
       term("skos", "altLabel"),
-      term("skos", "definition")
+      term("skos", "definition"),
+      // Decision 33: a retired term's three statements. `owl:deprecated` is OWL's own annotation property.
+      term("owl", "deprecated"),
+      term("dcterms", "isReplacedBy"),
+      term("skos", "historyNote")
     ],
     skos: () => [
       term("rdf", "type"),
@@ -174,7 +182,11 @@ const allowedPredicates = (kind: FileKind, vocabulary: Vocabulary): ReadonlyArra
       term("skos", "definition"),
       term("skos", "notation"),
       term("skos", "inScheme"),
-      term("skos", "topConceptOf")
+      term("skos", "topConceptOf"),
+      // Decision 33: the taxonomy alone says which codes are retired.
+      term("owl", "deprecated"),
+      term("dcterms", "isReplacedBy"),
+      term("skos", "historyNote")
     ],
     graph: () => [
       term("rdf", "type"),
@@ -254,6 +266,18 @@ export const constructFindings = (input: ConstructInput): ReadonlyArray<Construc
     }
     if (under(vocabulary.gist.namespace)(subject)) {
       const name = Str.slice(vocabulary.gist.namespace.length)(subject)
+      // A gist property is declared as the kind the list gives it, and states nothing else (decision 16).
+      const asProperty = R.get(vocabulary.gist.properties, name)
+      if (isType(statement, term("owl", "ObjectProperty"))) {
+        return O.exists(asProperty, GistProperty.guards.object)
+          ? []
+          : [found("namespace", subject, "the gist subject typed a relation is no relation on the gist list")]
+      }
+      if (isType(statement, term("owl", "DatatypeProperty"))) {
+        return O.exists(asProperty, GistProperty.guards.datatype)
+          ? []
+          : [found("namespace", subject, "the gist subject typed an attribute is no attribute on the gist list")]
+      }
       const carries =
         isType(statement, term("owl", "Class")) ||
         statement.predicate === term("rdfs", "subClassOf") ||

@@ -270,7 +270,7 @@ describe("an import, over the twins", () => {
               A.findFirst(result.rows, (row) => row.rowNumber === n),
               (row) =>
                 RowOutcome.guards.notImported(row) && DecidedBy.guards.person(row.decidedBy)
-                  ? O.some(row.decidedBy.name)
+                  ? row.decidedBy.name
                   : O.none()
             )
           expect([leftOutBy(2), leftOutBy(3)]).toEqual([O.some("Dana Whitfield"), O.some("Marcus Oyelaran")])

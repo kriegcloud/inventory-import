@@ -1,0 +1,7 @@
+# Decision 34's reason, refused: the tenant's record of the co-packer in CQ-P01's fixture is also typed an
+# organization. A SourceRecord is content, and gist 14.1.0 makes content and organizations disjoint. Read beside
+# CQ-P01's fixture, whose run is the near miss. Hand-written; only gate 9 reads it.
+@base <https://example.org/inventory-import/> .
+@prefix inv: <https://example.org/inventory-import/ontology/> .
+
+<fixture/SourceRecord/test_WorksCoPacker> a inv:Organization .

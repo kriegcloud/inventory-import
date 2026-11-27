@@ -1,3 +1,5 @@
+import { CountStart } from "./internal/CountStart.schema.ts"
+import { ReviewText } from "./internal/ReviewText.rules.ts"
 /**
  * The review region's rules as pure functions, so they can be tested without a browser: how a row stands after the
  * person's decisions, the counts that must add up, what one accept may touch, and what the import button says.
@@ -52,7 +54,7 @@ import * as S from "effect/Schema"
 import * as R from "effect/Record"
 import { $ReviewId } from "./internal/identity.ts"
 
-import { dual } from "effect/Function"
+import { dual, identity } from "effect/Function"
 import * as P from "effect/Predicate"
 import * as SchemaGetter from "effect/SchemaGetter"
 
@@ -80,10 +82,14 @@ export const TotalCells = Object.assign(
       })
   }).pipe($I.annoteSchema("TotalCells", { description: "A row's text completed for every region column" })),
   {
-    /** Reads complete text; the single fallback covers a column outside the declared domain. */
-    text: (cells: Completed, column: string): string => cells[column] ?? ""
+    /** Reads owned text, including empty declared cells; an unknown column has no value. */
+    text: (cells: Completed, column: string): O.Option<string> => R.get<string, string>(cells, column)
   }
 )
+
+// A fix or edit may name a file-only column absent from the source. Keep its recorded before-value unchanged.
+const originText = (cells: TotalCells, column: string): string =>
+  O.match(TotalCells.text(cells, column), { onNone: () => "", onSome: identity })
 
 /** Complete row text; a sparse record cannot be assigned to this type. */
 export type TotalCells = Completed
@@ -146,9 +152,6 @@ let sameFix = (left: Fix, right: Fix): boolean => {
   return sameFix(left, right)
 }
 
-/** A decision that says nothing yet: what a row without one starts from. */
-const undecided = ReviewDecision.make({})
-
 /** Kept over its rivals, now or before it was left out: what today's rows read as the `kept` flag. */
 const keptFlag = (decision: RowDecision): boolean =>
   isKept(decision.place) || (RowPlace.guards.leftOut(decision.place) && decision.place.wasKept)
@@ -158,9 +161,9 @@ const leftOutRow = (decision: O.Option<RowDecision>): boolean => O.isSome(decisi
 
 /** The decision with the row left out, remembering whether it had been kept. */
 const leaveOut = (decision: O.Option<RowDecision>): RowDecision =>
-  ReviewDecision.make({
-    ...O.getOrElse(decision, () => undecided),
-    place: leftOut(O.exists(decision, keptFlag))
+  O.match(decision, {
+    onNone: () => ReviewDecision.make({ place: leftOut(false) }),
+    onSome: (decision) => ReviewDecision.make({ ...decision, place: leftOut(keptFlag(decision)) })
   })
 
 export const emptyState: ReviewState = { decisions: HashMap.empty(), undo: [], redo: [] }
@@ -250,11 +253,17 @@ const untouched = new WeakMap<
 
 /** A row nobody has decided on: the rules' applied fixes are in force and its problem, if any, is open. */
 function viewUntouched(row: ReviewRow, fixable: Fixable, columns: ReadonlyArray<ReviewColumn>): RowView {
-  const known = untouched.get(row)
-  if (known !== undefined && known.fixable === fixable && known.columns === columns) return known.view
-  const view = build(row, O.none(), () => false, O.none(), fixable, false, columns)
-  untouched.set(row, { columns, fixable, view })
-  return view
+  return O.match(
+    O.filter(O.fromUndefinedOr(untouched.get(row)), (known) => known.fixable === fixable && known.columns === columns),
+    {
+      onSome: (known) => known.view,
+      onNone: () => {
+        const view = build(row, O.none(), () => false, O.none(), fixable, false, columns)
+        untouched.set(row, { columns, fixable, view })
+        return view
+      }
+    }
+  )
 }
 
 const sourceOf = (fix: Fix): "rule" | "model" | "unknown" =>
@@ -320,7 +329,7 @@ function build(
       else auto = true
       marks[fix.column] = {
         state: "applied" as const,
-        from: TotalCells.text(original, fix.column),
+        from: originText(original, fix.column),
         to: fix.to,
         by: sourceOf(fix),
         fix: O.some(fix),
@@ -338,7 +347,7 @@ function build(
       const fix = candidate.fix.value
       marks[fix.column] = {
         state: "applied" as const,
-        from: TotalCells.text(original, fix.column),
+        from: originText(original, fix.column),
         to: fix.to,
         by: sourceOf(fix),
         fix: O.some(fix),
@@ -359,7 +368,7 @@ function build(
   for (const [column, value] of R.toEntries(edits)) {
     marks[column] = {
       state: "applied" as const,
-      from: TotalCells.text(original, column),
+      from: originText(original, column),
       to: value,
       by: "you",
       fix: O.none(),
@@ -382,7 +391,7 @@ function build(
     const fix = proposal.value
     marks[fix.column] = {
       state: "proposed" as const,
-      from: TotalCells.text(complete, fix.column),
+      from: originText(complete, fix.column),
       to: fix.to,
       by: sourceOf(fix),
       fix
@@ -447,10 +456,10 @@ export function viewRows(input: {
   const byRow: Readonly<Record<string, O.Option<RowDecision>>> = Object.fromEntries(
     HashMap.map(decisions, (decision) => O.some(decision))
   )
-  // Missing decisions keep the existing shared None. The sparse lookup remains a counted fallback.
+  // Missing decisions remain None; existing wrapped decisions are reused without copying.
   Object.setPrototypeOf(byRow, null)
   const noDecision = O.none<RowDecision>()
-  const decisionOf = (rowId: string): O.Option<RowDecision> => byRow[rowId] ?? noDecision
+  const decisionOf = (rowId: string): O.Option<RowDecision> => O.flatten(O.fromUndefinedOr(byRow[rowId]))
   // A copy is settled once it is left out, or once the person typed a new value into the cell they shared.
   const settled = (rowId: string, column: O.Option<string>): boolean => {
     const decision = decisionOf(rowId)
@@ -492,11 +501,18 @@ export function count(views: ReadonlyArray<RowView>): Counts {
     } else {
       needs += 1
       const kind = O.match(view.problem, { onNone: () => "", onSome: (problem) => problem.kind })
-      MutableHashMap.set(kinds, kind, O.getOrElse(MutableHashMap.get(kinds, kind), () => 0) + 1)
+      const seen = MutableHashMap.get(kinds, kind)
+      if (O.isSome(seen)) MutableHashMap.set(kinds, kind, seen.value + 1)
+      else MutableHashMap.set(kinds, kind, 1)
     }
     for (const fix of view.row.applied) {
-      const mark = view.marks[fix.column]
-      if (mark !== undefined && isCellMarkApplied(mark) && mark.by !== "you" && !mark.accepted) applied += 1
+      if (
+        O.exists(
+          O.fromUndefinedOr(view.marks[fix.column]),
+          (mark) => isCellMarkApplied(mark) && mark.by !== "you" && !mark.accepted
+        )
+      )
+        applied += 1
     }
   }
   return {
@@ -513,7 +529,8 @@ export function count(views: ReadonlyArray<RowView>): Counts {
 }
 
 /** Undecided rows of one problem kind: none when the kind has no row waiting. */
-export const kindCount = (counts: Counts, kind: string): number => O.getOrElse(HashMap.get(counts.kinds, kind), () => 0)
+export const kindCount = (counts: Counts, kind: string): number =>
+  O.match(HashMap.get(counts.kinds, kind), { onNone: () => CountStart.make({}).value, onSome: identity })
 
 /** The rows a filter shows, in file order. A problem kind narrows the needs view only. */
 export function visible(input: {
@@ -545,9 +562,10 @@ type Gathered = {
 }
 
 /** Collects a group's rows locally, without copying the accumulated rows for each fix. */
-const gathered = (fix: Fix): Gathered => {
-  const rowIds: Array<string> = []
-  const froms: Array<string> = []
+const gathered = (input: { readonly fix: Fix; readonly rowId: string; readonly from: string }): Gathered => {
+  const { fix } = input
+  const rowIds: A.NonEmptyArray<string> = [input.rowId]
+  const froms: A.NonEmptyArray<string> = [input.from]
   let mixed = false
   return {
     fix,
@@ -569,7 +587,11 @@ const mixedOf = (group: Gathered): { readonly mixed: boolean } => ({ mixed: grou
 
 const variantsOf = (froms: ReadonlyArray<string>): ReadonlyArray<{ readonly from: string; readonly count: number }> => {
   const tally = MutableHashMap.empty<string, number>()
-  for (const from of froms) MutableHashMap.set(tally, from, O.getOrElse(MutableHashMap.get(tally, from), () => 0) + 1)
+  for (const from of froms) {
+    const seen = MutableHashMap.get(tally, from)
+    if (O.isSome(seen)) MutableHashMap.set(tally, from, seen.value + 1)
+    else MutableHashMap.set(tally, from, 1)
+  }
   return [...tally].map(([from, n]) => ({ from, count: n })).sort((a, b) => b.count - a.count)
 }
 
@@ -590,9 +612,10 @@ export function waitingGroups(input: {
     if (O.isSome(input.kind) && !O.exists(view.problem, (problem) => O.contains(input.kind, problem.kind))) continue
     const fix = proposed.value
     const groupId = proposed.value.group.value
-    const group = O.getOrElse(MutableHashMap.get(found, groupId), () => gathered(fix))
-    group.add(view.row.id, TotalCells.text(view.original, fix.column), fix)
-    MutableHashMap.set(found, groupId, group)
+    const from = originText(view.original, fix.column)
+    const seen = MutableHashMap.get(found, groupId)
+    if (O.isSome(seen)) seen.value.add(view.row.id, from, fix)
+    else MutableHashMap.set(found, groupId, gathered({ fix, rowId: view.row.id, from }))
   }
   return [...found]
     .map(([id, group]) => ({
@@ -616,12 +639,13 @@ export function appliedGroups(views: ReadonlyArray<RowView>): ReadonlyArray<FixG
   const found = MutableHashMap.empty<string, Gathered>()
   for (const view of views) {
     for (const fix of view.row.applied) {
-      const mark = view.marks[fix.column]
-      if (mark === undefined || !isCellMarkApplied(mark) || mark.by === "you") continue
+      const applied = O.filter(R.get(view.marks, fix.column), (mark) => isCellMarkApplied(mark) && mark.by !== "you")
+      if (O.isNone(applied)) continue
+      const mark = applied.value
       const id = O.match(fix.group, { onNone: () => `${fix.column}:${fix.to}`, onSome: (group) => group })
-      const group = O.getOrElse(MutableHashMap.get(found, id), () => gathered(fix))
-      group.add(view.row.id, mark.from, fix)
-      MutableHashMap.set(found, id, group)
+      const seen = MutableHashMap.get(found, id)
+      if (O.isSome(seen)) seen.value.add(view.row.id, mark.from, fix)
+      else MutableHashMap.set(found, id, gathered({ fix, rowId: view.row.id, from: mark.from }))
     }
   }
   return [...found].map(([id, group]) => ({
@@ -649,7 +673,8 @@ export const variantsText = (group: FixGroup, display: (value: string) => string
  * A value from the file as the person can tell it apart: "empty" for nothing, and quotation marks around a value
  * with spaces at its ends, because `Foot ` beside `Foot` otherwise reads as no change at all.
  */
-export const spellingOf = (from: string): string => (from === "" ? "empty" : from !== from.trim() ? `“${from}”` : from)
+export const spellingOf = (from: string): string =>
+  from === "" ? "empty" : from !== ReviewText.comparison(from) ? `“${from}”` : from
 
 // ---------------------------------------------------------------------------------------------------------------
 // The person's actions. Each is one undo step.
@@ -745,18 +770,21 @@ const swap = (
 /** An undo or a redo: the last step of one stack taken off and its mirror put on the other. */
 const travel = (state: ReviewState, way: "undo" | "redo"): Outcome => {
   const from = way === "undo" ? state.undo : state.redo
-  const step = from[from.length - 1]
-  if (step === undefined) return unchanged(state)
-  const { decisions, mirror } = swap(state.decisions, step)
-  return {
-    state:
-      way === "undo"
-        ? { decisions, undo: state.undo.slice(0, -1), redo: [...state.redo, mirror] }
-        : { decisions, undo: [...state.undo, mirror], redo: state.redo.slice(0, -1) },
-    label: `${way === "undo" ? "Undone" : "Redone"}: ${step.label}`,
-    changed: [...HashMap.keys(step.before)],
-    focus: step.focus
-  }
+  return O.match(A.last(from), {
+    onNone: () => unchanged(state),
+    onSome: (step) => {
+      const { decisions, mirror } = swap(state.decisions, step)
+      return {
+        state:
+          way === "undo"
+            ? { decisions, undo: state.undo.slice(0, -1), redo: [...state.redo, mirror] }
+            : { decisions, undo: [...state.undo, mirror], redo: state.redo.slice(0, -1) },
+        label: `${way === "undo" ? "Undone" : "Redone"}: ${step.label}`,
+        changed: [...HashMap.keys(step.before)],
+        focus: step.focus
+      }
+    }
+  })
 }
 
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
@@ -817,17 +845,21 @@ const decide: {
     const proposed = O.flatMap(view.problem, (problem) => problem.fix)
     if (view.status !== "needs" || O.isNone(proposed)) return
     const fix = proposed.value
-    const decision = O.getOrElse(decisionOf(view.row.id), () => undecided)
+    const decision = decisionOf(view.row.id)
     const wasApplied = view.row.applied.some((applied) => applied.column === fix.column)
     set(
       view.row.id,
-      wasApplied
-        ? ReviewDecision.make({
-            ...decision,
-            reverted: without(decision.reverted, fix.column),
-            accepted: [...without(decision.accepted, fix.column), fix.column]
-          })
-        : ReviewDecision.make({ ...decision, accepted: [...without(decision.accepted, fix.column), fix.column] })
+      O.match(decision, {
+        onNone: () => ReviewDecision.make({ accepted: [fix.column] }),
+        onSome: (decision) =>
+          wasApplied
+            ? ReviewDecision.make({
+                ...decision,
+                reverted: without(decision.reverted, fix.column),
+                accepted: [...without(decision.accepted, fix.column), fix.column]
+              })
+            : ReviewDecision.make({ ...decision, accepted: [...without(decision.accepted, fix.column), fix.column] })
+      })
     )
   }
   const label = write({
@@ -854,11 +886,15 @@ const decide: {
 })
 
 /** A fix's column taken out of force on one decision: no longer accepted, and undone. */
-const reverting = (decision: RowDecision, column: string): RowDecision =>
-  ReviewDecision.make({
-    ...decision,
-    reverted: [...without(decision.reverted, column), column],
-    accepted: without(decision.accepted, column)
+const reverting = (decision: O.Option<RowDecision>, column: string): RowDecision =>
+  O.match(decision, {
+    onNone: () => ReviewDecision.make({ reverted: [column] }),
+    onSome: (decision) =>
+      ReviewDecision.make({
+        ...decision,
+        reverted: [...without(decision.reverted, column), column],
+        accepted: without(decision.accepted, column)
+      })
   })
 
 /** Applies one action. Unknown rows and rows the action does not fit are skipped, never guessed at. */
@@ -894,7 +930,13 @@ export function act(input: ActInput): Outcome {
         const view = foundView.value
         const rivals = O.flatMap(view.problem, (problem) => problem.rivals)
         if (O.isNone(rivals)) return ""
-        d.set(rowId, ReviewDecision.make({ ...O.getOrElse(d.decisionOf(rowId), () => undecided), place: kept }))
+        d.set(
+          rowId,
+          O.match(d.decisionOf(rowId), {
+            onNone: () => ReviewDecision.make({ place: kept }),
+            onSome: (decision) => ReviewDecision.make({ ...decision, place: kept })
+          })
+        )
         let left = 0
         for (const rival of rivals.value) {
           const decision = d.decisionOf(rival)
@@ -926,12 +968,19 @@ export function act(input: ActInput): Outcome {
           )
             d.accept(view)
           else {
-            const decision = O.getOrElse(d.decisionOf(rowId), () => undecided)
+            const decision = d.decisionOf(rowId)
             const column = O.match(
               O.flatMap(view.problem, (problem) => problem.fix),
               { onNone: () => group.column, onSome: (fix) => columnFor(fix, value) }
             )
-            d.set(rowId, ReviewDecision.make({ ...decision, edits: { ...decision.edits, [column]: value } }))
+            d.set(
+              rowId,
+              O.match(decision, {
+                onNone: () => ReviewDecision.make({ edits: { [column]: value } }),
+                onSome: (decision) =>
+                  ReviewDecision.make({ ...decision, edits: { ...decision.edits, [column]: value } })
+              })
+            )
           }
         }
         return `${plural(d.written(), "row", "rows")} set to ${value}`
@@ -960,8 +1009,14 @@ export function act(input: ActInput): Outcome {
       decide(input, O.some(rowId), (d) => {
         const foundView = d.viewOf(rowId)
         if (O.isNone(foundView) || foundView.value.status === "stored" || foundView.value.status === "cannot") return ""
-        const decision = O.getOrElse(d.decisionOf(rowId), () => undecided)
-        d.set(rowId, ReviewDecision.make({ ...decision, edits: { ...decision.edits, [column]: value } }))
+        const decision = d.decisionOf(rowId)
+        d.set(
+          rowId,
+          O.match(decision, {
+            onNone: () => ReviewDecision.make({ edits: { [column]: value } }),
+            onSome: (decision) => ReviewDecision.make({ ...decision, edits: { ...decision.edits, [column]: value } })
+          })
+        )
         return "Value changed"
       }),
     revert: ({ rowId, column, how }) =>
@@ -970,13 +1025,7 @@ export function act(input: ActInput): Outcome {
         const mark = O.flatMap(view, (view) => R.get(view.marks, column))
         // Only a fix that is in force or waiting, and not a value the person typed themselves.
         if (O.isNone(view) || O.isNone(mark) || mark.value.by === "you" || view.value.status === "stored") return ""
-        d.set(
-          rowId,
-          reverting(
-            O.getOrElse(d.decisionOf(rowId), () => undecided),
-            column
-          )
-        )
+        d.set(rowId, reverting(d.decisionOf(rowId), column))
         return RevertHow.match(how, { undo: () => "Fix undone", reject: () => "Proposal rejected" })
       }),
     revertGroup: ({ groupId }) =>
@@ -985,13 +1034,7 @@ export function act(input: ActInput): Outcome {
         if (O.isNone(foundGroup)) return ""
         const group = foundGroup.value
         for (const rowId of group.rowIds) {
-          d.set(
-            rowId,
-            reverting(
-              O.getOrElse(d.decisionOf(rowId), () => undecided),
-              group.column
-            )
-          )
+          d.set(rowId, reverting(d.decisionOf(rowId), group.column))
         }
         return `${plural(d.written(), "fix", "fixes")} undone`
       })
@@ -1065,7 +1108,7 @@ const tabTally = (counts: Counts, words: ReviewWords): string =>
 export function heldLine(counts: Counts, words: ReviewWords): string {
   if (counts.total === 0) return ""
   const held = counts.needs + counts.cannot + counts.out
-  if (held === 0) return counts.stored === 0 ? `All ${counts.total} ${words.ready.toLowerCase()}` : ""
+  if (held === 0) return counts.stored === 0 ? `All ${counts.total} ${ReviewText.word(words.ready)}` : ""
   // Every row that is not imported is in the number, the ones already there too: it is the download's count.
   return `${held + counts.stored} won't be imported: ${tabTally(counts, words)}`
 }
@@ -1151,7 +1194,13 @@ export function heldCsv(input: {
   for (const view of input.views) {
     if (view.status === "ready") continue
     const reason = reasonOf({ view, kinds, words: input.words })
-    lines.push([rowName(view.row), reason, ...input.columns.map((column) => TotalCells.text(view.original, column.id))])
+    lines.push([
+      rowName(view.row),
+      reason,
+      ...input.columns.map((column) =>
+        O.match(TotalCells.text(view.original, column.id), { onNone: () => "", onSome: identity })
+      )
+    ])
   }
   return lines.map((line) => line.map(csvField).join(",")).join("\n")
 }
@@ -1252,15 +1301,19 @@ export function queue(input: {
 export const weakGuess = (fix: { readonly by: O.Option<string>; readonly confidence: O.Option<string> }): boolean =>
   O.contains(fix.by, "model") && O.contains(fix.confidence, "low")
 
-/** A `low` fix is a question for the person, not something to accept. Its choices are `to` and the alternatives. */
+/**
+ * A `low` fix, and one whose source gave no confidence, is a question for the person, not something to accept: asked,
+ * never applied in one press or for a group (Benjamin, 2026-11-26, as for a stored proposal with none). Its choices
+ * are `to` and the alternatives.
+ */
 export const choicesOf = (fix: {
   readonly to: string
   readonly confidence: O.Option<string>
   readonly why: { readonly alternatives: ReadonlyArray<string> }
 }): O.Option<ReadonlyArray<string>> =>
   O.map(
-    O.filter(fix.confidence, (confidence) => confidence === "low"),
-    () => [fix.to, ...fix.why.alternatives]
+    O.liftPredicate(fix, (fix) => !O.exists(fix.confidence, (confidence) => confidence !== "low")),
+    (fix) => [fix.to, ...fix.why.alternatives]
   )
 
 /** What the caller writes, and what it holds with a reason for each row. */
@@ -1328,9 +1381,11 @@ export function nextProblem(input: {
   )
   for (let step = 1; step <= list.length; step += 1) {
     const index = input.back === true ? start - step : start + step
-    const view = list[((index % list.length) + list.length) % list.length]
-    if (view !== undefined && view.status === "needs" && !O.contains(input.afterId, view.row.id))
-      return O.some(view.row.id)
+    const next = O.filter(
+      A.get(list, ((index % list.length) + list.length) % list.length),
+      (view) => view.status === "needs" && !O.contains(input.afterId, view.row.id)
+    )
+    if (O.isSome(next)) return O.some(next.value.row.id)
   }
   return O.none()
 }
@@ -1385,10 +1440,14 @@ export const shownWith = (
   const shown = column.display(text)
   return O.match(column.unitFrom, {
     onNone: () => shown,
-    onSome: (id) => {
-      const unit = TotalCells.text(cells, id).trim()
-      return unit !== "" && /^-?\d[\d,]*(\.\d+)?$/.test(shown.trim()) ? `${shown} ${unit}` : shown
-    }
+    onSome: (id) =>
+      O.match(TotalCells.text(cells, id), {
+        onNone: () => shown,
+        onSome: (text) => {
+          const unit = ReviewText.comparison(text)
+          return unit !== "" && /^-?\d[\d,]*(\.\d+)?$/.test(ReviewText.comparison(shown)) ? `${shown} ${unit}` : shown
+        }
+      })
   })
 }
 
@@ -1418,7 +1477,10 @@ export const pickedChoice = (view: RowView): O.Option<Choice> => {
   const choices = O.flatMap(view.row.problem, (problem) => problem.choices)
   if (O.isNone(column) || O.isNone(choices) || !O.exists(R.get(view.marks, column.value), (mark) => mark.by === "you"))
     return O.none()
-  return A.findFirst(choices.value, (choice) => choice.value === TotalCells.text(view.cells, column.value))
+  return O.match(TotalCells.text(view.cells, column.value), {
+    onNone: () => A.findFirst(choices.value, (choice) => choice.value === ""),
+    onSome: (text) => A.findFirst(choices.value, (choice) => choice.value === text)
+  })
 }
 
 /**
@@ -1468,7 +1530,7 @@ export function otherAnswers(input: {
 
 /** A column's name inside a sentence: lower case, except a name in capitals ("SKU") or one with a capital inside it. */
 export const inSentence = (label: string): string =>
-  label === label.toUpperCase() || /.[A-Z]/.test(label) ? label : label.toLowerCase()
+  label === ReviewText.capital(label) || /.[A-Z]/.test(label) ? label : ReviewText.word(label)
 
 /**
  * The button that opens the one field for a value the person types, when the caller gave no `ask`: "Set" and the
@@ -1478,7 +1540,7 @@ export const inSentence = (label: string): string =>
  * @example askFor("Item #") // "Set item #"
  * @example askFor("SKU") // "Set SKU"
  */
-export const askFor = (label: string): string => `Set ${inSentence(label.trim())}`
+export const askFor = (label: string): string => `Set ${inSentence(ReviewText.comparison(label))}`
 
 /** One line of the work list: a problem kind, how many of its rows still need the person, and whether it is done. */
 export type WorkItem = { readonly kind: ProblemKind; readonly left: number; readonly done: boolean }

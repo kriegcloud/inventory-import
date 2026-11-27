@@ -1,0 +1,33 @@
+# CQ-P04: Which two source records a tenant holds were decided to be about one party, by whom, when, and on what
+# evidence? (decision 34)
+# The decision in force about a pair is the tenant's latest by eventTime, so a reversed decision gives no row; the
+# pair, the decision and the later one are all the tenant's. "A tenant" is a value of ?tenant. The outcome is its
+# concept's IRI (decision 10), which the OWL file beside the question holds as an individual.
+# Each type step walks down the subclasses (decision 27), so a node typed by a subclass is found too.
+PREFIX inv: <https://example.org/inventory-import/ontology/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?tenant ?a ?b ?decider ?at ?evidence
+WHERE {
+  ?decision rdf:type/rdfs:subClassOf* inv:IdentityDecision ;
+            inv:inTenant ?tenant ;
+            inv:decidesOn ?a , ?b ;
+            inv:identityOutcome inv:IdentityOutcomeScheme-sameParty ;
+            inv:decidedBy ?decider ;
+            inv:eventTime ?at .
+  ?a rdf:type/rdfs:subClassOf* inv:SourceRecord ;
+     inv:inTenant ?tenant .
+  ?b rdf:type/rdfs:subClassOf* inv:SourceRecord ;
+     inv:inTenant ?tenant .
+  FILTER (STR(?a) < STR(?b))
+  OPTIONAL { ?decision inv:citesEvidence/inv:evidenceText ?evidence }
+  FILTER NOT EXISTS {
+    ?later rdf:type/rdfs:subClassOf* inv:IdentityDecision ;
+           inv:inTenant ?tenant ;
+           inv:decidesOn ?a , ?b ;
+           inv:eventTime ?laterAt .
+    FILTER (?laterAt > ?at)
+  }
+}
+ORDER BY ?tenant ?a ?b

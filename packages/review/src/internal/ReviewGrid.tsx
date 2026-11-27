@@ -1,3 +1,10 @@
+import { ReviewText } from "./ReviewText.rules.ts"
+import { AtomContext } from "./atomContext.adapter.ts"
+import { TanStackTable } from "./tanstackTable.adapter.ts"
+import { TanStackVirtual } from "./tanstackVirtual.adapter.ts"
+import * as S from "effect/Schema"
+import * as Effect from "effect/Effect"
+import { $ReviewId } from "./identity.ts"
 import { TotalCells } from "@inventory/review/ReviewDraft"
 import { query } from "./browser.ts"
 import { dual, identity } from "effect/Function"
@@ -131,8 +138,12 @@ const actionsLeast = 240
 const actionsQuiet = 120
 const actionsMost = 360
 
-const nameOf = (view: RowView, first: ReviewColumn | undefined): string => {
-  const name = first === undefined ? "" : TotalCells.text(view.cells, first.id)
+// Decide how an absent cell is drawn only where the screen needs text.
+const cellText = (cells: TotalCells, column: string): string =>
+  O.match(TotalCells.text(cells, column), { onNone: () => "", onSome: (text) => text })
+
+const nameOf = (view: RowView, first: O.Option<ReviewColumn>): string => {
+  const name = O.match(first, { onNone: () => "", onSome: (column) => cellText(view.cells, column.id) })
   return name === "" ? `row ${rowName(view.row)}` : name
 }
 
@@ -177,7 +188,7 @@ function Compare(props: {
 }) {
   const { view, other } = props
   const differing = props.columns.filter(
-    (column, index) => index === 0 || TotalCells.text(view.cells, column.id) !== TotalCells.text(other.cells, column.id)
+    (column, index) => index === 0 || cellText(view.cells, column.id) !== cellText(other.cells, column.id)
   )
   return (
     <>
@@ -188,8 +199,8 @@ function Compare(props: {
         {differing.slice(0, 6).map((column) => (
           <Fragment key={column.id}>
             <span className="text-muted-foreground">{column.label}</span>
-            <CutText text={TotalCells.text(view.cells, column.id)} className={cn("font-medium", codeFace(column))} />
-            <CutText text={TotalCells.text(other.cells, column.id)} className={cn("font-medium", codeFace(column))} />
+            <CutText text={cellText(view.cells, column.id)} className={cn("font-medium", codeFace(column))} />
+            <CutText text={cellText(other.cells, column.id)} className={cn("font-medium", codeFace(column))} />
           </Fragment>
         ))}
       </div>
@@ -269,9 +280,16 @@ const longest = (values: ReadonlyArray<string>, n: number): ReadonlyArray<string
     if (top.length < n) top.push(value)
     else {
       let at = 0
-      for (let index = 1; index < top.length; index += 1)
-        if ((top[index]?.length ?? 0) < (top[at]?.length ?? 0)) at = index
-      if (value.length > (top[at]?.length ?? 0)) top[at] = value
+      let shortest = 0
+      let index = 0
+      for (const kept of top) {
+        if (index === 0 || kept.length < shortest) {
+          at = index
+          shortest = kept.length
+        }
+        index += 1
+      }
+      if (value.length > shortest) top[at] = value
     }
   }
   return top
@@ -311,16 +329,18 @@ const measureNeeds = (input: {
     let widest = 0
     for (const value of longest(
       views.map((view) =>
-        TotalCells.text(view.cells, column.id) === "" && O.isSome(column.byDefault)
+        cellText(view.cells, column.id) === "" && O.isSome(column.byDefault)
           ? `${shownWith(column, column.byDefault.value, view.cells)}, default`
-          : shownWith(column, TotalCells.text(view.cells, column.id), view.cells)
+          : shownWith(column, cellText(view.cells, column.id), view.cells)
       ),
       40
     ))
       widest = Math.max(widest, textWidth(value, { mono, medium: false }))
     for (const view of views) {
-      const mark = view.marks[column.id]
-      if (mark === undefined || mark.from === mark.to || view.status === "out") continue
+      const foundMark = O.fromUndefinedOr(view.marks[column.id])
+      if (O.isNone(foundMark)) continue
+      const mark = foundMark.value
+      if (mark.from === mark.to || view.status === "out") continue
       const from = textWidth(spellingOf(shownWith(column, mark.from, view.cells)), { mono, medium: false })
       const guess = isCellMarkProposed(mark) && O.isSome(choicesOf(mark.fix))
       // A mark that draws an icon: a model's sparkle, or the question mark of a suggestion nobody was named for.
@@ -329,7 +349,7 @@ const measureNeeds = (input: {
       const chip = textWidth(to, { mono, medium: true }) + chipChrome + icon
       const value = guess
         ? from + 6 + icon + textWidth(`${to}?`, { mono, medium: false })
-        : isCellMarkProposed(mark) && mark.from.trim() === mark.to && to.length > longValue
+        : isCellMarkProposed(mark) && ReviewText.comparison(mark.from) === mark.to && to.length > longValue
           ? chip
           : from + arrowGap + chip
       // A proposal carries its "Why?" in the cell, except under a group heading, which says why for all its rows.
@@ -376,7 +396,11 @@ export const actionsFit = (input: {
     const choices = O.flatMap(fix, choicesOf)
     const label = O.match(subject, {
       onNone: () => "",
-      onSome: (subject) => input.columns.find((column) => column.id === subject)?.label ?? subject
+      onSome: (subject) =>
+        O.match(O.fromUndefinedOr(input.columns.find((column) => column.id === subject)), {
+          onNone: () => subject,
+          onSome: (column) => column.label
+        })
     })
     const only = O.flatMap(
       O.filter(problem.choices, (picks) => picks.length === 1),
@@ -457,8 +481,8 @@ const Row = memo(function Row(props: {
   readonly cellEditor: O.Option<NonNullable<ReviewRegionProps["cellEditor"]>>
 }) {
   const { view, columns, actions } = props
-  const first = columns[0]
-  const name = nameOf(view, first)
+  const first = A.head(columns)
+  const name = nameOf(view, A.head(columns))
   // The problem the person can answer here, and the one the row shows: a row nothing here can fix shows its problem
   // (its tag, its reason, the cell it is in) and offers no answer.
   const problem = view.status === "needs" ? view.problem : O.none()
@@ -471,15 +495,15 @@ const Row = memo(function Row(props: {
   const choices = O.flatMap(fix, choicesOf)
   // One status mark per row: the tag. Only a required cell with nothing in it is also tinted, because an empty cell
   // has no ink to point at; a bad value is red text, a proposal is its own mark.
-  const subjectEmpty = O.isSome(subject) && TotalCells.text(view.cells, subject.value) === ""
+  const subjectEmpty = O.isSome(subject) && cellText(view.cells, subject.value) === ""
   const hiddenSubject =
     out ||
     O.isNone(subject) ||
-    (view.marks[subject.value] === undefined && subjectEmpty) ||
+    (O.isNone(R.get(view.marks, subject.value)) && subjectEmpty) ||
     columns.some((column) => O.contains(subject, column.id)) ||
     props.under.some((column) => O.contains(subject, column.id))
-      ? undefined
-      : props.allColumns.find((column) => O.contains(subject, column.id))
+      ? O.none<ReviewColumn>()
+      : O.fromUndefinedOr(props.allColumns.find((column) => O.contains(subject, column.id)))
   const bad =
     O.contains(
       O.orElse(
@@ -567,8 +591,10 @@ const Row = memo(function Row(props: {
 
   // A fix already in force on a cell says why too, and can be taken out again from there.
   const whyApplied = (column: ReviewColumn): ReactNode => {
-    const mark = view.marks[column.id]
-    if (props.readOnly || out || mark === undefined || !isCellMarkApplied(mark) || mark.by === "you") return null
+    const foundMark = O.fromUndefinedOr(view.marks[column.id])
+    if (props.readOnly || out || O.isNone(foundMark)) return null
+    const mark = foundMark.value
+    if (!isCellMarkApplied(mark) || mark.by === "you") return null
     if (O.isNone(mark.fix) || mark.from === mark.to) return null
     const made = mark.fix.value
     return (
@@ -611,7 +637,7 @@ const Row = memo(function Row(props: {
       )
     }
     const isSubject = O.contains(subject, column.id)
-    const text = TotalCells.text(view.cells, column.id)
+    const text = cellText(view.cells, column.id)
     return (
       <span
         className={cn(
@@ -621,7 +647,7 @@ const Row = memo(function Row(props: {
           isSubject && bad && O.isNone(fix) && "font-medium text-destructive"
         )}
       >
-        {(out || view.marks[column.id] === undefined) && text !== "" ? (
+        {(out || O.isNone(R.get(view.marks, column.id))) && text !== "" ? (
           // A plain value that does not fit ends in an ellipsis; its whole text is one hover, focus or tap away.
           <CutText text={shownWith(column, text, view.cells)} className="min-w-0" />
         ) : (
@@ -691,9 +717,9 @@ const Row = memo(function Row(props: {
   // outline button with its evidence, never as the row's own answer.
   const typeIt = (subject: string, guess: O.Option<Fix>): ReactNode => {
     if (O.isNone(problem)) return null
-    const label = O.getOrElse(HashMap.get(props.labels, subject), () => subject)
+    const label = O.match(HashMap.get(props.labels, subject), { onNone: () => subject, onSome: (label) => label })
     const own = O.flatMap(props.cellEditor, (editor) =>
-      editor({ row: view.row, column: subject, value: TotalCells.text(view.cells, subject) })
+      editor({ row: view.row, column: subject, value: cellText(view.cells, subject) })
     )
     return (
       <Overlay
@@ -741,7 +767,7 @@ const Row = memo(function Row(props: {
                 <EditForm
                   label={label}
                   size="sm"
-                  value={TotalCells.text(view.cells, subject)}
+                  value={cellText(view.cells, subject)}
                   onSave={(next) => {
                     close()
                     actions.edit(view.row.id, subject, next)
@@ -768,73 +794,77 @@ const Row = memo(function Row(props: {
 
   // A row's own answer takes at least 128 px and what its words need beyond that, as the actions column was sized
   // for (`actionsFit`). Short of room it cuts its words, never running under the button after it.
-  let main: ReactNode = null
+  let main: O.Option<ReactNode> = O.none()
   if (O.isSome(problem) && !props.readOnly && !props.banded) {
     if (O.isSome(picks) && O.isSome(subject)) {
       // A pick with no default: every choice is the same outline button, in the caller's order; a suggestion says so
       // in words and is not chosen for the person.
-      const only = picks.value.length === 1 ? picks.value[0] : undefined
-      main =
-        only !== undefined ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="xs"
-                className="min-w-32 shrink"
-                {...firstAction}
-                onClick={() => actions.edit(view.row.id, subject.value, only.value)}
-              >
-                <span className="truncate">{choiceText(only)}</span>
-                <span className="sr-only"> for {name}</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{choiceText(only)}</TooltipContent>
-          </Tooltip>
-        ) : (
-          <Overlay
-            title={O.match(problem.value.ask, { onNone: () => "Choose", onSome: (ask) => ask })}
-            about={`The choices for ${name}; none is chosen for you`}
-            align="end"
-            className="w-80"
-            trigger={
-              <Button variant="outline" size="xs" className="min-w-32 shrink" {...firstAction}>
-                <span className="truncate">
-                  {O.match(problem.value.ask, { onNone: () => "Choose", onSome: (ask) => ask })}
-                </span>
-                <span className="sr-only"> for {name}</span>
-              </Button>
-            }
-          >
-            {(close) => (
-              // Fifteen units are taller than a laptop's screen below the row: the list scrolls inside the panel, on a
-              // thin bar of its own that takes no room from the choices.
-              <ScrollArea className={picks.value.length > 7 ? "h-80" : undefined}>
-                <span className="flex flex-col gap-2 pr-3">
-                  {picks.value.map((pick) => (
-                    <Button
-                      key={pick.value}
-                      variant="outline"
-                      size="sm"
-                      className="h-auto min-h-8"
-                      onClick={() => {
-                        close()
-                        actions.edit(view.row.id, subject.value, pick.value)
-                      }}
-                    >
-                      {/* A suggestion's reason can be long: it wraps inside its button, never past the panel. */}
-                      <span className="py-1.5 whitespace-normal">{choiceText(pick)}</span>
-                    </Button>
-                  ))}
-                </span>
-              </ScrollArea>
-            )}
-          </Overlay>
-        )
+      const only = O.filter(A.head(picks.value), () => picks.value.length === 1)
+      main = O.some(
+        O.match(only, {
+          onSome: (only) => (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="xs"
+                  className="min-w-32 shrink"
+                  {...firstAction}
+                  onClick={() => actions.edit(view.row.id, subject.value, only.value)}
+                >
+                  <span className="truncate">{choiceText(only)}</span>
+                  <span className="sr-only"> for {name}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{choiceText(only)}</TooltipContent>
+            </Tooltip>
+          ),
+          onNone: () => (
+            <Overlay
+              title={O.match(problem.value.ask, { onNone: () => "Choose", onSome: (ask) => ask })}
+              about={`The choices for ${name}; none is chosen for you`}
+              align="end"
+              className="w-80"
+              trigger={
+                <Button variant="outline" size="xs" className="min-w-32 shrink" {...firstAction}>
+                  <span className="truncate">
+                    {O.match(problem.value.ask, { onNone: () => "Choose", onSome: (ask) => ask })}
+                  </span>
+                  <span className="sr-only"> for {name}</span>
+                </Button>
+              }
+            >
+              {(close) => (
+                // Fifteen units are taller than a laptop's screen below the row: the list scrolls inside the panel, on a
+                // thin bar of its own that takes no room from the choices.
+                <ScrollArea className={picks.value.length > 7 ? "h-80" : undefined}>
+                  <span className="flex flex-col gap-2 pr-3">
+                    {picks.value.map((pick) => (
+                      <Button
+                        key={pick.value}
+                        variant="outline"
+                        size="sm"
+                        className="h-auto min-h-8"
+                        onClick={() => {
+                          close()
+                          actions.edit(view.row.id, subject.value, pick.value)
+                        }}
+                      >
+                        {/* A suggestion's reason can be long: it wraps inside its button, never past the panel. */}
+                        <span className="py-1.5 whitespace-normal">{choiceText(pick)}</span>
+                      </Button>
+                    ))}
+                  </span>
+                </ScrollArea>
+              )}
+            </Overlay>
+          )
+        })
+      )
     } else if (O.isSome(subject) && O.isSome(fix) && weakGuess(fix.value)) {
-      main = typeIt(subject.value, fix)
+      main = O.fromNullOr(typeIt(subject.value, fix))
     } else if (O.isSome(fix) && O.isSome(choices)) {
-      main = (
+      main = O.some(
         <ButtonGroup aria-label={`Choose for ${name}`} className="min-w-32 shrink">
           {choices.value.map((choice, at) => (
             <Tooltip key={choice}>
@@ -860,7 +890,7 @@ const Row = memo(function Row(props: {
         </ButtonGroup>
       )
     } else if (O.isSome(fix)) {
-      main = (
+      main = O.some(
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -878,7 +908,7 @@ const Row = memo(function Row(props: {
         </Tooltip>
       )
     } else if (O.isSome(subject)) {
-      main = typeIt(subject.value, O.none())
+      main = O.fromNullOr(typeIt(subject.value, O.none()))
     }
   }
 
@@ -891,65 +921,71 @@ const Row = memo(function Row(props: {
       {...R.getSomes({ "data-group": props.banded ? O.map(props.group, (group) => group.id) : O.none() })}
       aria-rowindex={props.index + 2}
     >
-      {first === undefined ? null : (
-        <StickyTableRowHeader
-          grouped={O.isSome(props.group)}
-          tone={O.contains(subject, first.id) && subjectEmpty ? "danger" : undefined}
-        >
-          <span className="flex items-center gap-2.5">
-            {props.folded.length === 0 ? null : (
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="-mr-1.5 flex-none"
-                aria-expanded={props.expanded}
-                aria-label={`${props.expanded ? "Hide" : "Show"} ${props.folded.map((column) => column.label).join(", ")} for row ${rowName(view.row)}`}
-                onClick={() => props.onExpand(view.row.id)}
-              >
-                {props.expanded ? <ChevronDownIcon aria-hidden /> : <ChevronRightIcon aria-hidden />}
-              </Button>
-            )}
-            <span className="w-7 flex-none text-right text-xs font-normal text-muted-foreground tabular-nums">
-              {view.row.line}
-            </span>
-            <span className="min-w-0 flex-1">
-              {out ? (
-                <del className="block font-normal text-muted-foreground">
-                  <CutText text={name} />
-                </del>
-              ) : TotalCells.text(view.cells, first.id) === "" && view.marks[first.id] === undefined ? (
-                // An empty name with a suggestion for it shows the suggestion (who made it, Why?, Reject) instead.
-                <span className="font-normal text-destructive">Empty</span>
-              ) : (
-                <span className="flex min-w-0">{value(first)}</span>
-              )}
-              {props.under.length === 0 && hiddenSubject === undefined ? null : (
-                <span
-                  className={cn(
-                    "flex gap-2 truncate font-normal text-muted-foreground",
-                    // In a 36px row the line is tighter than in a 44px one.
-                    props.dense ? "text-xs leading-3.5" : "items-center text-xs leading-4"
-                  )}
+      {O.match(first, {
+        onNone: () => null,
+        onSome: (first) => (
+          <StickyTableRowHeader
+            grouped={O.isSome(props.group)}
+            tone={O.contains(subject, first.id) && subjectEmpty ? "danger" : undefined}
+          >
+            <span className="flex items-center gap-2.5">
+              {props.folded.length === 0 ? null : (
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="-mr-1.5 flex-none"
+                  aria-expanded={props.expanded}
+                  aria-label={`${props.expanded ? "Hide" : "Show"} ${props.folded.map((column) => column.label).join(", ")} for row ${rowName(view.row)}`}
+                  onClick={() => props.onExpand(view.row.id)}
                 >
-                  {props.under.map((column) => (
-                    <span key={column.id} className="min-w-0">
-                      <span className="sr-only">{column.label} </span>
-                      {value(column)}
-                    </span>
-                  ))}
-                  {/* The row's problem is in a column this width has no room for: its change is shown here, so
-                      every row under a heading still says what it was and what it becomes. */}
-                  {hiddenSubject === undefined ? null : (
-                    <span className="min-w-0 flex-none">
-                      {hiddenSubject.label} {value(hiddenSubject)}
-                    </span>
-                  )}
-                </span>
+                  {props.expanded ? <ChevronDownIcon aria-hidden /> : <ChevronRightIcon aria-hidden />}
+                </Button>
               )}
+              <span className="w-7 flex-none text-right text-xs font-normal text-muted-foreground tabular-nums">
+                {view.row.line}
+              </span>
+              <span className="min-w-0 flex-1">
+                {out ? (
+                  <del className="block font-normal text-muted-foreground">
+                    <CutText text={name} />
+                  </del>
+                ) : cellText(view.cells, first.id) === "" && O.isNone(R.get(view.marks, first.id)) ? (
+                  // An empty name with a suggestion for it shows the suggestion (who made it, Why?, Reject) instead.
+                  <span className="font-normal text-destructive">Empty</span>
+                ) : (
+                  <span className="flex min-w-0">{value(first)}</span>
+                )}
+                {props.under.length === 0 && O.isNone(hiddenSubject) ? null : (
+                  <span
+                    className={cn(
+                      "flex gap-2 truncate font-normal text-muted-foreground",
+                      // In a 36px row the line is tighter than in a 44px one.
+                      props.dense ? "text-xs leading-3.5" : "items-center text-xs leading-4"
+                    )}
+                  >
+                    {props.under.map((column) => (
+                      <span key={column.id} className="min-w-0">
+                        <span className="sr-only">{column.label} </span>
+                        {value(column)}
+                      </span>
+                    ))}
+                    {/* The row's problem is in a column this width has no room for: its change is shown here, so
+                      every row under a heading still says what it was and what it becomes. */}
+                    {O.match(hiddenSubject, {
+                      onNone: () => null,
+                      onSome: (hidden) => (
+                        <span className="min-w-0 flex-none">
+                          {hidden.label} {value(hidden)}
+                        </span>
+                      )
+                    })}
+                  </span>
+                )}
+              </span>
             </span>
-          </span>
-        </StickyTableRowHeader>
-      )}
+          </StickyTableRowHeader>
+        )
+      })}
       {props.showStatus ? (
         <StickyTableCell>
           {O.match(shownProblem, {
@@ -992,14 +1028,14 @@ const Row = memo(function Row(props: {
               </span>
             ) : O.isSome(problem) && O.isSome(others) && O.isSome(extra) ? (
               <>
-                {main}
+                {O.match(main, { onNone: () => null, onSome: (main) => main })}
                 <Overlay
                   title={`Other answers for row ${rowName(view.row)}`}
                   about={`Type a value, leave row ${rowName(view.row)} out, or the page's own answer for ${name}`}
                   align="end"
                   className="w-80"
                   trigger={
-                    <Button variant="quiet" size="xs" {...(main === null ? firstAction : {})}>
+                    <Button variant="quiet" size="xs" {...(O.isNone(main) ? firstAction : {})}>
                       Other answers<span className="sr-only"> for {name}</span>
                     </Button>
                   }
@@ -1014,7 +1050,10 @@ const Row = memo(function Row(props: {
                               onSome: (present) => (
                                 <EditForm
                                   key="type"
-                                  label={O.getOrElse(HashMap.get(props.labels, present), () => present)}
+                                  label={O.match(HashMap.get(props.labels, present), {
+                                    onNone: () => present,
+                                    onSome: (label) => label
+                                  })}
                                   size="sm"
                                   value=""
                                   onSave={(next) => {
@@ -1073,11 +1112,11 @@ const Row = memo(function Row(props: {
                 ),
                 onSome: () => (
                   <>
-                    {main}
+                    {O.match(main, { onNone: () => null, onSome: (main) => main })}
                     <Button
                       variant="quiet"
                       size="xs"
-                      {...(main === null ? firstAction : {})}
+                      {...(O.isNone(main) ? firstAction : {})}
                       onClick={() => actions.leaveOut(view.row.id)}
                     >
                       Leave out<span className="sr-only"> {name}</span>
@@ -1140,7 +1179,7 @@ function Detail(props: { readonly view: RowView; readonly columns: ReadonlyArray
           </dt>
           <dd className={cn("min-w-0 whitespace-normal", codeFace(column))}>
             <CellValue
-              value={TotalCells.text(view.cells, column.id)}
+              value={cellText(view.cells, column.id)}
               display={(text) => shownWith(column, text, view.cells)}
               mark={view.status === "out" ? O.none() : R.get(view.marks, column.id)}
               accepted={O.contains(view.decided, "accepted")}
@@ -1224,7 +1263,10 @@ function GroupRow(props: {
   const rowIds = group.rowIds.filter((rowId) => !HashSet.has(props.excluded, rowId))
   const n = rowIds.length
   const choices = choicesOf(group)
-  const column = O.getOrElse(HashMap.get(props.labels, group.column), () => group.column)
+  const column = O.match(HashMap.get(props.labels, group.column), {
+    onNone: () => group.column,
+    onSome: (label) => label
+  })
   const other = `Other ${inSentence(column)}`
   const leaveOut = `Leave out ${n}`
   // The quiet answers side by side when the column has room for both, else behind one button.
@@ -1409,13 +1451,25 @@ function GroupRow(props: {
 type Heading = { readonly group: O.Option<FixGroup>; readonly sectioned: boolean }
 
 /** What the grid notes of the lines it was last given: when to measure again, and when to go back to the top. */
-type Sign = {
-  readonly hash: number
-  readonly firstKey: string
-  readonly length: number
-  readonly measure: number
-  readonly top: number
-}
+class Sign extends S.Opaque<Sign, { readonly brand: unique symbol }>()(
+  S.Struct({
+    hash: S.Int,
+    firstKey: S.String.pipe(
+      S.withConstructorDefault(Effect.succeed("")),
+      S.withDecodingDefaultTypeKey(Effect.succeed(""))
+    ),
+    length: S.Natural,
+    measure: S.Natural.pipe(
+      S.withConstructorDefault(Effect.succeed(0)),
+      S.withDecodingDefaultTypeKey(Effect.succeed(0))
+    ),
+    top: S.Natural.pipe(S.withConstructorDefault(Effect.succeed(0)), S.withDecodingDefaultTypeKey(Effect.succeed(0)))
+  }).pipe(
+    $ReviewId
+      .create("ReviewGrid")
+      .annoteSchema("Sign", { description: "The grid's line identity and measurement revision" })
+  )
+) {}
 
 /**
  * The virtual list of one grid: TanStack's, which keeps the scroll position and the lines' measured sizes. The grid
@@ -1597,17 +1651,24 @@ const makeGrid: {
       const sized = columns.map((column, index) => ({
         id: column.id,
         size: column.size,
-        need: measured[index] ?? O.match(column.width, { onNone: () => fillLeast, onSome: (width) => width }),
+        need: O.match(A.get(measured, index), {
+          onNone: () => O.match(column.width, { onNone: () => fillLeast, onSome: identity }),
+          onSome: identity
+        }),
         priority: priorityOf(column),
         keep: index === 0 || column.id === reasonColumn.id || HashSet.has(kept, column.id)
       }))
       const first = planColumns({ columns: sized, fixed, room })
       const detailed = first.folded.some((id) => columns.find((column) => column.id === id)?.under !== true)
-      const head = sized[0]
       // Rows with a detail carry a button before their number: a first column sized to its values makes room for it.
-      return detailed && head !== undefined && head.size === "fit"
-        ? planColumns({ columns: [{ ...head, need: head.need + expander }, ...sized.slice(1)], fixed, room })
-        : first
+      return O.match(
+        O.filter(A.head(sized), (head) => detailed && head.size === "fit"),
+        {
+          onNone: () => first,
+          onSome: (head) =>
+            planColumns({ columns: [{ ...head, need: head.need + expander }, ...sized.slice(1)], fixed, room })
+        }
+      )
     }),
     // A plan is ids and widths: two that read the same are the same plan.
     (before, next) => stringify(before) === stringify(next)
@@ -1670,30 +1731,35 @@ const makeGrid: {
       const shape = lineMatch(entry, { Row: () => 1, Detail: () => 2, Group: () => 3, Kind: () => 3, Rest: () => 3 })
       hash = (Math.imul(hash, 31) + shape) | 0
     }
-    const head = now[0]
-    const firstKey =
-      head === undefined
-        ? ""
-        : lineMatch(head, {
+    const stamp = Sign.make({
+      hash,
+      length: now.length,
+      ...R.getSomes({
+        firstKey: O.map(A.head(now), (head) =>
+          lineMatch(head, {
             Row: (line) => line.view.row.id,
             Detail: () => "detail",
             Group: () => "group",
             Kind: () => "kind",
             Rest: () => "rest"
           })
+        )
+      })
+    })
+    const firstKey = stamp.firstKey
     return O.match(get.self<Sign>(), {
-      onNone: () => ({ hash, firstKey, length: now.length, measure: 0, top: 0 }),
+      onNone: () => stamp,
       onSome: (before) =>
         before.hash === hash && before.firstKey === firstKey && before.length === now.length
           ? before
-          : {
+          : Sign.make({
               hash,
               firstKey,
               length: now.length,
               measure: before.measure + 1,
               top:
                 before.firstKey !== firstKey && Math.abs(before.length - now.length) > 1 ? before.top + 1 : before.top
-            }
+            })
     })
   })
   // A value under the name takes a second line: such rows are 44 px whatever the density, so the virtual list's
@@ -1703,16 +1769,18 @@ const makeGrid: {
   )
 
   const sizeOf = (index: number): number => {
-    const line = registry.get(entries)[index]
-    return line === undefined
-      ? bandHeight
-      : lineMatch(line, {
+    const line = TanStackVirtual.entry(registry.get(entries), index)
+    return O.match(line, {
+      onNone: () => bandHeight,
+      onSome: (line) =>
+        lineMatch(line, {
           Row: () => registry.get(rowSize),
           Group: () => groupHeight,
           Kind: () => bandHeight,
           Rest: () => bandHeight,
           Detail: () => bandHeight
         })
+    })
   }
 
   // -- The virtual list is TanStack's: where the frame is scrolled to and how tall each line was measured are its
@@ -1734,7 +1802,7 @@ const makeGrid: {
   }
   const list: Lines = new Virtualizer<HTMLDivElement, Element>({
     count: registry.get(entries).length,
-    getScrollElement: () => O.getOrNull(registry.get(scroller)),
+    getScrollElement: () => TanStackVirtual.scroller(registry.get(scroller)),
     estimateSize: sizeOf,
     overscan: 12,
     // A new size of the frame is told even when the range stays: the lines in view are read again all the same.
@@ -1780,7 +1848,7 @@ const makeGrid: {
       get(heard)
       get(rowSize)
       get(scroller)
-      if (!inStep(lines)) return O.getOrElse(get.self<Drawn>(), () => nothingDrawn)
+      if (!inStep(lines)) return AtomContext.previous(get, () => nothingDrawn)
       return { items: list.getVirtualItems(), total: list.getTotalSize() }
     }),
     (before, next) => before.items === next.items && before.total === next.total
@@ -1904,14 +1972,13 @@ export function ReviewGrid(props: GridProps) {
   // The region asks for a row to be in view before it puts the focus there.
   useAtomSubscribe(region.reveal, grid.bring)
 
-  const padTop = items[0]?.start ?? 0
-  const padBottom = total - (items[items.length - 1]?.end ?? 0)
+  const { top: padTop, bottom: padBottom } = TanStackVirtual.padding(items, total)
   const span = columns.length + (showStatus ? 2 : 1)
   // The flex column is drawn without a width and takes what the others leave, so rounding never opens a gap.
   const widthOf = (id: string): number | undefined =>
     O.contains(plan.flex, id) ? undefined : plan.shown.find((shown) => shown.id === id)?.width
   const widths = [
-    widthOf(columns[0]?.id ?? ""),
+    O.match(A.head(columns), { onNone: () => widthOf(""), onSome: (column) => widthOf(column.id) }),
     ...(showStatus ? [statusWidth] : []),
     ...columns.slice(1).map((column) => widthOf(column.id)),
     actionsWidth
@@ -1928,7 +1995,7 @@ export function ReviewGrid(props: GridProps) {
         <StickyTableHeader>
           <StickyTableRow aria-rowindex={1}>
             {columns.map((column, index) => {
-              const sortable = column.id === reasonColumn.id ? undefined : props.table.getColumn(column.id)
+              const sortable = column.id === reasonColumn.id ? O.none() : TanStackTable.column(props.table, column.id)
               return (
                 <Fragment key={column.id}>
                   <StickyTableColumn
@@ -1936,7 +2003,7 @@ export function ReviewGrid(props: GridProps) {
                     {...R.getSomes({ align: column.align })}
                     // A sortable heading is one control as large as its cell, so the cell keeps no padding of its own.
                     flush={
-                      sortable !== undefined &&
+                      O.isSome(sortable) &&
                       !(O.exists(column.match, isColumnMatchUnmatched) && props.onMatch !== undefined)
                     }
                   >
@@ -1948,11 +2015,11 @@ export function ReviewGrid(props: GridProps) {
                       >
                         {index === 0 && folded.length > 0 ? <span aria-hidden className="w-6 flex-none" /> : null}
                         {index === 0 ? <span className="mr-0.5 w-7 flex-none text-right text-xs">Row</span> : null}
-                        {sortable === undefined ? (
+                        {O.isNone(sortable) ? (
                           column.label
                         ) : (
                           <DataTableColumnHeader
-                            column={sortable}
+                            column={sortable.value}
                             label={column.label}
                             {...R.getSomes({ unit: column.unit })}
                             // The sort mark sits beside its own label, never at the cell's far edge, where it read
@@ -1999,9 +2066,9 @@ export function ReviewGrid(props: GridProps) {
             <>
               {padTop > 0 ? <StickyTableFill span={span} height={padTop} /> : null}
               {items.map((item) => {
-                const entry = entries[item.index]
-                if (entry === undefined) return null
-                return lineMatch<ReactNode>(entry, {
+                const entry = TanStackVirtual.entry(entries, item.index)
+                if (O.isNone(entry)) return null
+                return lineMatch<ReactNode>(entry.value, {
                   Detail: ({ view }) => (
                     <StickyTableBand
                       key={`detail:${view.row.id}`}

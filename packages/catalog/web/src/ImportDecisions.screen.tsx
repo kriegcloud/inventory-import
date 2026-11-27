@@ -21,7 +21,7 @@ import { fieldLabels } from "@inventory/catalog-contract/Staged"
 import { catalogApi } from "./Catalog.runtime.ts"
 import { catalogKeys } from "./Catalog.keys.ts"
 import { importAddress } from "./internal/route.ts"
-import { when } from "./internal/format.tsx"
+import { importWords, when } from "./internal/format.tsx"
 
 const sourceWords = { rule: "Rule", model: "Model", person: "Person" } as const
 
@@ -29,7 +29,7 @@ const proposedBy = (record: ChangeRecord): string => sourceWords[changeSource(re
 const decidedBy = (record: ChangeRecord): string =>
   changeDecidedBy(record.change) === "rule"
     ? "Rule"
-    : O.match(record.decidedByName, { onNone: () => "Person", onSome: (name) => name })
+    : O.match(record.decidedByName, { onNone: () => importWords.notRecorded, onSome: (name) => name })
 /** How sure the proposal's source was, when the value came from a proposal. */
 const confidenceOf = (record: ChangeRecord): O.Option<string> => changeConfidence(record.change)
 

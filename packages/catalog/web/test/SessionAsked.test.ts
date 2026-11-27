@@ -1,3 +1,4 @@
+import { StorageTwin } from "@inventory/ui/StorageTwin"
 import type { SaveAnswer } from "./support/catalog.ts"
 import * as MutableRef from "effect/MutableRef"
 import { assertTrue } from "@effect/vitest/utils"
@@ -35,7 +36,7 @@ const browser = vi.hoisted(() => {
   const kept: Record<string, string> = {}
   const tab: Record<string, string> = {}
   const storage = (of: Record<string, string>) => ({
-    getItem: (key: string) => of[key] ?? null,
+    getItem: (key: string) => StorageTwin.getItem(of, key),
     setItem: (key: string, value: string) => {
       of[key] = value
     },

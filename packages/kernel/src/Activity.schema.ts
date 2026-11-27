@@ -10,7 +10,7 @@
 import * as S from "effect/Schema"
 import * as Model from "effect/schema/Model"
 import { ActivityId, MemberId, OrganizationId } from "./Ids.id.ts"
-import { aboutClass, aboutProperty, noTerm } from "./Terms.pointer.ts"
+import { aboutClass, aboutPath, aboutProperty, noTerm } from "./Terms.pointer.ts"
 import { DisplayName } from "./Text.schema.ts"
 
 // The marks of the three fields built as a `Model` `Field` (report 14 section 3.5). A `Field` is marked on each variant
@@ -18,9 +18,11 @@ import { DisplayName } from "./Text.schema.ts"
 // variant's own type; the marks are hoisted as annotation objects, never as an `S.annotateKey(...)` callback, which
 // would type every variant it touched as `Top`.
 const subjectMark = aboutClass("inv:AuditEntry")
-const deferredMark = {
+// Decision 135: the run that made the change, then its agent's name. The lift states nothing for it (decision 155):
+// `AgentRun` stores no id, so a run is stated on fixtures by hand.
+const agentMark = {
   description: "The agent that did this for the actor. None: the person did it themselves.",
-  ...noTerm("deferred", "party")
+  ...aboutPath([{ property: "inv:recordedAgentRun", node: "inv:AgentRun" }, { property: "inv:agentName" }])
 }
 const atMark = aboutProperty("inv:recordedAt")
 
@@ -66,12 +68,12 @@ export class Activity extends Model.Class<Activity>("Activity")(
       })
     ),
     agent: Model.fieldEvolve(Model.FieldOption(DisplayName), {
-      select: (s) => s.annotateKey(deferredMark),
-      insert: (s) => s.annotateKey(deferredMark),
-      update: (s) => s.annotateKey(deferredMark),
-      json: (s) => s.annotateKey(deferredMark),
-      jsonCreate: (s) => s.annotateKey(deferredMark),
-      jsonUpdate: (s) => s.annotateKey(deferredMark)
+      select: (s) => s.annotateKey(agentMark),
+      insert: (s) => s.annotateKey(agentMark),
+      update: (s) => s.annotateKey(agentMark),
+      json: (s) => s.annotateKey(agentMark),
+      jsonCreate: (s) => s.annotateKey(agentMark),
+      jsonUpdate: (s) => s.annotateKey(agentMark)
     }),
     createdAt: Model.fieldEvolve(Model.DateTimeInsert, {
       select: (s) => s.annotateKey(atMark),

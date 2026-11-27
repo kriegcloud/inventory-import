@@ -143,8 +143,8 @@ branch stands at `722b08a1`). The vocabulary is
 `packages/kernel/src/Terms.vocab.ts`, its helpers `@beep/vocabulary` (`packages/foundation/modeling/vocabulary`), and
 the projector, the fixtures and gates 1 to 5, 8 and 9 are `@inventory/ontology` (`packages/ontology`). Gate 6 is the
 type-check and gate 7 the law `bun run beep laws ontology-terms`. `bun run check` runs gates 1 to 8 and
-`bun run check:full` gate 9 as well, with ROBOT v1.9.11 and HermiT under Java 17. The CI job for gate 9 is written
-and has not run on GitHub. [PLAN](PLAN.md) has the steps, the choices made along the way, the walk of each planted
+`bun run check:full` gate 9 as well, with ROBOT v1.9.11 and HermiT under Java 17. The CI job for gate 9 runs on
+GitHub and passes; its first run failed and was fixed. [PLAN](PLAN.md) has the steps, the choices made along the way, the walk of each planted
 mistake through the gates and the closing note.
 
 ## Decisions

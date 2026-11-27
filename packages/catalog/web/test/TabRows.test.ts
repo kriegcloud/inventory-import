@@ -1,3 +1,6 @@
+import { TabIdentity } from "./support/TabIdentity.schema.ts"
+import { WebLocks } from "./support/webLocks.adapter.ts"
+import { StorageTwin } from "@inventory/ui/StorageTwin"
 import * as MutableRef from "effect/MutableRef"
 import { assertTrue } from "@effect/vitest/utils"
 import { identity } from "effect/Function"
@@ -60,7 +63,7 @@ const browser = vi.hoisted(() => {
   const closed = false
   // An erase reaches the storage every tab reads a moment later, as another tab's copy lags behind it in a browser.
   const storage = (of: () => Record<string, string>) => ({
-    getItem: (key: string) => of()[key] ?? null,
+    getItem: (key: string) => StorageTwin.getItem(of(), key),
     setItem: (key: string, value: string) => {
       of()[key] = value
     },
@@ -109,7 +112,7 @@ const browser = vi.hoisted(() => {
           callback: (lock: unknown) => Promise<unknown>
         ) =>
           Promise.resolve().then(() => {
-            const mode = options.mode ?? "exclusive"
+            const mode = WebLocks.mode(options)
             // As a browser grants: a shared lock beside shared ones, an exclusive one alone, and never past a request
             // that waits for the same lock already.
             const free = (): boolean => {
@@ -244,7 +247,7 @@ const tab = (own: Record<string, string>, signedIn: O.Option<Member>) =>
       return {
         /** This tab's id once it is its own (empty before): a copy of an open tab takes another once it finds the lock held. */
         get id() {
-          return O.getOrElse(registry.get(tabs.thisTab), () => "")
+          return O.match(registry.get(tabs.thisTab), { onNone: () => TabIdentity.make({}).value, onSome: identity })
         },
         session: browser.session.current.now,
         saves,

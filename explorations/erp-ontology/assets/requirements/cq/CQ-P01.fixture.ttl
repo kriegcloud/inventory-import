@@ -1,0 +1,78 @@
+# The fixture of CQ-P01 (report 04 section 4, report 18 section 10). Two tenants hold records of the organizations
+# they trade with: test_ExampleWorks a co-packer it buys from and sells to, a flour mill it only buys from, a shared
+# company it only sells to and a sole trader, a person, with both flags true; test_SecondOrg another co-packer with
+# both flags true and its own record of the shared company, which it only buys from. Each record states its source
+# keys and one capturedAt, its latest read (decision 156). Nothing here is a record of this app, and every name
+# starts `test_`.
+@base <https://example.org/inventory-import/> .
+@prefix inv: <https://example.org/inventory-import/ontology/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<data/test_ExampleWorks/Tenant/test_ExampleWorks> a inv:Tenant .
+<data/test_SecondOrg/Tenant/test_SecondOrg> a inv:Tenant .
+
+<fixture/Organization/test_CoPacker> a inv:Organization .
+<fixture/Organization/test_FlourMill> a inv:Organization .
+<fixture/Organization/test_SharedCo> a inv:Organization .
+<fixture/Organization/test_OtherCoPacker> a inv:Organization .
+<fixture/Person/test_SoleTrader> a inv:Person .
+
+<fixture/SourceRecord/test_WorksCoPacker> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:recordOf <fixture/Organization/test_CoPacker> ;
+  inv:sourceSystem "test_Ledger" ;
+  inv:sourceType "Company" ;
+  inv:sourceId "0001" ;
+  inv:capturedAt "2026-11-01T09:00:00Z"^^xsd:dateTime ;
+  inv:isCustomer true ;
+  inv:isVendor true .
+
+<fixture/SourceRecord/test_WorksFlourMill> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:recordOf <fixture/Organization/test_FlourMill> ;
+  inv:sourceSystem "test_Ledger" ;
+  inv:sourceType "Company" ;
+  inv:sourceId "0002" ;
+  inv:capturedAt "2026-11-01T09:00:00Z"^^xsd:dateTime ;
+  inv:isCustomer false ;
+  inv:isVendor true .
+
+<fixture/SourceRecord/test_WorksSharedCo> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:recordOf <fixture/Organization/test_SharedCo> ;
+  inv:sourceSystem "test_Ledger" ;
+  inv:sourceType "Company" ;
+  inv:sourceId "0003" ;
+  inv:capturedAt "2026-11-01T09:00:00Z"^^xsd:dateTime ;
+  inv:isCustomer true ;
+  inv:isVendor false .
+
+<fixture/SourceRecord/test_WorksSoleTrader> a inv:SourceRecord ;
+  inv:inTenant <data/test_ExampleWorks/Tenant/test_ExampleWorks> ;
+  inv:recordOf <fixture/Person/test_SoleTrader> ;
+  inv:sourceSystem "test_Ledger" ;
+  inv:sourceType "Company" ;
+  inv:sourceId "0004" ;
+  inv:capturedAt "2026-11-01T09:00:00Z"^^xsd:dateTime ;
+  inv:isCustomer true ;
+  inv:isVendor true .
+
+<fixture/SourceRecord/test_SecondOtherCoPacker> a inv:SourceRecord ;
+  inv:inTenant <data/test_SecondOrg/Tenant/test_SecondOrg> ;
+  inv:recordOf <fixture/Organization/test_OtherCoPacker> ;
+  inv:sourceSystem "test_Ledger" ;
+  inv:sourceType "Company" ;
+  inv:sourceId "0001" ;
+  inv:capturedAt "2026-11-01T09:00:00Z"^^xsd:dateTime ;
+  inv:isCustomer true ;
+  inv:isVendor true .
+
+<fixture/SourceRecord/test_SecondSharedCo> a inv:SourceRecord ;
+  inv:inTenant <data/test_SecondOrg/Tenant/test_SecondOrg> ;
+  inv:recordOf <fixture/Organization/test_SharedCo> ;
+  inv:sourceSystem "test_Ledger" ;
+  inv:sourceType "Company" ;
+  inv:sourceId "0003" ;
+  inv:capturedAt "2026-11-01T09:00:00Z"^^xsd:dateTime ;
+  inv:isCustomer false ;
+  inv:isVendor true .

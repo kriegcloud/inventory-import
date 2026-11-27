@@ -1,3 +1,4 @@
+import { cycle } from "./cycle.ts"
 import { identity } from "effect/Function"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
@@ -18,19 +19,22 @@ export const lineKinds: ReadonlyArray<ProblemKind> = [
     id: "unit",
     label: "Unit to pick",
     tone: "decision",
-    help: O.some("The file says “length”. Pick the unit the job counts it in.")
+    help: O.some("The file says “length”. Pick the unit the job counts it in."),
+    fixable: true
   }),
   ProblemKind.make({
     id: "comma",
     label: "Decimal comma",
     tone: "decision",
-    help: O.some("The quantity is written with a comma.")
+    help: O.some("The quantity is written with a comma."),
+    fixable: true
   }),
   ProblemKind.make({
     id: "stock",
     label: "Not in stock",
     tone: "blocker",
-    help: O.some("The SKU is not on your item list. Type one, or leave it out.")
+    help: O.some("The SKU is not on your item list. Type one, or leave it out."),
+    fixable: true
   })
 ]
 
@@ -156,94 +160,102 @@ const strangers: A.NonEmptyReadonlyArray<Material> = [
   { name: "Zinc primer 2 L tin", sku: "PG-zinc-2L", unit: "L" }
 ]
 
+// The immutable source cycles select each job's members once; each generation below still makes fresh jobs and lines.
+const jobPlans = A.map(making, (what, index) => ({
+  what,
+  due: cycle(days, index * 2),
+  lines: A.makeBy(4 + ((index * 5) % 4), (at) => {
+    const material = cycle(materials, index * 3 + at * 7)
+    const qty = material.unit === "pcs" ? String(8 + ((index + at) % 5) * 4) : String(2 + ((index * at) % 5))
+    // The source plan is fixed; generation still constructs each row afresh.
+    const unit = material.unit === "m" && (index + at) % 6 === 0 ? "pcs" : material.unit
+    return { job: `J-${2041 + index}`, material: material.name, sku: material.sku, qty, unit }
+  })
+}))
+
 /** The file as the page reads it: 24 jobs, 4 to 7 lines each, the same every time. */
 export function makeJobs(): ReadonlyArray<Job> {
   let line = 2
-  const jobs = making.map((what, index) => {
-    const count = 4 + ((index * 5) % 4)
+  const jobs = A.map(jobPlans, ({ what, due, lines: planned }, index) => {
     const lines: Array<Line> = []
-    for (let at = 0; at < count; at += 1) {
-      const material = materials[(index * 3 + at * 7) % materials.length] ?? A.headNonEmpty(materials)
-      const qty = material.unit === "pcs" ? String(8 + ((index + at) % 5) * 4) : String(2 + ((index * at) % 5))
-      // Now and then a bar is counted in cut pieces, not metres: both are on the unit list.
-      const unit = material.unit === "m" && (index + at) % 6 === 0 ? "pcs" : material.unit
+    for (const source of planned) {
       lines.push(
         Line.make({
           line,
-          job: `J-${2041 + index}`,
-          material: material.name,
-          sku: material.sku,
-          qty,
-          unit,
+          job: source.job,
+          material: source.material,
+          sku: source.sku,
+          qty: source.qty,
+          unit: source.unit,
           problem: O.none()
         })
       )
       line += 1
     }
-    const due = days[(index * 2) % days.length] ?? "Mon 23 Nov"
     return { code: `J-${2041 + index}`, making: what, due, lines }
   })
   // The questions, then the suggestion for a unit: what the other lines with that SKU say.
   let comma = 0
   let stranger = 0
   for (const [jobAt, lineAt, kind] of questions) {
-    const job = jobs[jobAt]
-    const target = job?.lines[lineAt]
-    if (job === undefined || target === undefined) continue
-    const lines = [...job.lines]
-    if (kind === "unit") {
-      const bar = materials[(jobAt + lineAt) % 4] ?? A.headNonEmpty(materials)
-      lines[lineAt] = {
-        ...target,
-        material: bar.name,
-        sku: bar.sku,
-        unit: "length",
-        problem: Problem.makeOption({ kind: "unit", column: O.some("unit"), ask: O.some("Pick a unit") })
+    const foundJob = A.get(jobs, jobAt)
+    const foundTarget = O.flatMap(foundJob, (job) => A.get(job.lines, lineAt))
+    O.map(O.all({ job: foundJob, target: foundTarget }), ({ job, target }) => {
+      const lines = [...job.lines]
+      if (kind === "unit") {
+        const bar = cycle(materials, (jobAt + lineAt) % 4)
+        lines[lineAt] = {
+          ...target,
+          material: bar.name,
+          sku: bar.sku,
+          unit: "length",
+          problem: Problem.makeOption({ kind: "unit", column: O.some("unit"), ask: O.some("Pick a unit") })
+        }
       }
-    }
-    if (kind === "comma") {
-      const [qty, material] = commas[comma % commas.length] ?? ["1,5", A.headNonEmpty(materials)]
-      comma += 1
-      const to = qty.replace(",", ".")
-      lines[lineAt] = {
-        ...target,
-        material: material.name,
-        sku: material.sku,
-        unit: material.unit,
-        qty,
-        problem: Problem.makeOption({
-          kind: "comma",
-          column: O.some("qty"),
-          fix: O.some(
-            Fix.make({
-              column: "qty",
-              to,
-              label: O.some("a decimal point"),
-              by: O.some("rule"),
-              confidence: O.some("high"),
-              kind: "comma",
-              group: O.some("qty:comma"),
-              why: {
-                basis: `"${qty}" is ${to} written with a decimal comma.`,
-                detail: O.some("Every other quantity in the file uses a point.")
-              }
-            })
-          )
-        })
+      if (kind === "comma") {
+        const [qty, material] = cycle(commas, comma)
+        comma += 1
+        const to = qty.replace(",", ".")
+        lines[lineAt] = {
+          ...target,
+          material: material.name,
+          sku: material.sku,
+          unit: material.unit,
+          qty,
+          problem: Problem.makeOption({
+            kind: "comma",
+            column: O.some("qty"),
+            fix: O.some(
+              Fix.make({
+                column: "qty",
+                to,
+                label: O.some("a decimal point"),
+                by: O.some("rule"),
+                confidence: O.some("high"),
+                kind: "comma",
+                group: O.some("qty:comma"),
+                why: {
+                  basis: `"${qty}" is ${to} written with a decimal comma.`,
+                  detail: O.some("Every other quantity in the file uses a point.")
+                }
+              })
+            )
+          })
+        }
       }
-    }
-    if (kind === "stock") {
-      const material = strangers[stranger % strangers.length] ?? A.headNonEmpty(strangers)
-      stranger += 1
-      lines[lineAt] = {
-        ...target,
-        material: material.name,
-        sku: material.sku,
-        unit: material.unit,
-        problem: Problem.makeOption({ kind: "stock", column: O.some("sku"), ask: O.some("Type a SKU") })
+      if (kind === "stock") {
+        const material = cycle(strangers, stranger)
+        stranger += 1
+        lines[lineAt] = {
+          ...target,
+          material: material.name,
+          sku: material.sku,
+          unit: material.unit,
+          problem: Problem.makeOption({ kind: "stock", column: O.some("sku"), ask: O.some("Type a SKU") })
+        }
       }
-    }
-    job.lines = lines
+      job.lines = lines
+    })
   }
   const all = jobs.flatMap((job) => job.lines)
   for (const job of jobs) {

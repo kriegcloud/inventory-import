@@ -1,4 +1,6 @@
+import { ReviewText } from "./internal/ReviewText.rules.ts"
 import * as S from "effect/Schema"
+import { facetColumn } from "./internal/facetColumn.ts"
 import { platform, byId } from "./internal/browser.ts"
 import { ColumnMatch } from "@inventory/review/ReviewTypes"
 import {
@@ -400,7 +402,7 @@ function RegionBody(props: WithTable & { readonly regionTable: RegionTable }) {
     A.findFirst(work, (item) => O.contains(activeKind, item.kind.id)),
     (item) => item.kind.label
   )
-  const statusCaption = `${props.title}: ${(filter === "auto" ? words.auto : words[filter]).toLowerCase()}`
+  const statusCaption = `${props.title}: ${ReviewText.word(filter === "auto" ? words.auto : words[filter])}`
   const countCaption = `${whole.format(ordered.length)} ${ordered.length === 1 ? props.noun[0] : noun}`
   const caption = O.match(activeLabel, {
     onNone: () => `${statusCaption}, ${countCaption}`,
@@ -463,7 +465,7 @@ function RegionBody(props: WithTable & { readonly regionTable: RegionTable }) {
         label={O.match(lastStep, { onNone: () => "Undo", onSome: (step) => `Undo: ${step.label}` })}
         tip={O.match(lastStep, {
           onNone: () => "Nothing to undo",
-          onSome: (step) => `Undo: ${step.label.toLowerCase()} (${undoKeys})`
+          onSome: (step) => `Undo: ${ReviewText.word(step.label)} (${undoKeys})`
         })}
         narrow={narrow}
         disabled={O.isNone(lastStep)}
@@ -475,7 +477,7 @@ function RegionBody(props: WithTable & { readonly regionTable: RegionTable }) {
         label={O.match(nextRedo, { onNone: () => "Redo", onSome: (step) => `Redo: ${step.label}` })}
         tip={O.match(nextRedo, {
           onNone: () => "Nothing to redo",
-          onSome: (step) => `Redo: ${step.label.toLowerCase()} (${redoKeys})`
+          onSome: (step) => `Redo: ${ReviewText.word(step.label)} (${redoKeys})`
         })}
         narrow={narrow}
         disabled={O.isNone(nextRedo)}
@@ -557,20 +559,18 @@ function RegionBody(props: WithTable & { readonly regionTable: RegionTable }) {
             onSome: (column) => (
               <DataTableFacetedFilter
                 key={facet.column.id}
-                column={{
-                  ...column,
-                  // The table is not an own property of a column, so a spread alone drops it and the filter,
-                  // which follows the table's filters to redraw, would find none.
+                column={facetColumn({
                   table,
-                  getFilterValue: () => facet.picked,
-                  setFilterValue: (next: unknown) =>
+                  column,
+                  picked: facet.picked,
+                  pick: (next: unknown) =>
                     setFacetPicked((before) => ({
                       ...before,
                       [facet.column.id]: Array.isArray(next)
                         ? A.filter(next, (value): value is string => typeof value === "string")
                         : []
                     }))
-                }}
+                })}
                 title={facet.column.label}
                 options={facet.options.map((option) => ({ label: option.label, value: option.key, count: option.n }))}
                 multiple

@@ -1,0 +1,6 @@
+# The fixture of the planted `bare-type.planted.rq`: one node typed only `inv:Tenant`, which the OWL file places under
+# `inv:Organization`. Nothing here is a record, and its name starts `test_`, as every fixture individual's does.
+@base <https://example.org/inventory-import/> .
+@prefix inv: <https://example.org/inventory-import/ontology/> .
+
+<fixture/Tenant/test_TenantOnly> a inv:Tenant .

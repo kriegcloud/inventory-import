@@ -1,5 +1,5 @@
 import { dual } from "effect/Function"
-import { StoredDecisions } from "./Import/ImportStore.store.ts"
+import { type ImportListQuery, StoredDecisions } from "./Import/ImportStore.store.ts"
 // The catalog's ports in memory: the twins a test runs the handlers on. One state holds what the tables hold, and
 // each write is one pure step from a state to the next, as each write on D1 is one atomic batch. The one thing not
 // to break: a twin answers what the D1 adapter answers. Where the adapter guards a write ("the import is still
@@ -1475,65 +1475,59 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         })
         return perform(organizationId, self)
       }),
-      listOpen: dual(2, (self: number, organizationId: OrganizationId) => {
-        const perform = Effect.fnUntraced(function* (organizationId: OrganizationId, limit: number) {
-          const state = yield* Ref.get(ref)
-          const open = A.reverse(
-            A.sort(
-              A.filter(
-                state.drafts,
-                (entry) => entry.organizationId === organizationId && DraftStatus.is.open(entry.draft.status)
-              ),
-              Order.mapInput(DateTime.Order, (entry: MemDraft) => entry.draft.createdAt)
-            )
+      listOpen: Effect.fn("ImportStore.listOpen")(function* ({ organizationId, limit }: ImportListQuery) {
+        const state = yield* Ref.get(ref)
+        const open = A.reverse(
+          A.sort(
+            A.filter(
+              state.drafts,
+              (entry) => entry.organizationId === organizationId && DraftStatus.is.open(entry.draft.status)
+            ),
+            Order.mapInput(DateTime.Order, (entry: MemDraft) => entry.draft.createdAt)
           )
-          return { drafts: A.map(A.take(open, limit), (entry) => entry.draft), total: open.length }
-        })
-        return perform(organizationId, self)
+        )
+        return { drafts: A.map(A.take(open, limit), (entry) => entry.draft), total: open.length }
       }),
-      listPast: dual(2, (self: number, organizationId: OrganizationId) => {
-        const perform = Effect.fnUntraced(function* (organizationId: OrganizationId, limit: number) {
-          const state = yield* Ref.get(ref)
-          const past = A.getSomes(
-            A.map(
-              A.filter(state.drafts, (entry) => entry.organizationId === organizationId),
-              (entry) =>
-                O.map(
-                  A.last(
-                    A.sort(
-                      A.filter(
-                        state.confirms,
-                        (confirm) => confirm.organizationId === organizationId && confirm.importId === entry.draft.id
-                      ),
-                      byMoment
-                    )
-                  ),
-                  (last) => ({ entry, last })
-                )
-            )
+      listPast: Effect.fn("ImportStore.listPast")(function* ({ organizationId, limit }: ImportListQuery) {
+        const state = yield* Ref.get(ref)
+        const past = A.getSomes(
+          A.map(
+            A.filter(state.drafts, (entry) => entry.organizationId === organizationId),
+            (entry) =>
+              O.map(
+                A.last(
+                  A.sort(
+                    A.filter(
+                      state.confirms,
+                      (confirm) => confirm.organizationId === organizationId && confirm.importId === entry.draft.id
+                    ),
+                    byMoment
+                  )
+                ),
+                (last) => ({ entry, last })
+              )
           )
-          const newest = A.reverse(
-            A.sort(
-              past,
-              Order.mapInput(DateTime.Order, (row: { readonly last: MemConfirm }) => row.last.at)
-            )
+        )
+        const newest = A.reverse(
+          A.sort(
+            past,
+            Order.mapInput(DateTime.Order, (row: { readonly last: MemConfirm }) => row.last.at)
           )
-          const imports = A.map(A.take(newest, limit), ({ entry, last }): PastImport => ({
-            id: entry.draft.id,
-            fileName: entry.draft.fileName,
-            rowCount: entry.draft.rowCount,
-            status: entry.draft.status,
-            confirmedByName: last.byName,
-            confirmedAt: last.at,
-            items: A.filter(
-              state.items,
-              (item) => item.organizationId === organizationId && item.importId === entry.draft.id
-            ).length,
-            notImported: last.notImported
-          }))
-          return { imports, total: past.length }
-        })
-        return perform(organizationId, self)
+        )
+        const imports = A.map(A.take(newest, limit), ({ entry, last }): PastImport => ({
+          id: entry.draft.id,
+          fileName: entry.draft.fileName,
+          rowCount: entry.draft.rowCount,
+          status: entry.draft.status,
+          confirmedByName: last.byName,
+          confirmedAt: last.at,
+          items: A.filter(
+            state.items,
+            (item) => item.organizationId === organizationId && item.importId === entry.draft.id
+          ).length,
+          notImported: last.notImported
+        }))
+        return { imports, total: past.length }
       }),
       remove: dual(2, (self: Draft, actor: Member) => remove(actor, self)),
       decisions: dual(2, (self: string, organizationId: OrganizationId) => {

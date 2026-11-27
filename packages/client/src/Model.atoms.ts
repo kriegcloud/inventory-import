@@ -15,8 +15,9 @@ import * as Effect from "effect/Effect"
 import { dual } from "effect/Function"
 import * as Layer from "effect/Layer"
 import * as MutableHashMap from "effect/MutableHashMap"
+import * as MutableHashSet from "effect/MutableHashSet"
 import * as O from "effect/Option"
-import type * as AsyncResult from "effect/reactivity/AsyncResult"
+import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import type * as Reactivity from "effect/reactivity/Reactivity"
 import * as Stream from "effect/Stream"
@@ -77,7 +78,8 @@ export interface ModelAtoms<Id, Client> extends ApiAtoms<Id, Client> {
    * member changes (another member, another organization, nobody) the watch is closed, looked at or not, and the new
    * member's starts from nothing (waiting, with no state). For the same member, a watch nobody looks at is kept open
    * for `keepUnwatched` from when the screen left it, so a return shows its state at once; then it is closed, and
-   * `forgetReads` closes every one. Refreshing it opens the watch again.
+   * `forgetReads` closes every one, shown or not, and opens none: a screen showing one waits until the page's member
+   * changes or it is refreshed. Refreshing it opens the watch again.
    */
   readonly watched: <K, A, E>(self: (client: Client, key: K) => Stream.Stream<A, E>) => (key: K) => Watched<A, E>
 }
@@ -143,12 +145,24 @@ export const makeModelAtoms: {
  * member's atom is let go by the registry as soon as nothing reads or holds it (no idle time of its own), which closes
  * its stream: the screen stops reading it when the member changes, and its hold ends then too (`makeHolds`). A
  * member's atom is forgotten whenever nothing holds it any more, so a later look opens a new one for the member as
- * the page knows them then.
+ * the page knows them then. `forgetReads` forgets every member's, and a screen that still shows this key lets go of
+ * the watch it followed, which closes it, and opens none: it shows nothing (waiting) until the page's member changes
+ * or the key is refreshed, so no watch is opened again for the person the page is leaving.
  */
 const watchOne = <A, E, R>(open: (who: O.Option<Member>) => Stream.Stream<A, E, R>): Watched<A, E> => {
   const perMember = MutableHashMap.empty<string, Watched<A, E>>()
+  // How each screen that shows this key now is told that `forgetReads` let go of its watch.
+  const showing = MutableHashSet.empty<() => void>()
+  // In each registry, whether `forgetReads` let go of the watch a screen showed: until the member changes or the key
+  // is refreshed (which reads it again as false), the screen opens no watch.
+  const forgotten = Atom.make(false)
   const holds = makeHolds({
-    forget: () => MutableHashMap.clear(perMember),
+    forget: () => {
+      MutableHashMap.clear(perMember)
+      const told = A.fromIterable(showing)
+      MutableHashSet.clear(showing)
+      for (const forgetShown of told) forgetShown()
+    },
     leave: (member) => MutableHashMap.remove(perMember, member),
     members: () => perMember.pipe(MutableHashMap.keys, A.fromIterable)
   })
@@ -165,6 +179,11 @@ const watchOne = <A, E, R>(open: (who: O.Option<Member>) => Stream.Stream<A, E, 
   let shown = { member: "", who: O.none<Member>() }
   return Atom.readable(
     (get) => {
+      if (get(forgotten)) {
+        // Let go by `forgetReads`: nothing is opened, not even for the same member, until the page's member changes.
+        get.subscribe(memberKey, () => get.set(forgotten, false))
+        return AsyncResult.initial()
+      }
       const member = get(memberKey)
       const who = get.once(memberAtom)
       shown = { member, who }
@@ -176,10 +195,18 @@ const watchOne = <A, E, R>(open: (who: O.Option<Member>) => Stream.Stream<A, E, 
           holds.left(get.registry, member, read)
       })
       get.subscribe(read, (value) => get.setSelf(value))
+      const forgetShown = () => get.set(forgotten, true)
+      MutableHashSet.add(showing, forgetShown)
+      get.addFinalizer(() => MutableHashSet.remove(showing, forgetShown))
       // Looked at again: the hold an earlier leave took ends, now that the screen keeps it mounted.
       holds.looked(member)
       return get.once(read)
     },
-    (refresh) => refresh(forMember(shown.member, shown.who))
+    (refresh) => {
+      // The watch it shows, if it has one: none after `forgetReads`, and a refresh then opens one for the member.
+      const read = MutableHashMap.get(perMember, shown.member)
+      refresh(forgotten)
+      O.map(read, refresh)
+    }
   )
 }

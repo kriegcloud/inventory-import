@@ -74,7 +74,8 @@ export const usedUpWords = `The day's ${dailyModelCalls} AI calls are used`
 
 /**
  * The sentence a person reads when the day's calls are used and nothing answers by its rules instead (the check that
- * the key works): when they come back, at midnight UTC (decision 25; the sentence decided for move 2).
+ * the key works): when they come back, at midnight UTC (decision 25; the words are Benjamin's, 2026-11-27,
+ * "Midnight UTC").
  */
 export const usedUpSentence: Sentence = `${usedUpWords}. They come back at midnight UTC.`
 

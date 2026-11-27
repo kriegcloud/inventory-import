@@ -957,3 +957,23 @@ Built 2026-11-27 (`apps/model/src/Retention.ts`). The library takes `retention` 
 Layer (`layerDurableObjects({ retention })`), and every model of the Worker is provided that one platform, so the one
 value is given once and holds for all of them. A test reads it through the library's own `retentionWindows`. Not
 checked: a receipt older than 30 days on a deploy.
+
+### 2026-11-27 — Move 2: after the fourth round (the model's Worker reads the session, the site forwards)
+
+| Asked | Options (recommended first) | Answer |
+| --- | --- | --- |
+| The used-up sentence changed with the model's UTC day; the new words came from the agent's task text. Which does a person read? | "The day's 40 AI calls are used. They come back at midnight UTC."; "They come back tomorrow."; the old "They come back over the next day." | "Midnight UTC" |
+| What does a removed member's allowance read, and live read, answer? | The same 404 another organization's member gets (`AllowanceNotFound`, no sentence); a rejection of its own with words of mine | "Same 404" |
+| The day's count is now a network hop away. When the model's Worker cannot be reached, do the assistant, the suggestions and the AI check answer by their rules? | Keep the server error, as when the database count failed; answer by the rules with a new sentence | "Keep the error" |
+| Under `bun run dev` (Vite, models in memory) a live read through the site's route does not work; calls do. No screen reads one yet. | Calls only for now, live reads under `dev:alchemy`; fix it now; screens ask again every few seconds under Vite | "Calls only, for now" |
+
+I chose; the agent recommended the same, all four. On the fourth I first picked "Fix it now" in the dialog and
+corrected it in my next message: "I meant your recommended on the last one". So `bun run dev` keeps calls only, live
+reads are developed under `bun run dev:alchemy`, and it is decided again when the first screen needs one (the
+allowance on screen, move 7). Rejected: a removed person told anything about the organization; an AI call that could
+go uncounted; work on a path no screen uses yet. Reverse: a new decision by him.
+
+Also decided the same day, from a review comment on pull request 56 (recorded in the root `DECISIONS.md`): a server
+error reads "It may not have gone through. Reload the page to see what is stored before trying again.", for the
+app's requests and the model's calls: "New words, both".
+

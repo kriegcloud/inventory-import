@@ -1,7 +1,7 @@
 ---
 type: Decisions
 title: Decisions
-description: Module taxonomy decisions. The open questions, one decision each, with the option recommended and what it was tried on, and the answered ones with the options he rejected and how to reverse them.
+description: Module taxonomy decisions. The open questions, one decision each, with the option recommended and what it was tried on, and the answered ones with the options he rejected and how to reverse them. Decision 1 was answered twice; the later answer stands.
 ---
 
 # Decisions
@@ -14,26 +14,64 @@ date, the answer and how to reverse it.
 
 | # | Question | Recommended | Changes | Where it is argued |
 | --- | --- | --- | --- | --- |
-| 2 | Is a block's exported name its tag, and its file's stem that name, as a law? | Yes; a decision's file takes its command's stem and the class keeps its own name | | [README](README.md), "Uniform names would cost the model its words" |
+| 2 | Is "an event's or a command's file has its tag for a stem, exports its kind's names and is imported as a namespace" a law? | Yes | Rewritten 2026-11-27 after decision 1 was replaced | Decision 1 below; `scratchpad/experiments/import-module` |
 | 6 | What ending do the four files with none take? (`Host.ts` in both hosts, `Adapters.ts` and `Config.ts` in access's) | Asked when its part of the brief opens | | [BRIEF](BRIEF.md), Map |
-| 7 | Is each of the three endings used once a kind, or is its file renamed? (`.reference`, `.state`, `.route`) | Asked when its part of the brief opens | | [BRIEF](BRIEF.md), Map |
+| 7 | Is each of the three endings used once a kind, or is its file renamed? (`.reference`, `.state`, `.route`) | Asked when its part of the brief opens | Decision 1 as replaced gives a model `.state.ts`; `.state` is asked first | [BRIEF](BRIEF.md), Map |
 
-Decisions 1, 3, 4 and 5 were answered on 2026-11-27 and are under "Answered". 2, 6 and 7 were not put to him; none
-blocks the brief's first slice.
+Decisions 1, 3, 4 and 5 were answered on 2026-11-27 and are under "Answered"; he replaced his answer to 1 the same
+day. 2, 6 and 7 were not put to him; none blocks the brief's first slice.
 
-### 2. Name, tag and stem
+### 2. Stem, exports and the namespace import
 
-- **A law (recommended).** `laws block-files` reads each block's tag already; it would also compare it with the
-  exported name and the file's stem.
+Decision 1 as replaced sets the shape; this asks who holds it. As first written it asked whether a block's exported
+name is its tag; under role names the exported name is the kind's (`Event`, `Command`) and the stem is the tag.
+
+- **A law (recommended).** `laws block-files` reads each block's tag already. It would compare the tag with the
+  file's stem, hold a `.event.ts` to `Event` and `evolve` and a `.command.ts` to `Command`, `decide` and its own
+  rejections, and refuse a named import of `Event` or `Command`. Without the last, thirteen classes named `Event`
+  are one editor suggestion from being imported under the wrong name.
 - **A convention.** Written in `docs/building.md`, held by review.
 
+Not asked by it: what a decision's, an aggregate's or a rejection's file exports. They keep their own names today.
+
 ## Answered
+
+### 2026-11-27: decision 1, replaced
+
+Asked by dialog twice after the first answer below: whether the namespace shape replaces it ("Yes, adopt it"), then
+which names the files export ("Role names, event per file"). Both were the recommended option.
+
+**1. Where an event, a command and their logic live.**
+
+- Question: does an event's `evolve` sit beside the event and a command's `decide` beside the command, and what does
+  each file export?
+- Answer: "Role names, event per file". One event to `<Tag>.event.ts`, exporting `Event` and `evolve`. One command to
+  `<Tag>.command.ts`, exporting `Command`, `decide` and the rejections only it returns. Each is imported as a
+  namespace named for its stem: `ImportStaged.Event`, `ImportStaged.evolve`, `StageImport.Command`,
+  `StageImport.decide`. The state and the invariants are in `<Aggregate>.state.ts`; the aggregate's file keeps the two
+  unions, the transitions and the listing.
+- Rationale: his, that Effect's and the library's own modules are read this way (`Option.map`) and that a file read
+  as a namespace gives every block of a kind the same names. An event has its own file because four of the model's
+  eleven commands record an event another file declares, and `UndoGroup` records two. Tried on `Import` as sixteen
+  files (`scratchpad/experiments/import-module`): it proves what the package's one file proves, a broken moved
+  `decide` and a broken moved `evolve` are each caught, and the whole model verifies against the package's lock, the
+  lock unchanged (`scratchpad/experiments/command-file`, `model-role`).
+- Rejected: "Role names, events stay with commands" (`StageImport.Event`), which loses the event's word and has no
+  place for a second event; "Named exports, as built" (`StageImport.ImportStaged`, `ActCounted.ActCounted`), also
+  verified; `evolve` and `decide` as statics of the class, which the prover reads only with about forty lines added
+  to it (`prover-static-member.patch`); and the first answer below.
+- Costs he took: the 60 mutants that name `Import.aggregate.ts` each change a line of a `decide` and are written
+  again; `.state.ts` and `.event.ts` become kinds; every event's class is named `Event` where a hover or a stack
+  trace shows a class's name; the transitions do not move, because the lock keeps each rule's text.
+- Reverse: move each `evolve` and `decide` back into the aggregate's or the decision's file and each event back
+  beside the command that records it, and rename the classes to their tags. No rule and no tag changes either way,
+  so the lock holds in both directions.
 
 ### 2026-11-27: decisions 1, 3, 4 and 5
 
 Asked by dialog, each with its options, the recommended one first. He picked the recommended option of each.
 
-**1. Where a command of the model lives.**
+**1. Where a command of the model lives.** Replaced the same day; see above.
 
 - Question: does a command stay in the file of the aggregate or decision that decides it, or take a file of its own,
   and does its `decide` go with it?

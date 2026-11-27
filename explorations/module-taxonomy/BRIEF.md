@@ -1,17 +1,18 @@
 ---
 type: Brief
 title: "Brief: module-kinds"
-description: The goal module-kinds. One registry of file kinds that the repository's laws read, for the four layers of a context; a port under one ending; and each command of the catalog's model in a file of its own.
+description: The goal module-kinds. One registry of file kinds that the repository's laws read, for the four layers of a context; a port under one ending; and each event and each command of the catalog's model in a file of its own, read as a namespace.
 ---
 
 # Brief: `module-kinds`
 
 Benjamin's words, 2026-11-27: "following the principles of what we've just done with Rpcs could achieve an extremely
 consistent module structure & taxonomy throughout a repo." The reading is [the README](README.md); his answers are in
-[DECISIONS.md](DECISIONS.md), and this brief is built on decisions 1, 3, 4 and 5 as he answered them.
+[DECISIONS.md](DECISIONS.md), and this brief is built on decisions 1, 3, 4 and 5 as he answered them: 1 as he
+replaced it the same day, which rewrote every part here about commands.
 
 Nothing here is built. No file in `packages/` or `apps/` has changed and no goal is open. Every number was measured on
-this repository at `a184783d` by the two experiments under `scratchpad/experiments/`.
+this repository at `a184783d` by the experiments under `scratchpad/experiments/`.
 
 ## Problem
 
@@ -28,7 +29,10 @@ A file's ending says what kind of thing it holds, and one law checks that for th
 - **Which layer may load which kind is held by layer only.** `laws boundaries` says `web` may import `model`. That a
   screen never loads a port, a handler or an in-memory twin is true today (0 of 269 imports) and held by nothing.
 - **A command is found by reading its decider.** `Import.aggregate.ts` is 725 lines: seven commands, nine events and
-  thirteen rejections above the aggregate. The library's layout gives each command a file.
+  thirteen rejections above the aggregate, then every `decide` and `evolve` inside it. What one event does to an
+  import is 500 lines from the event.
+- **No two blocks of a kind export the same names.** An event's class, its `evolve` and a command's `decide` are
+  found by reading, not by knowing the kind.
 
 ## Appetite
 
@@ -37,8 +41,12 @@ Scope, not time. In:
 - The registry as a schema and a table in `packages/tooling/tool/cli`, and `laws block-files` and `laws boundaries`
   reading it for `contract`, `model`, `host` and `web`.
 - The nine port files renamed to `.port.ts`, with their export entries and imports.
-- Each command of the catalog's model moved to a `.command.ts` with its events and the rejections only it returns,
-  and each shared rejection to a `.rejection.ts`. `decide` stays where it is.
+- Each event of the catalog's model moved to `<Tag>.event.ts`, exporting `Event` and `evolve`; each command to
+  `<Tag>.command.ts`, exporting `Command`, `decide` and the rejections only it returns; each shared rejection to a
+  `.rejection.ts`; an aggregate's state and invariants to `<Aggregate>.state.ts`. Every such file is imported as a
+  namespace named for its stem.
+- `.event.ts` and `.state.ts` as kinds of the registry, and the model's mutants that name a moved line written
+  again (60 name `Import.aggregate.ts`).
 - An ending for each of the four files that have none and a kind or a rename for each of the three one-off endings,
   once he has answered what they are (decisions 6 and 7).
 
@@ -48,7 +56,9 @@ Out:
 - Export keys (decision 5: "Leave them").
 - The packages outside a context: the kernel, the drivers, the client, the review package, infra, the CLI, the app.
 - Splitting the 23 `.rules.ts` files of the two models by what each is.
-- Moving a `decide`, or the state, out of an aggregate's file (decision 1: "Own file, decide stays").
+- Moving a transition, or the two unions it reads, out of an aggregate's file: the lock keeps each rule's text.
+- `evolve` or `decide` as a static of a class, and any change to the prover.
+- Role names for a decision, an aggregate or a rejection. They keep their own names.
 
 ## Sketch
 
@@ -62,33 +72,63 @@ of endings and layers from the registry instead of its six tables. `boundaries` 
 package through that package's `exports` to a file, and asks the registry whether the importer's layer may load that
 kind. The experiment's test does both readings over the real tree in under a second.
 
-**Commands.** For each aggregate and decision of `packages/catalog/model`: the command, the events it records and the
-rejections only it returns move to `<Command>.command.ts` beside it; a rejection several commands return moves to
-`<Name>.rejection.ts`. The decider's file imports them and keeps its state, its rules, `evolve` and `decide`. The
-unions the prover reads (`ImportCommand`, `ImportEvent`) stay exported from the aggregate's file. Tried on a copy of
-the whole model with `MatchColumn`, in exactly this shape (`model-split-command`): verified against the package's
-lock, the lock unchanged (`scratchpad/experiments/command-file`).
+**Events and commands.** `scratchpad/experiments/import-module` is the shape, on `Import`: sixteen files where one
+was.
+
+| File | Exports | Read as |
+| --- | --- | --- |
+| `<Tag>.event.ts` | `Event`, `evolve` | `ImportStaged.Event`, `ImportStaged.evolve` |
+| `<Tag>.command.ts` | `Command`, `decide`, the rejections only it returns | `StageImport.Command`, `StageImport.decide` |
+| `<Aggregate>.rejection.ts` | each rejection several commands return, by its own name | named imports |
+| `<Aggregate>.state.ts` | the state's schema and each invariant, a named function | named imports |
+| `<Aggregate>.aggregate.ts` | the two unions, the transitions in place, and the listing | as today |
+
+The aggregate's listing then has every key equal to its namespace: `evolve: { ImportStaged: ImportStaged.evolve }`,
+`decide: { StageImport: StageImport.decide }`, `commands: [StageImport.Command]`. A command's file imports the
+event's to record it (`ImportStaged.Event.make(...)`); a decision that records an import's event imports it the same
+way. No tag changes, so `guards`, `catchTag`, an Api's command list and the lock read as before. Proved against the
+package's own aggregate, 210 lines of standing the same, and the whole model verified against the package's lock,
+the lock unchanged (`scratchpad/experiments/command-file`, `model-role`).
 
 ## Rabbit holes
 
 - **The uptake goal moves the same files.** `goals/alchemy-domain-uptake` rewrites handlers, stores and adapters into
   blocks of the library: a `.store.ts` renamed here may be a projection's port or gone there. The port renames go
   first or wait for the move that touches each file; they never run beside it.
-- **`block-files` allows a command in its decider's file.** Once the commands have moved, that allowance is taken
-  out, or the two places drift apart again.
+- **`block-files` allows a command in its decider's file, and has no `.event.ts` or `.state.ts`.** The two kinds
+  are added before the first file moves. Once the commands and events have moved, the allowance is taken out, or the
+  two places drift apart again. The law was not run on the experiment's files.
+- **`.state.ts` is taken once already.** `ItemEditor.state.ts` in `catalog/web` is one of decision 7's three one-off
+  endings. A model's `.state.ts` is another thing under the same ending: decision 7 is answered for `.state` before
+  the kind is written, or the registry holds one ending with two meanings.
+- **A named import of `Event` or `Command`.** Nine classes of `Import` are named `Event`. The editor will offer
+  `import { Event }`; until decision 2 is answered nothing refuses it.
+- **Inside its file `Event` hides the DOM's.** No file of the model uses that one; a diagnostic that minds was not
+  met by `scratch:check`.
+- **A class's own name.** Where the library or a tool prints a class's name and not its tag, every event reads
+  `Event`. Not looked for: read the library's use of a class's `name` before the first move.
+- **The four decisions.** Their commands record events of `Row`, `Group` and `Import`. The experiment moved
+  `Import`'s events only and left each decision's command, `decide` and rules in its file. What a decision's file
+  becomes is not in this brief.
+- **The transitions do not move.** In a file of their own they prove the same and the lock refuses all 23. And
+  `invariants` and `transitions` are objects written in the aggregate's file: imported whole, the prover finds none.
 - **`laws model-inputs`.** Every file a model, an aggregate or a decision imports must be an input of the package's
   `verify`, `prove` and mutant tasks. Each new `.command.ts` and `.rejection.ts` is one.
-- **The mutants.** Each names a file, an anchor and a line's exact text. None anchors on a command's or an event's
-  declaration that I found, but the 192 were not all read: run `mutants:sample` after the first aggregate moves.
-- **Export entries.** Exports are exact, one entry a file. A command another package imports today through
-  `./ImportAggregate` needs an entry of its own, or that package's imports change.
+- **The mutants.** Each names a file, an anchor and a line's exact text with its indentation. All 60 that name
+  `Import.aggregate.ts` change a line of a `decide`; both the file and the indentation change. They are written
+  again in the change that moves the `decide`, and `mutants:sample` is run on it. The other 132 were not all read.
+- **Export entries.** Exports are exact, one entry a file. A command or an event another package imports today
+  through `./ImportAggregate` needs an entry of its own and a namespace import there. Eight files import one of the
+  import's events or commands by name today: four of the model's source, three of its tests and one test of
+  `catalog/web`. The experiment rewrote the four.
 - **`.rules.ts`.** The registry holds it as one kind. Asking what each of the 23 is belongs to another goal.
 - **The table of who holds what was written from today's tree.** It refuses no file for its layer by construction.
   Before it is a law, each row is read against what the layer is for, not against what is there.
 
 ## No-gos
 
-- No uniform export names (`Contract`, `Handler`, `Payload`) for blocks, and no folder or `index.ts` for one block.
+- No folder or `index.ts` for one block, and no role names beyond the four decision 1 gives (`Event`, `evolve`,
+  `Command`, `decide`).
 - No rule of the model changes, and the lock is not updated: a run that needs `UPDATE_VERIFY_LOCK=1` is a failed move.
 - No rename in a file another open goal is moving, in the same change.
 - No registry row for a package outside a context until that package has been counted.
@@ -101,7 +141,9 @@ lock, the lock unchanged (`scratchpad/experiments/command-file`).
 | `block-files` reading the registry | `module-kinds`, first slice | `packages/tooling/tool/cli/src/commands/Laws/BlockFiles.rules.ts` (its `placed`, `reserved`, `declarers`, `holds`, `besideItsOwn`, `homes`) and `test/BlockFiles.test.ts` |
 | Nine ports under `.port.ts` | `module-kinds`, first slice | the eight `.store.ts` files of `packages/catalog/model` and `packages/access/model`, and `packages/access/contract/src/Allowance/ModelAllowance.gateway.ts` |
 | `boundaries` asking the registry about each import's kind | `module-kinds`, later, when the first slice is merged | `packages/tooling/tool/cli/src/commands/Laws/Boundaries.rules.ts`; the reading in `scratchpad/experiments/kind-registry/KindRegistry.test.ts` |
-| Commands of the catalog's model in files of their own | `module-kinds`, later, when decision 2 is answered and no move of `alchemy-domain-uptake` is open on `packages/catalog/model` | `packages/catalog/model/src/Import/Import.aggregate.ts`, the four `Review/*.decision.ts`; `scratchpad/experiments/command-file` |
+| `.event.ts` and `.state.ts` as kinds, and the stem, exports and import law if decision 2 says so | `module-kinds`, later, before the first event moves | `Kinds.registry.ts`, `BlockFiles.rules.ts` |
+| Events and commands of `Import` in files of their own, read as namespaces | `module-kinds`, later, when no move of `alchemy-domain-uptake` is open on `packages/catalog/model` | `packages/catalog/model/src/Import/Import.aggregate.ts`; `scratchpad/experiments/import-module`; the 60 mutants |
+| The same for `Row` and `Group`, and what a decision's file becomes | `module-kinds`, later, after `Import`; the decision's shape is not designed | `Row.aggregate.ts`, `Group.aggregate.ts`, the four `Review/*.decision.ts` |
 | The four files with no ending and the three one-off endings | `module-kinds`, later, when decisions 6 and 7 are answered | `packages/*/host/src/Host.ts`, `packages/access/host/src/Adapters.ts` and `Config.ts`; `ItemsOfRow.reference.ts`, `ItemEditor.state.ts`, `SignIn.route.ts` |
 | The registry for packages outside a context | not this goal | NET-NEW; needs the census first |
 

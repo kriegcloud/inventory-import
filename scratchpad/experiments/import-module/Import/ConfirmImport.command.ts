@@ -1,49 +1,13 @@
-// One command of the import: the events it records and what each makes of an import, the rejections only it
-// returns, and what the import decides of it.
+// One command of the import: the rejections only it returns, and what the import decides of it.
 import * as Domain from "@alchemy.run/domain"
 import * as Effect from "effect/Effect"
-import { dual } from "effect/Function"
 import * as S from "effect/Schema"
 import { CurrentActor } from "../Actor/Actor.context.ts"
 import { Session } from "../Actor/Session.middleware.ts"
 import { Change, Digest, ImportKey } from "../Review/Change.schema.ts"
 import { NotOpen, NotPermitted, ReviewMovedOn } from "./Import.rejection.ts"
 import { ImportState } from "./Import.state.ts"
-
-/** The import was confirmed: what became of its rows, as the four outcomes that add up to them. */
-export class ImportConfirmed extends Domain.Event(
-  "ImportConfirmed",
-  { change: Change, created: S.Natural, updated: S.Natural, already: S.Natural, notImported: S.Natural, by: S.String },
-  { description: "The import was confirmed: how many rows were created, updated, already there and not imported" }
-) {}
-
-/** What an import is after `ImportConfirmed`. */
-export const evolve: {
-  (e: ImportConfirmed): (s: ImportState) => ImportState
-  (s: ImportState, e: ImportConfirmed): ImportState
-} = dual(2, (s: ImportState, e: ImportConfirmed): ImportState =>
-  ImportState.guards.Open(s)
-    ? ImportState.cases.Imported.make({
-        status: "Imported",
-        organizationId: s.organizationId,
-        rows: s.rows,
-        confirms: s.confirms + 1,
-        matching: s.matching,
-        columns: s.columns,
-        changes: e.change,
-        confirmedAt: e.change,
-        inForce: s.inForce + e.created,
-        replaced: s.replaced + e.updated,
-        standing: s.standing + 1,
-        lastGroup: s.lastGroup,
-        topGroup: s.topGroup,
-        created: e.created,
-        updated: e.updated,
-        already: e.already,
-        notImported: e.notImported
-      })
-    : s
-)
+import * as ImportConfirmed from "./ImportConfirmed.event.ts"
 
 /** The plan was built at a change that is no longer the last: the handler builds it again. */
 export class PlanBehind extends Domain.Rejection(
@@ -71,7 +35,7 @@ export class CountsDoNotAddUp extends Domain.Rejection(
  * `planAt`: the handler built the plan from rows written up to this number. `shown` and `plan`: what every row
  * becomes, as one digest, as the screen had it and as the plan has it.
  */
-export class ConfirmImport extends Domain.Command(
+export class Command extends Domain.Command(
   "ConfirmImport",
   {
     middleware: [Session],
@@ -86,14 +50,14 @@ export class ConfirmImport extends Domain.Command(
       already: S.Natural,
       notImported: S.Natural
     },
-    events: [ImportConfirmed],
+    events: [ImportConfirmed.Event],
     rejects: [NotPermitted, NotOpen, ReviewMovedOn, PlanBehind, NotWhatWasShown, CountsDoNotAddUp]
   },
   { description: "Confirm the import, naming the last change the screen received and what its button said" }
 ) {}
 
 /** What the import decides of `ConfirmImport`. */
-export const decide = Effect.fn("Import.ConfirmImport")(function* (s: ImportState, cmd: ConfirmImport) {
+export const decide = Effect.fn("Import.ConfirmImport")(function* (s: ImportState, cmd: Command) {
   const actor = yield* CurrentActor
   if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})
   if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})
@@ -106,7 +70,7 @@ export const decide = Effect.fn("Import.ConfirmImport")(function* (s: ImportStat
   // No more is ever in force than the file has rows.
   if (s.inForce + cmd.created > s.rows) return yield* CountsDoNotAddUp.make({})
   return [
-    ImportConfirmed.make({
+    ImportConfirmed.Event.make({
       change: s.changes + 1,
       created: cmd.created,
       updated: cmd.updated,

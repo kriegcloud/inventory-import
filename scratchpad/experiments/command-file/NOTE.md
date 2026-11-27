@@ -106,6 +106,11 @@ sorted lines.
   aggregate holds `import * as StageImport` and `StageImport.decide`, `StageImport.evolve`,
   `StageImport.StageImport`. Proved as the baseline; the whole model verified against the unchanged lock.
 
+- **With role names and one event to a file, the same** (`WholeModel.test.ts`, `model-role/`). Each of the import's
+  nine events is `<Tag>.event.ts` exporting `Event` and `evolve`, each command's file exports `Command` and
+  `decide`, and the four decisions record `ActCounted.Event` and `GroupCounted.Event`. The whole model verified
+  against the unchanged lock. The `Import` folder there is the one in [import-module](../import-module/NOTE.md).
+
 Not tried here: the stories; `laws block-files` and `laws model-inputs` on the new files. The model's mutants name a file, an
 anchor and the exact text of a line with its indentation (60 of the 192 name `src/Import/Import.aggregate.ts`), so
 moving a decide means writing those again; moving only a command and its event leaves every decide where its mutants

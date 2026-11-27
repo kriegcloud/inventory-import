@@ -4,7 +4,7 @@ title: Module taxonomy
 description: Whether the per-unit module shape tried on RPCs in beep-effect (one unit, role-named files, a contract door and a handler door) gives @alchemy.run/domain blocks, and the rest of this repository, one consistent structure. A reading from source and two experiments run: a command in its own file proves as before, and a registry of kinds refuses sixteen of the two contexts' 173 files.
 status: active
 stage: shape
-next: he says whether the import-module shape (each command's file read as a namespace) replaces decision 1; the brief matches as written (2026-11-27); decisions 2, 6 and 7 are open
+next: he says whether the rewritten brief matches (decision 1 replaced 2026-11-27: an event and a command each in a file read as a namespace, exporting its kind's names); decisions 2, 6 and 7 are open
 goals: []
 ---
 
@@ -75,6 +75,14 @@ Three things in the library key on it:
 
 The rule that gives the consistency he is after is the opposite one: **a block's exported name is its tag, and its
 file's stem is that name.** The repository nearly holds it today. It is not a law.
+
+**Replaced on 2026-11-27.** This section argued against uniform names for files read by named imports, where
+thirteen classes called `Event` would each need an alias. He proposed reading each file as a namespace, as Effect's
+modules are read, and then chose role names with one event to a file: the stem is the tag and carries the word
+(`ImportStaged`), and the file exports its kind's names (`Event` and `evolve`; `Command` and `decide`). The first
+point above still holds and nothing in it moves, since every tag is as it was. The second is why an event has a file
+of its own and is not an export of the command that records it. The third stands as a cost: a hover reads `Event`
+for every event. See decision 1 in [DECISIONS.md](DECISIONS.md).
 
 ### What is missing is not a shape, it is a list
 
@@ -264,10 +272,12 @@ Three experiments, each a folder under `scratchpad/experiments/`, before any fil
 
 ## Questions for Benjamin
 
-Five, in [DECISIONS.md](DECISIONS.md). He answered four on 2026-11-27, each as recommended: one command to a
-`.command.ts` with its `decide` left where it is; one registry of kinds for every layer of a context; one ending for
-a port; and export keys left as they are, which sets aside what "The doors are kinds" above proposes for them. Open:
-whether a block's name, tag and stem being equal is a law.
+Five, in [DECISIONS.md](DECISIONS.md). He answered four on 2026-11-27, each as recommended: one registry of kinds
+for every layer of a context; one ending for a port; export keys left as they are, which sets aside what "The doors
+are kinds" above proposes for them; and one command to a `.command.ts` with its `decide` left where it is. He
+replaced that last answer the same day: an event and a command each have a file, read as a namespace, with `evolve`
+beside the event and `decide` beside the command. Open: whether "the stem is the tag, and a file exports its kind's
+names" is a law.
 
 ## Trail
 
@@ -302,3 +312,10 @@ whether a block's name, tag and stem being equal is a law.
   verifies. He then proposed reading each command's file as a namespace instead, as Effect's modules are read
   (`StageImport.decide`, `StageImport.evolve`, `StageImport.StageImport`). That needs no change to the prover: proved,
   and the whole model verified against the unchanged lock. `import-module` is now in that form.
+- 2026-11-27: he said he likes the namespace shape and asked whether the union should read
+  `StageImport.ImportStaged` or `StageImport.Event`. Neither as the files stood: the second loses the event's word,
+  and four of the model's eleven commands record an event another file declares (`UndoGroup` records two). He chose
+  role names with one event to a file: `ImportStaged.Event`, `ImportStaged.evolve`, `StageImport.Command`,
+  `StageImport.decide`. `import-module` is now sixteen files in that form: it proves as the package's file does, a
+  broken moved `decide` and a broken moved `evolve` are each caught, and the whole model verifies against the
+  unchanged lock (`command-file`, `model-role`). Decision 1 is replaced and the brief's command part rewritten.

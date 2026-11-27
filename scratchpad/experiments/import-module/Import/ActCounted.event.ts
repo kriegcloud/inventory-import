@@ -10,7 +10,7 @@ import { ImportState } from "./Import.state.ts"
  * row holds after it: the change that recorded the decision (0 when the row has none), whose it is, and its flags.
  * `actor` is who acted; after an undo the decision the row then holds can be another person's.
  */
-export class ActCounted extends Domain.Event(
+export class Event extends Domain.Event(
   "ActCounted",
   {
     change: Change,
@@ -28,8 +28,6 @@ export class ActCounted extends Domain.Event(
 
 /** What an import is after `ActCounted`. */
 export const evolve: {
-  (e: ActCounted): (s: ImportState) => ImportState
-  (s: ImportState, e: ActCounted): ImportState
-} = dual(2, (s: ImportState, e: ActCounted): ImportState =>
-  ImportState.guards.Open(s) ? { ...s, changes: e.change } : s
-)
+  (e: Event): (s: ImportState) => ImportState
+  (s: ImportState, e: Event): ImportState
+} = dual(2, (s: ImportState, e: Event): ImportState => (ImportState.guards.Open(s) ? { ...s, changes: e.change } : s))

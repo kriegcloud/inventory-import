@@ -1,47 +1,28 @@
-// One command of the import: the events it records and what each makes of an import, the rejections only it
-// returns, and what the import decides of it.
+// One command of the import: the rejections only it returns, and what the import decides of it.
 import * as Domain from "@alchemy.run/domain"
 import * as Effect from "effect/Effect"
-import { dual } from "effect/Function"
 import * as S from "effect/Schema"
 import { CurrentActor } from "../Actor/Actor.context.ts"
 import { Session } from "../Actor/Session.middleware.ts"
-import { Change, Columns, ImportKey } from "../Review/Change.schema.ts"
+import { Columns, ImportKey } from "../Review/Change.schema.ts"
+import * as ColumnMatched from "./ColumnMatched.event.ts"
 import { ConfirmedSince, MatchedSince, NotOpen, NotPermitted } from "./Import.rejection.ts"
 import { ImportState } from "./Import.state.ts"
 
-/**
- * Which column fills each field now, every field a match moved included, the number of the match, and who made it:
- * the mapping, and since which match each field reads its column, can be rebuilt from the import's events alone.
- */
-export class ColumnMatched extends Domain.Event(
-  "ColumnMatched",
-  { change: Change, matching: S.Int, columns: Columns, by: S.String },
-  { description: "A column was matched to a field: every field's column after it" }
-) {}
-
-/** What an import is after `ColumnMatched`. */
-export const evolve: {
-  (e: ColumnMatched): (s: ImportState) => ImportState
-  (s: ImportState, e: ColumnMatched): ImportState
-} = dual(2, (s: ImportState, e: ColumnMatched): ImportState =>
-  ImportState.guards.Open(s) ? { ...s, changes: e.change, matching: e.matching, columns: e.columns } : s
-)
-
 /** Match a column to a field. `columns` is every field's column after it; `saw` the matching the sender's screen has. */
-export class MatchColumn extends Domain.Command(
+export class Command extends Domain.Command(
   "MatchColumn",
   {
     middleware: [Session],
     input: { importId: ImportKey, columns: Columns, saw: S.Int, opening: S.Int },
-    events: [ColumnMatched],
+    events: [ColumnMatched.Event],
     rejects: [NotPermitted, NotOpen, ConfirmedSince, MatchedSince]
   },
   { description: "Match a column to a field, naming the last match the sender saw" }
 ) {}
 
 /** What the import decides of `MatchColumn`. */
-export const decide = Effect.fn("Import.MatchColumn")(function* (s: ImportState, cmd: MatchColumn) {
+export const decide = Effect.fn("Import.MatchColumn")(function* (s: ImportState, cmd: Command) {
   const actor = yield* CurrentActor
   if (!ImportState.guards.Open(s)) return yield* NotOpen.make({})
   if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* NotPermitted.make({})
@@ -50,7 +31,7 @@ export const decide = Effect.fn("Import.MatchColumn")(function* (s: ImportState,
   // Every field reads this already, by its heading or by hand: nothing is recorded, and nothing is taken back.
   if (s.columns === cmd.columns) return []
   return [
-    ColumnMatched.make({
+    ColumnMatched.Event.make({
       change: s.changes + 1,
       matching: s.matching + 1,
       columns: cmd.columns,

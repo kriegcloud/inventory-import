@@ -10,7 +10,7 @@ import { ImportState } from "./Import.state.ts"
  * group: how many rows it is of, and who acted. `top` is the last act on a group still in force after this one: itself
  * when it decides a group, the one that was under it when it takes one back (0 for none).
  */
-export class GroupCounted extends Domain.Event(
+export class Event extends Domain.Event(
   "GroupCounted",
   { change: Change, step: Step, rows: S.Natural, label: S.String, by: S.String, top: Change },
   {
@@ -21,8 +21,8 @@ export class GroupCounted extends Domain.Event(
 
 /** What an import is after `GroupCounted`. */
 export const evolve: {
-  (e: GroupCounted): (s: ImportState) => ImportState
-  (s: ImportState, e: GroupCounted): ImportState
-} = dual(2, (s: ImportState, e: GroupCounted): ImportState =>
+  (e: Event): (s: ImportState) => ImportState
+  (s: ImportState, e: Event): ImportState
+} = dual(2, (s: ImportState, e: Event): ImportState =>
   ImportState.guards.Open(s) ? { ...s, changes: e.change, lastGroup: e.change, topGroup: e.top } : s
 )

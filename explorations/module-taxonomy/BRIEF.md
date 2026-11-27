@@ -8,7 +8,7 @@ description: The goal module-kinds. One registry of file kinds that the reposito
 
 Benjamin's words, 2026-11-27: "following the principles of what we've just done with Rpcs could achieve an extremely
 consistent module structure & taxonomy throughout a repo." The reading is [the README](README.md); his answers are in
-[DECISIONS.md](DECISIONS.md), and this brief is built on decisions 1, 3, 4 and 5 as he answered them: 1 as he
+[DECISIONS.md](DECISIONS.md), and this brief is built on decisions 1 to 5 as he answered them: 1 as he
 replaced it the same day, which rewrote every part here about commands.
 
 Nothing here is built. No file in `packages/` or `apps/` has changed and no goal is open. Every number was measured on
@@ -102,7 +102,7 @@ the lock unchanged (`scratchpad/experiments/command-file`, `model-role`).
   endings. A model's `.state.ts` is another thing under the same ending: decision 7 is answered for `.state` before
   the kind is written, or the registry holds one ending with two meanings.
 - **A named import of `Event` or `Command`.** Nine classes of `Import` are named `Event`. The editor will offer
-  `import { Event }`; until decision 2 is answered nothing refuses it.
+  `import { Event }`. Decision 2 makes refusing it a law; that check lands before the first event moves.
 - **Inside its file `Event` hides the DOM's.** No file of the model uses that one; a diagnostic that minds was not
   met by `scratch:check`.
 - **A class's own name.** Where the library or a tool prints a class's name and not its tag, every event reads
@@ -129,6 +129,7 @@ the lock unchanged (`scratchpad/experiments/command-file`, `model-role`).
 
 - No folder or `index.ts` for one block, and no role names beyond the four decision 1 gives (`Event`, `evolve`,
   `Command`, `decide`).
+- No event or command moved before `block-files` holds decision 2's three checks.
 - No rule of the model changes, and the lock is not updated: a run that needs `UPDATE_VERIFY_LOCK=1` is a failed move.
 - No rename in a file another open goal is moving, in the same change.
 - No registry row for a package outside a context until that package has been counted.
@@ -141,7 +142,7 @@ the lock unchanged (`scratchpad/experiments/command-file`, `model-role`).
 | `block-files` reading the registry | `module-kinds`, first slice | `packages/tooling/tool/cli/src/commands/Laws/BlockFiles.rules.ts` (its `placed`, `reserved`, `declarers`, `holds`, `besideItsOwn`, `homes`) and `test/BlockFiles.test.ts` |
 | Nine ports under `.port.ts` | `module-kinds`, first slice | the eight `.store.ts` files of `packages/catalog/model` and `packages/access/model`, and `packages/access/contract/src/Allowance/ModelAllowance.gateway.ts` |
 | `boundaries` asking the registry about each import's kind | `module-kinds`, later, when the first slice is merged | `packages/tooling/tool/cli/src/commands/Laws/Boundaries.rules.ts`; the reading in `scratchpad/experiments/kind-registry/KindRegistry.test.ts` |
-| `.event.ts` and `.state.ts` as kinds, and the stem, exports and import law if decision 2 says so | `module-kinds`, later, before the first event moves | `Kinds.registry.ts`, `BlockFiles.rules.ts` |
+| `.event.ts` and `.state.ts` as kinds, and the law of decision 2: stem is tag, a kind's export names, no named import of `Event` or `Command` | `module-kinds`, later, before the first event moves | `Kinds.registry.ts`, `BlockFiles.rules.ts` |
 | Events and commands of `Import` in files of their own, read as namespaces | `module-kinds`, later, when no move of `alchemy-domain-uptake` is open on `packages/catalog/model` | `packages/catalog/model/src/Import/Import.aggregate.ts`; `scratchpad/experiments/import-module`; the 60 mutants |
 | The same for `Row` and `Group`, and what a decision's file becomes | `module-kinds`, later, after `Import`; the decision's shape is not designed | `Row.aggregate.ts`, `Group.aggregate.ts`, the four `Review/*.decision.ts` |
 | The four files with no ending and the three one-off endings | `module-kinds`, later, when decisions 6 and 7 are answered | `packages/*/host/src/Host.ts`, `packages/access/host/src/Adapters.ts` and `Config.ts`; `ItemsOfRow.reference.ts`, `ItemEditor.state.ts`, `SignIn.route.ts` |

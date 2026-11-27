@@ -4,7 +4,7 @@ title: Module taxonomy
 description: Whether the per-unit module shape tried on RPCs in beep-effect (one unit, role-named files, a contract door and a handler door) gives @alchemy.run/domain blocks, and the rest of this repository, one consistent structure. A reading from source and two experiments run: a command in its own file proves as before, and a registry of kinds refuses sixteen of the two contexts' 173 files.
 status: active
 stage: shape
-next: he says whether the rewritten brief matches (decision 1 replaced 2026-11-27: an event and a command each in a file read as a namespace, exporting its kind's names); decisions 2, 6 and 7 are open
+next: he says whether the rewritten brief matches (decision 1 replaced 2026-11-27: an event and a command each in a file read as a namespace, exporting its kind's names); decision 2 answered (a law); decisions 6 and 7 are open
 goals: []
 ---
 
@@ -276,8 +276,9 @@ Five, in [DECISIONS.md](DECISIONS.md). He answered four on 2026-11-27, each as r
 for every layer of a context; one ending for a port; export keys left as they are, which sets aside what "The doors
 are kinds" above proposes for them; and one command to a `.command.ts` with its `decide` left where it is. He
 replaced that last answer the same day: an event and a command each have a file, read as a namespace, with `evolve`
-beside the event and `decide` beside the command. Open: whether "the stem is the tag, and a file exports its kind's
-names" is a law.
+beside the event and `decide` beside the command. He then answered the fifth: that shape is a law of
+`block-files`, with a named import of `Event` or `Command` refused. Decisions 6 and 7 were added by the brief and
+are open.
 
 ## Trail
 
@@ -319,3 +320,4 @@ names" is a law.
   `StageImport.decide`. `import-module` is now sixteen files in that form: it proves as the package's file does, a
   broken moved `decide` and a broken moved `evolve` are each caught, and the whole model verifies against the
   unchanged lock (`command-file`, `model-role`). Decision 1 is replaced and the brief's command part rewritten.
+- 2026-11-27: he answered decision 2: a law. The brief holds the first move of an event behind it.

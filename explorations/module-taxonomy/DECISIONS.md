@@ -14,27 +14,29 @@ date, the answer and how to reverse it.
 
 | # | Question | Recommended | Changes | Where it is argued |
 | --- | --- | --- | --- | --- |
-| 2 | Is "an event's or a command's file has its tag for a stem, exports its kind's names and is imported as a namespace" a law? | Yes | Rewritten 2026-11-27 after decision 1 was replaced | Decision 1 below; `scratchpad/experiments/import-module` |
 | 6 | What ending do the four files with none take? (`Host.ts` in both hosts, `Adapters.ts` and `Config.ts` in access's) | Asked when its part of the brief opens | | [BRIEF](BRIEF.md), Map |
 | 7 | Is each of the three endings used once a kind, or is its file renamed? (`.reference`, `.state`, `.route`) | Asked when its part of the brief opens | Decision 1 as replaced gives a model `.state.ts`; `.state` is asked first | [BRIEF](BRIEF.md), Map |
 
 Decisions 1, 3, 4 and 5 were answered on 2026-11-27 and are under "Answered"; he replaced his answer to 1 the same
-day. 2, 6 and 7 were not put to him; none blocks the brief's first slice.
-
-### 2. Stem, exports and the namespace import
-
-Decision 1 as replaced sets the shape; this asks who holds it. As first written it asked whether a block's exported
-name is its tag; under role names the exported name is the kind's (`Event`, `Command`) and the stem is the tag.
-
-- **A law (recommended).** `laws block-files` reads each block's tag already. It would compare the tag with the
-  file's stem, hold a `.event.ts` to `Event` and `evolve` and a `.command.ts` to `Command`, `decide` and its own
-  rejections, and refuse a named import of `Event` or `Command`. Without the last, thirteen classes named `Event`
-  are one editor suggestion from being imported under the wrong name.
-- **A convention.** Written in `docs/building.md`, held by review.
-
-Not asked by it: what a decision's, an aggregate's or a rejection's file exports. They keep their own names today.
+day and then answered 2. 6 and 7 were not put to him; neither blocks the brief's first slice.
 
 ## Answered
+
+### 2026-11-27: decision 2
+
+Asked by dialog after decision 1 was replaced. He picked the recommended option.
+
+**2. Who holds the stem, the exports and the namespace import.**
+
+- Question: is "an event's or a command's file has its tag for a stem, exports its kind's names and is imported as a
+  namespace" a law or a convention?
+- Answer: "A law". `laws block-files` compares each block's tag with its file's stem, holds a `.event.ts` to `Event`
+  and `evolve` and a `.command.ts` to `Command`, `decide` and its own rejections, and refuses a named import of
+  `Event` or `Command`.
+- Rationale: nine classes of `Import` are named `Event`, and an editor offers `import { Event }` for each. Rejected:
+  "A law, without the import rule"; "A convention", held by review. Nothing of the law is written or tried.
+- Not decided by it: what a decision's, an aggregate's or a rejection's file exports. They keep their own names.
+- Reverse: take the three checks out of `block-files`; no file changes.
 
 ### 2026-11-27: decision 1, replaced
 

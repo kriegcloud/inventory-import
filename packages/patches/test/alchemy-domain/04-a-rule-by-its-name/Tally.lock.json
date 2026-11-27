@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "rules": {
+    "Tally": {
+      "ACountIsNeverNegative": { "kind": "invariant", "source": "(tally) => tally.count >= 0" },
+      "ACountNeverFalls": { "kind": "transition", "source": "({ before, after }) => after.count >= before.count" }
+    }
+  }
+}

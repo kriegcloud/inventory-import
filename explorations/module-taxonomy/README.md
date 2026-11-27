@@ -4,7 +4,7 @@ title: Module taxonomy
 description: Whether the per-unit module shape tried on RPCs in beep-effect (one unit, role-named files, a contract door and a handler door) gives @alchemy.run/domain blocks, and the rest of this repository, one consistent structure. A reading from source and two experiments run: a command in its own file proves as before, and a registry of kinds refuses sixteen of the two contexts' 173 files.
 status: active
 stage: shape
-next: he says whether the rewritten brief matches (decision 1 replaced 2026-11-27: an event and a command each in a file read as a namespace, exporting its kind's names); decision 2 answered (a law); decisions 6 and 7 are open
+next: he reads `scratchpad/experiments/catalog-model` (the whole model in the shape, verified) and says whether it goes into `packages/catalog/model`; decisions 8 to 11 are answered (kind folders, the blocks to come, hosts and surfaces, sealed values); the rest of 6, and 7, are open
 goals: []
 ---
 
@@ -277,8 +277,10 @@ for every layer of a context; one ending for a port; export keys left as they ar
 are kinds" above proposes for them; and one command to a `.command.ts` with its `decide` left where it is. He
 replaced that last answer the same day: an event and a command each have a file, read as a namespace, with `evolve`
 beside the event and `decide` beside the command. He then answered the fifth: that shape is a law of
-`block-files`, with a named import of `Event` or `Command` refused. Decisions 6 and 7 were added by the brief and
-are open.
+`block-files`, with a named import of `Event` or `Command` refused. Decisions 6 and 7 were added by the brief. He
+then raised and answered 8 to 11: a folder for a kind with more than five files, the blocks to come placed by
+subject, one `.host.ts` with a surface file for each Api, and a `.sealed.ts` for each sealed value. Decision 10
+answers 6 for `Host.ts`; the rest of 6, and 7, are open.
 
 ## Trail
 
@@ -333,3 +335,22 @@ are open.
 - 2026-11-27: he chose the transitions by name in `import-module` only: eighteen files, the aggregate's a listing of
   138 lines. It proves as the package's file does. The whole-model copy keeps them inline until the lock change is
   in `packages/patches`.
+- 2026-11-27: he chose both patches and one full model. `packages/patches` now holds
+  `alchemy-domain/04-a-rule-by-its-name` (the lock keeps the text a rule's name is declared as) and
+  `05-a-structs-defaults` (the prover reads a constructor default that is a number, a text, a truth or `null`), each
+  with its test, and the package's own `verify` passes with them. `scratchpad/experiments/catalog-model` is the whole
+  model in the shape: 52 files, every state case a branded `S.Opaque` class with its fields described, every rule in
+  a `.transition.ts` file, the four decisions as listings, the counts of an open import and a group's `undoneAt`
+  left to their defaults. Verified against the package's lock, the lock unchanged. `command-file` and
+  `import-module` were dropped (`scratchpad/LOG.md`; in history at `ba3ac17f`).
+- 2026-11-27: he asked whether a big module should have a folder for its commands and one for its events. Decision
+  8: a kind with more than five files in its module gets a folder named for its plural, its union beside it in a
+  file named for the union, and no `index.ts`. `catalog-model` is in that layout (`Import/commands/`,
+  `Import/events/`), 53 files, verified against the unchanged lock.
+- 2026-11-27: he asked for the library's other blocks planned for now: query, policy, view, projection, saga and
+  external system, then the cluster host, the MCP and CLI surfaces, rewrites and compactions, sealed values and the
+  Vault. Decisions 9, 10 and 11 place each, and the brief has a table of the 24 planned blocks by module. One trial
+  block of each read and reaction kind, and a rewrite, sits in its decided home in `catalog-model` with a story
+  that passes. Listed in the real model on a copy, they leave the lock as it is; Verify then asks for the saga and
+  policy to be followed or skipped by name, and for the external system to be answered. A compaction, a sealed
+  field, the Vault and every host are on paper.

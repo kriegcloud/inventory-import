@@ -14,13 +14,160 @@ date, the answer and how to reverse it.
 
 | # | Question | Recommended | Changes | Where it is argued |
 | --- | --- | --- | --- | --- |
-| 6 | What ending do the four files with none take? (`Host.ts` in both hosts, `Adapters.ts` and `Config.ts` in access's) | Asked when its part of the brief opens | | [BRIEF](BRIEF.md), Map |
+| 6 | What ending do the two files with none take? (`Adapters.ts` and `Config.ts` in access's host; decision 10a answered `Host.ts` in both hosts) | Asked when its part of the brief opens | | [BRIEF](BRIEF.md), Map |
 | 7 | Is each of the three endings used once a kind, or is its file renamed? (`.reference`, `.state`, `.route`) | Asked when its part of the brief opens | Decision 1 as replaced gives a model `.state.ts`; `.state` is asked first | [BRIEF](BRIEF.md), Map |
 
 Decisions 1, 3, 4 and 5 were answered on 2026-11-27 and are under "Answered"; he replaced his answer to 1 the same
-day and then answered 2. 6 and 7 were not put to him; neither blocks the brief's first slice.
+day and then answered 2, and 8 to 11 (kind folders, the blocks to come, hosts and surfaces, sealed values) as he
+raised them. 10a answered 6 for `Host.ts`; the rest of 6, and 7, were not put to him, and neither blocks the brief's
+first slice.
 
 ## Answered
+
+### 2026-11-27: decision 11, sealed values and the Vault
+
+Asked when he said "add Sealed fields and the Vault to the taxonomy too". In the library at `e1c3e6d` a sealed value
+is a schema, `Domain.Sealed(S.String)`, used as a field of events and commands; the Vault that opens and shreds it is
+`Domain.VaultLive` over a `Domain.KeyStore` and a `Domain.KeyWrap`, provided where the model's Layer is built.
+
+**11a. A sealed value's file.**
+
+- Question: the taxonomy puts a shared value in `<Noun>.schema.ts`. Does a sealed one go there?
+- Answer: "Its own ending: .sealed.ts". `Member/Email.sealed.ts`, one sealed value to a file, in the module of the
+  subject it is about.
+- Rationale: every piece of personal data in a model is found by file name, and the registry can hold rules for the
+  kind alone: the file declares one `Domain.Sealed`, and no `.schema.ts` holds one. `block-files` does not read the
+  ending yet. Rejected: "A .schema.ts like any value" (found only by searching the code) and "Inside the command that
+  sets it" (every other block imports a command to get a value).
+- Reverse: rename each to `.schema.ts` and drop the kind from the registry.
+
+**11b. The Vault.** Placed by the agent from decisions 9 and 10; he chose no option.
+
+- The Vault adds no kind. A query, policy or saga reads it in its own Live (`yield* Domain.Vault`). `VaultLive`, its
+  key store and its key wrap are provided in `<Model>.host.ts`, where the model's Layer is built; the library's own
+  stores and wraps are used as they are, and one written here is a `.adapter.ts` in the host. A story uses the
+  library's test Vault.
+- Reverse: nothing to undo.
+- Neither is tried in the experiment: the model has no personal data sealed today, and a sealed field on an event
+  changes an aggregate the lock holds.
+
+### 2026-11-27: decision 10, hosts and the surfaces of an Api
+
+Asked when he added Effect Cluster, the CLI and the agent tools and MCP server. None adds a block to a model: in the
+library at `e1c3e6d`, `toHttpApi`, `toCli`, `toToolkit` and `toMcp` each take an Api, and
+`@alchemy.run/domain/EffectCluster` is a host beside the Cloudflare one. The alchemy-domain brief plans all of them
+(its moves 7 and 9).
+
+**10a. A file that runs a model on a platform.**
+
+- Question: what ending does it take, on Durable Objects today and on Effect Cluster later?
+- Answer: "One ending: .host.ts". `Catalog.host.ts`, `Usage.host.ts`; the platform is in the file. Cluster's cron and
+  singleton are files of their own, `.cron.ts` and `.singleton.ts`. This answers decision 6 for `Host.ts` in both
+  hosts; `Adapters.ts` and `Config.ts` stay open.
+- Rationale: a model can move between Durable Objects and the Cluster pool (the alchemy-domain decision 27) with no
+  rename, and the registry gains one kind. Rejected: "An ending per platform" (`.worker.ts`, `.cluster.ts`) and "A
+  folder per platform" (a second folder rule beside decision 8).
+- Reverse: rename each to its platform's ending and give the registry one kind per platform.
+
+**10b. A surface derived from an Api.**
+
+- Question: how is the file named and which layer holds it?
+- Answer: "An ending per surface, in the host", named for the Api it serves: `Admin.http.ts`, `Admin.cli.ts`,
+  `Assistant.toolkit.ts`, `Assistant.mcp.ts`. The model holds only the Api, one `.api.ts` per kind of client.
+- Rationale: it is the `.http.ts` kind the hosts have already, and no CLI or AI module reaches a model package.
+  Rejected: "One ending: .surface.ts", which renames today's `.http.ts`, and "Beside the Api, in the model".
+- Reverse: move each surface beside its Api and open the model layer to those kinds.
+- Not tried on Effect Cluster: `@alchemy.run/effect-cluster` is not installed here, so 10a's cluster half is on paper.
+
+### 2026-11-27: decision 9, the blocks the model does not have yet
+
+Asked when he said views, queries, policies, projections, sagas and external systems are coming and the layout
+should be settled for them now. None exists in a package today: the model is verified and not hosted. The alchemy-domain
+exploration's brief names 24 of them (streams included) and `goals/alchemy-domain-uptake` builds them.
+
+**9a. Where they live.**
+
+- Question: do the read-side and reaction blocks live with the aggregate they read, or elsewhere?
+- Answer: "By subject, own modules". A module is a subject and need not hold an aggregate. A view keyed by an
+  aggregate sits with it. A projection, its store port and the queries over that store are one module. A policy, a
+  saga and an external system sit with the process they drive.
+- Rationale: 8a counts per kind, and with everything about the import in `Import/` its root gains a view, two streams,
+  five queries, a projection and several policies, none past five, so about twenty files with no folder. By subject,
+  `Import/` stays the write side and 8a stands. It is the library's own layout (`Ledger/` beside `Account/`), and the
+  package already has `Item/`, `Suggestion/` and `Staging/`. Rejected: "With the aggregate they read", which changes
+  8a to count the root, and "Write side and read side split" (`Reading/`, `Reacting/`).
+- Reverse: move each block beside the aggregate it reads and reopen 8a.
+
+**9b. Where a block's Live goes.**
+
+- Question: a view, stream, query, projection, policy and saga each have a declaration and a handler Layer. One file
+  or two?
+- Answer: "Same file as the block". The Live reaches a store only through a `.port.ts`. An external system is the
+  exception the library makes: declared in the model, its adapter in the host.
+- Rationale: the registry reads one kind per file, and `.handler.ts` retires with the HTTP handlers it holds.
+  Rejected: "A sibling .live.ts" (a second file and a new kind per block) and "Keep .handler.ts per module".
+- Reverse: split each Live into a sibling file and give the registry the ending.
+
+**9d. Rewrites and compactions.** Added the same day, when he said "add Rewrite and Compaction to the taxonomy too".
+Placed by the agent from 9a and 9b; he chose neither option himself.
+
+- Question: where do `Domain.Rewrite` and `Domain.Compaction` live, and where does a compaction's Live go?
+- Answer: each is one file, `<Name>.rewrite.ts` or `<Name>.compaction.ts`, in the module of the aggregate it is `of`
+  (the endings `block-files` reads already). A rewrite is pure and has no Live. A compaction's Live is in its file and
+  writes the replaced events through a `.port.ts`, whose adapter is the host's.
+- Rationale: 9b with no exception. The library's example puts a compaction's handler in a sibling `.live.ts` that
+  imports an R2 bucket; a model package here imports only the library and `effect`, so the bucket is behind a port.
+  Rejected: the library's `.live.ts`, a second file and a kind for one block.
+- The alchemy-domain brief names no rewrite and no compaction. A rewrite is tried in the experiment; a compaction is
+  not: its roll-up is an event of its aggregate that `evolve` folds, which changes an aggregate the lock holds.
+- Reverse: split a compaction's Live into `<Name>.live.ts` and give the registry the ending.
+
+**9c. How far this exploration goes.**
+
+- Question: the real blocks are the uptake goal's. What does this packet do to prove the layout?
+- Answer: "One trial block per kind". All 24 are placed in the brief, and the catalog-model experiment gets one small
+  block of each of the seven kinds in its decided home, with what Verify, the lock and the type check do with them
+  recorded. A trial block is never copied into a package.
+- Rationale: rejected "Paper only" (the uptake goal would find any surprise) and "Build the import's real ones"
+  (overlaps the uptake goal's move 3 and the session on it).
+- Reverse: drop the trial blocks from the experiment.
+
+### 2026-11-27: decision 8, kind folders
+
+Asked after he proposed `commands/` and `events/` folders for `Import/`, which holds 7 commands and 9 events among 21
+files in one flat listing.
+
+**8a. When a kind gets a folder.**
+
+- Question: when does a module's files of one kind move into a folder named for the kind?
+- Answer: "Per kind, over 5 files". The folder takes the kind's plural (`commands/`, `events/`); the file keeps its
+  singular ending (`.command.ts`, `.event.ts`, and `.transition.ts`, `.rejection.ts` at the module's root).
+- Rationale: a flat listing sorts by noun, so `Import.aggregate.ts` falls between `GroupCounted.event.ts` and
+  `ImportConfirmed.event.ts`; with the folders the module's own five files are what the folder shows. A number lets
+  `block-files` refuse both a folder of five or fewer and a flat kind of six or more. The union file is not counted.
+  Today `Import/` folds both kinds; `Row/`, `Group/` and `Review/` stay flat. Rejected: "Per module, all or nothing",
+  "Always folders" (a `Row/events/` of two files) and "Author's judgment" (no check).
+- Reverse: move the files back beside the aggregate and rewrite the imports; no export or rule changes.
+
+**8b. Where a union lives.**
+
+- Question: `Import.union.ts` holds `ImportCommand` and `ImportEvent`. Where do they live beside the folders?
+- Answer: "A .union.ts in each folder": `commands/ImportCommand.union.ts` and `events/ImportEvent.union.ts`.
+- Rationale: an import here names its file, so `index.ts` shortens no path, and it has no ending for the registry of
+  decision 3 to read. One ending serves folded and flat modules. Rejected: "index.ts holding only the union",
+  "index.ts as union plus barrel" (the repository's import standard refuses barrels, and whether Verify follows a
+  schema through a re-export was not tried) and "Keep Import.union.ts at the root".
+- Decided by the agent from this answer, for one rule everywhere: a union file is named for the union it exports, so
+  the flat modules' `Row.union.ts` and `Group.union.ts` become `RowEvent.union.ts` and `GroupEvent.union.ts`.
+- Reverse: put both unions back in `Import/Import.union.ts`; rename the two flat files back.
+
+**8c. `Review/`.**
+
+- Question: `Review/` has 4 commands, 4 decisions and 4 transition files among 14. Folders by kind, by act, or none?
+- Answer: "Stay flat".
+- Rationale: no kind passes five, so 8a decides it with no exception, and `Deciding.decision.ts` sorts beside the
+  `Deciding.transition.ts` it lists. Rejected: "A folder per act" (a second folder rule) and "Kind folders here too".
+- Reverse: nothing to undo.
 
 ### 2026-11-27: decision 2
 
